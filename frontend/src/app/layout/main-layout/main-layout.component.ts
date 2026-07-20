@@ -1,88 +1,131 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterOutlet } from '@angular/router';
+import {
+  PciAppLayoutComponent,
+  PciBreadcrumbComponent,
+  PciBreadcrumbItem,
+  PciNavGroup,
+} from '@davillawitte/pci-design-system';
+
+import { AuthService } from '../../core/auth/auth.service';
+import { BreadcrumbService } from '../../core/navigation/breadcrumb.service';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, PciAppLayoutComponent, PciBreadcrumbComponent],
   template: `
-    <div class="layout">
-      <header class="layout__header">
-        <div class="layout__brand">
-          <span class="layout__logo">PCI</span>
-          <div>
-            <span class="layout__title">Gestão IC</span>
-            <span class="layout__subtitle">Instituto de Criminalística — RN</span>
-          </div>
-        </div>
-      </header>
-      <main class="layout__content">
+    <pci-app-layout
+      brandTitle="SIGAD-IC"
+      brandSubtitle="Instituto de Criminalística — RN"
+      brandLogoSrc="/assets/images/ic-icon.png"
+      [navGroups]="navGroups()"
+      [activeItemId]="activeItemId()"
+      breadcrumbRoot=""
+      breadcrumbCurrent=""
+      [userName]="userName()"
+      [userMeta]="userMeta()"
+      [userAvatarName]="userAvatarName()"
+      [collapsed]="collapsed()"
+      [mobileOpen]="mobileOpen()"
+      (collapsedChange)="collapsed.set($event)"
+      (mobileOpenChange)="mobileOpen.set($event)"
+      (activeItemChange)="onNavChange($event)"
+      (logout)="onLogout()"
+    >
+      <div class="layout-body" (click)="onCrumbAreaClick($event)">
+        <pci-breadcrumb [items]="breadcrumb.items()" (itemClick)="onBreadcrumbClick($event)" />
         <router-outlet />
-      </main>
-      <footer class="layout__footer">
-        <small>Polícia Científica do RN</small>
-      </footer>
-    </div>
+      </div>
+    </pci-app-layout>
   `,
   styles: `
-    .layout {
-      min-height: 100vh;
+    .layout-body {
       display: flex;
       flex-direction: column;
+      gap: 1.25rem;
     }
 
-    .layout__header {
-      padding: 1rem 2rem;
-      background: var(--pci-color-navy, #0e1e45);
-      color: var(--pci-color-gold, #c8a040);
-    }
-
-    .layout__brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .layout__logo {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 0.5rem;
-      border: 2px solid var(--pci-color-gold, #c8a040);
-      font-weight: 700;
-      font-size: 0.75rem;
-      color: var(--pci-color-gold, #c8a040);
-    }
-
-    .layout__title {
-      display: block;
-      font-weight: 600;
-      color: #fff;
-      letter-spacing: 0.02em;
-    }
-
-    .layout__subtitle {
-      display: block;
-      font-size: 0.75rem;
-      color: rgb(255 255 255 / 70%);
-    }
-
-    .layout__content {
-      flex: 1;
-      padding: 2rem;
-      max-width: 960px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .layout__footer {
-      padding: 1rem 2rem;
-      text-align: center;
-      color: var(--pci-color-text-secondary, #6b7280);
-      border-top: 1px solid var(--pci-color-border, #e5e7eb);
-      background: #fff;
+    :host ::ng-deep .pci-app-layout__breadcrumb {
+      display: none;
     }
   `,
 })
-export class MainLayoutComponent {}
+export class MainLayoutComponent {
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  readonly breadcrumb = inject(BreadcrumbService);
+
+  readonly collapsed = signal(false);
+  readonly mobileOpen = signal(false);
+
+  private readonly routeMap: Record<string, string> = {
+    home: '/',
+    usuarios: '/usuarios',
+    perfis: '/perfis',
+    permissoes: '/permissoes',
+  };
+
+  readonly activeItemId = computed(() => this.breadcrumb.navId());
+
+  readonly navGroups = computed<PciNavGroup[]>(() => {
+    const groups: PciNavGroup[] = [
+      {
+        title: 'Principal',
+        items: [{ id: 'home', label: 'Início', icon: 'home' }],
+      },
+    ];
+
+    if (this.auth.isSuperAdmin()) {
+      groups.push({
+        title: 'Administração do Sistema',
+        items: [
+          { id: 'usuarios', label: 'Usuários', icon: 'users' },
+          { id: 'perfis', label: 'Perfis', icon: 'shield' },
+          { id: 'permissoes', label: 'Permissões', icon: 'lock' },
+        ],
+      });
+    }
+
+    return groups;
+  });
+
+  readonly userName = computed(
+    () => this.auth.currentUser()?.displayName ?? 'Usuário',
+  );
+
+  readonly userMeta = computed(() => {
+    const user = this.auth.currentUser();
+    if (!user) {
+      return 'SIGAD-IC';
+    }
+
+    return user.perfis[0] ?? user.meta ?? 'SIGAD-IC';
+  });
+
+  readonly userAvatarName = computed(
+    () => this.auth.currentUser()?.displayName ?? 'Usuário',
+  );
+
+  onNavChange(itemId: string): void {
+    const path = this.routeMap[itemId] ?? '/';
+    void this.router.navigateByUrl(path);
+  }
+
+  onBreadcrumbClick(item: PciBreadcrumbItem): void {
+    if (item.href) {
+      void this.router.navigateByUrl(item.href);
+    }
+  }
+
+  onCrumbAreaClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('a.pci-breadcrumb__link')) {
+      event.preventDefault();
+    }
+  }
+
+  onLogout(): void {
+    this.auth.logout();
+    void this.router.navigateByUrl('/login');
+  }
+}

@@ -1,6 +1,7 @@
-using FluentValidation;
+using System.Text.Json.Serialization;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using TemplateSistema.Application;
 using TemplateSistema.Infrastructure;
@@ -12,7 +13,7 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    Log.Information("Starting Template Sistema API");
+    Log.Information("Starting SIGAD-IC API");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -25,10 +26,40 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        });
+
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
-        options.SwaggerDoc("v1", new() { Title = "Template Sistema API", Version = "v1" });
+        options.SwaggerDoc("v1", new() { Title = "SIGAD-IC API", Version = "v1" });
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme.",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer",
+                    },
+                },
+                Array.Empty<string>()
+            },
+        });
     });
 
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -63,11 +94,15 @@ try
     }
 
     app.UseCors("Frontend");
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+
+    app.MapControllers();
 
     app.MapGet("/", () => Results.Redirect("/swagger"))
         .ExcludeFromDescription();

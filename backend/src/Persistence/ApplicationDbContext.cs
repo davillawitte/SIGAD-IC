@@ -1,14 +1,21 @@
 using Microsoft.EntityFrameworkCore;
+using TemplateSistema.Domain.Entities;
 
 namespace TemplateSistema.Persistence;
 
 /// <summary>
 /// DbContext único com schema padrão (public).
-/// TODO: Separação por schema/setor (schema-per-sector) é evolução futura planejada —
-/// ver README seção "Estratégia de banco de dados".
 /// </summary>
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<Setor> Setores => Set<Setor>();
+    public DbSet<Servidor> Servidores => Set<Servidor>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<Perfil> Perfis => Set<Perfil>();
+    public DbSet<Permissao> Permissoes => Set<Permissao>();
+    public DbSet<PerfilPermissao> PerfilPermissoes => Set<PerfilPermissao>();
+    public DbSet<UsuarioPerfil> UsuarioPerfis => Set<UsuarioPerfil>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("public");

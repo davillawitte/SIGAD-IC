@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TemplateSistema.Persistence.Seed;
 
 namespace TemplateSistema.Persistence;
 
@@ -22,6 +23,8 @@ public static class DatabaseInitializer
                 logger.LogInformation("Applying database migrations (attempt {Attempt}/{MaxAttempts})...", attempt, MaxAttempts);
                 await context.Database.MigrateAsync(cancellationToken);
                 logger.LogInformation("Database migrations applied.");
+
+                await AuthSeed.SeedAsync(context, logger, cancellationToken);
                 return;
             }
             catch (Exception ex) when (attempt < MaxAttempts && IsTransient(ex))

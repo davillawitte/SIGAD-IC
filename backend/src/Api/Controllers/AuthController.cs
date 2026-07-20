@@ -1,0 +1,33 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using TemplateSistema.Application.Abstractions;
+using TemplateSistema.Application.Auth;
+
+namespace TemplateSistema.Api.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController(
+    IAuthService authService,
+    IValidator<LoginRequest> loginValidator) : ControllerBase
+{
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
+    {
+        var validation = await loginValidator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        var result = await authService.LoginAsync(request, cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Unauthorized(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
+}
