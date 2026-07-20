@@ -1,0 +1,51 @@
+## Build
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+TestResults/
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+**/packages/*
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## EF
+*.db
+*.db-shm
+*.db-wal
+
+## OS
+.DS_Store
+Thumbs.db
+
+## IDE
+.idea/
+*.swp
+*~
+
+## Env
+.env
+.env.*
+!.env.example
+
+## Node (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+## Docker
+postgres_data/
+
+## .NET tools (local)
+backend/.tools/

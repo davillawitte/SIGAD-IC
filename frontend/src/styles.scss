@@ -1,0 +1,13 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--pci-font-family, 'Segoe UI', system-ui, sans-serif);
+  background: var(--pci-color-background, #f4f6f8);
+  color: var(--pci-color-text-primary, #1a1a2e);
+  -webkit-font-smoothing: antialiased;
+}

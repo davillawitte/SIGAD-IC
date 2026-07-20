@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gestao_ic_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gestao_ic_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@davillawitte"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore frontend dependencies
+        working-directory: frontend
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Restore backend
+        working-directory: backend
+        run: dotnet restore TemplateSistema.sln
+
+      - name: Build backend
+        working-directory: backend
+        run: dotnet build TemplateSistema.sln --no-restore -c Release
+
+      - name: Test backend
+        working-directory: backend
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=gestao_ic_test;Username=postgres;Password=postgres"
+        run: dotnet test TemplateSistema.sln --no-build -c Release --verbosity normal
