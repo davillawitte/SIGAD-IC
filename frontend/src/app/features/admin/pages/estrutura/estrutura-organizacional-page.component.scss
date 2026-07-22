@@ -1,0 +1,220 @@
+:host {
+  display: block;
+}
+
+.org {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-6, 1.5rem);
+  width: 100%;
+}
+
+.org__panel {
+  border: 1px solid var(--pci-color-border, #d0d5dd);
+  border-radius: var(--pci-radius-lg, 0.75rem);
+  background: var(--pci-color-surface, #fff);
+  overflow: hidden;
+}
+
+.org__panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--pci-color-border, #d0d5dd);
+  background: var(--pci-color-surface-muted, #f9fafb);
+}
+
+.org__panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--pci-color-text-primary, #101828);
+}
+
+.org__panel-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--pci-color-text-secondary, #667085);
+  max-width: 36rem;
+}
+
+.org__empty,
+.org__empty-title {
+  margin: 0;
+  color: var(--pci-color-text-secondary, #667085);
+  font-size: 0.875rem;
+}
+
+.org__empty-title {
+  color: var(--pci-color-text-primary, #101828);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.org__empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.org-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+.org-tree__direcao + .org-tree__nucleo,
+.org-tree__nucleo + .org-tree__nucleo {
+  border-top: 1px solid var(--pci-color-border, #e4e7ec);
+}
+
+.org-tree__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0.55rem 1rem;
+}
+
+.org-tree__row--nucleo {
+  background: transparent;
+}
+
+.org-tree__row--nucleo:hover,
+.org-tree__row--setor:hover,
+.org-tree__row--direcao:hover {
+  background: color-mix(in srgb, var(--pci-color-primary, #1b3a5c) 4%, transparent);
+}
+
+.org-tree__row--setor {
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  padding-left: 2.25rem;
+  min-height: 2.85rem;
+}
+
+.org-tree__row--direcao {
+  background: color-mix(in srgb, var(--pci-gold-500, #c8a040) 6%, transparent);
+}
+
+.org-tree__toggle,
+.org-tree__root-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--pci-color-text-secondary, #667085);
+  cursor: pointer;
+}
+
+.org-tree__toggle:hover {
+  background: var(--pci-color-surface-muted, #f2f4f7);
+  color: var(--pci-color-text-primary, #101828);
+}
+
+.org-tree__root-mark {
+  cursor: default;
+  color: var(--pci-navy-800, #1b3a5c);
+}
+
+.org-tree__branch {
+  display: inline-flex;
+  justify-content: center;
+  width: 1.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--pci-color-text-tertiary, #98a2b3);
+  user-select: none;
+}
+
+.org-tree__identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.org-tree__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.org-tree__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--pci-color-text-primary, #101828);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.org-tree__row--setor .org-tree__name {
+  font-weight: 500;
+}
+
+.org-tree__meta {
+  font-size: 0.75rem;
+  color: var(--pci-color-text-secondary, #667085);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.org-tree__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  opacity: 0.85;
+}
+
+.org-tree__row:hover .org-tree__actions {
+  opacity: 1;
+}
+
+.org-tree__children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.35rem;
+}
+
+.org-tree__empty-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem 0.75rem 2.25rem;
+}
+
+.org-tree__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--pci-color-primary, #1b3a5c);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .org-tree__row--setor {
+    padding-left: 1rem;
+  }
+
+  .org-tree__meta {
+    white-space: normal;
+  }
+}

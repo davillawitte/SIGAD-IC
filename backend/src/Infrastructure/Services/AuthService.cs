@@ -33,7 +33,7 @@ public class AuthService(
             return Result<LoginResponse>.Failure("Usuário bloqueado ou inativo.");
         }
 
-        if (!usuario.Servidor.Ativo)
+        if (!usuario.Servidor.EstaAtivo)
         {
             return Result<LoginResponse>.Failure("Servidor vinculado inativo.");
         }

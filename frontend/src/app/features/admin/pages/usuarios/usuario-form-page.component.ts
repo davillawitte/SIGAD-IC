@@ -1,222 +1,102 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
-  PciButtonComponent,
-  PciCardComponent,
-  PciCardContentComponent,
-  PciCardDescriptionComponent,
-  PciCardHeaderComponent,
-  PciCardTitleComponent,
   PciCheckboxComponent,
+  PciFormPageComponent,
   PciInputComponent,
+  PciSelectionListComponent,
   PciStackComponent,
 } from '@davillawitte/pci-design-system';
+import type { PciSelectOption, PciSelectionListItem } from '@davillawitte/pci-design-system';
 
+import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
-import { PerfilListItem, ServidorListItem, SetorListItem } from '../../models/admin.models';
+import type { PerfilListItem, ServidorListItem } from '../../models/admin.models';
+import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
 
 @Component({
   selector: 'app-usuario-form-page',
   imports: [
     CommonModule,
-    FormsModule,
+    ReactiveFormsModule,
+    MatSelectModule,
     PciAlertComponent,
-    PciButtonComponent,
-    PciCardComponent,
-    PciCardContentComponent,
-    PciCardDescriptionComponent,
-    PciCardHeaderComponent,
-    PciCardTitleComponent,
     PciCheckboxComponent,
+    PciFormPageComponent,
     PciInputComponent,
+    PciSelectionListComponent,
     PciStackComponent,
+    AppFormSectionComponent,
+    AppFormColDirective,
   ],
-  template: `
-    <section class="page">
-      <pci-card>
-        <pci-card-header>
-          <pci-card-title>{{ isEdit() ? 'Editar usuário' : 'Novo usuário' }}</pci-card-title>
-          <pci-card-description>
-            {{
-              isEdit()
-                ? 'Atualize perfis e status do usuário.'
-                : 'Todo usuário precisa estar vinculado a um servidor sem login.'
-            }}
-          </pci-card-description>
-        </pci-card-header>
-        <pci-card-content>
-          <pci-stack gap="4" [fullWidth]="true">
-            @if (error()) {
-              <pci-alert variant="error" title="Erro" [message]="error()!" />
-            }
-
-            @if (!isEdit()) {
-              <label class="field">
-                <span>Servidor</span>
-                <select [(ngModel)]="servidorId" name="servidorId">
-                  <option value="">Selecione um servidor</option>
-                  @for (servidor of servidores(); track servidor.id) {
-                    <option [value]="servidor.id">
-                      {{ servidor.nome }} — {{ servidor.matricula }}
-                    </option>
-                  }
-                </select>
-              </label>
-
-              @if (servidores().length === 0) {
-                <pci-alert
-                  variant="info"
-                  title="Nenhum servidor disponível"
-                  message="Cadastre um servidor abaixo para liberar a criação de usuário."
-                />
-
-                <pci-stack gap="3" [fullWidth]="true">
-                  <pci-input label="Nome do servidor" [(ngModel)]="novoServidor.nome" name="srvNome" />
-                  <pci-input label="Matrícula" [(ngModel)]="novoServidor.matricula" name="srvMatricula" />
-                  <pci-input label="CPF" [(ngModel)]="novoServidor.cpf" name="srvCpf" />
-                  <pci-input label="Cargo" [(ngModel)]="novoServidor.cargo" name="srvCargo" />
-                  <pci-input label="E-mail" [(ngModel)]="novoServidor.email" name="srvEmail" />
-                  <label class="field">
-                    <span>Setor</span>
-                    <select [(ngModel)]="novoServidor.setorId" name="srvSetor">
-                      <option value="">Selecione</option>
-                      @for (setor of setores(); track setor.id) {
-                        <option [value]="setor.id">{{ setor.sigla }} — {{ setor.nome }}</option>
-                      }
-                    </select>
-                  </label>
-                  <pci-button
-                    variant="secondary"
-                    icon="user-plus"
-                    [loading]="savingServidor()"
-                    (clicked)="createServidor()"
-                  >
-                    Cadastrar servidor
-                  </pci-button>
-                </pci-stack>
-              }
-
-              <pci-input label="Login" [(ngModel)]="login" name="login" />
-              <pci-input label="Senha" type="password" [(ngModel)]="senha" name="senha" />
-            } @else {
-              <p class="meta"><strong>Login:</strong> {{ login }}</p>
-              <p class="meta"><strong>Servidor:</strong> {{ nomeServidor }}</p>
-
-              <pci-checkbox
-                label="Bloqueado"
-                [checked]="bloqueado"
-                (changed)="bloqueado = $event"
-              />
-              <pci-checkbox label="Ativo" [checked]="ativo" (changed)="ativo = $event" />
-            }
-
-            <div class="checks">
-              <strong>Perfis</strong>
-              @for (perfil of perfis(); track perfil.id) {
-                <pci-checkbox
-                  [label]="perfil.nome + ' (' + perfil.codigo + ')'"
-                  [checked]="selectedPerfilIds().includes(perfil.id)"
-                  (changed)="togglePerfil(perfil.id, $event)"
-                />
-              }
-            </div>
-
-            <pci-stack direction="horizontal" gap="3">
-              <pci-button
-                variant="primary"
-                icon="save"
-                [loading]="saving()"
-                [disabled]="!canSave()"
-                (clicked)="save()"
-              >
-                Salvar
-              </pci-button>
-              <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
-            </pci-stack>
-          </pci-stack>
-        </pci-card-content>
-      </pci-card>
-    </section>
-  `,
-  styles: `
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.875rem;
-    }
-
-    .field span {
-      color: var(--pci-color-text-secondary, #6b7280);
-      font-weight: 500;
-    }
-
-    select {
-      height: 2.5rem;
-      border: 1px solid var(--pci-color-border, #e5e7eb);
-      border-radius: var(--pci-radius-md, 0.5rem);
-      padding: 0 0.75rem;
-      background: #fff;
-    }
-
-    .checks {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .meta {
-      margin: 0;
-      font-size: 0.875rem;
-      color: var(--pci-color-text-secondary, #6b7280);
-    }
-  `,
+  templateUrl: './usuario-form-page.component.html',
+  styleUrl: './usuario-form-page.component.scss',
 })
 export class UsuarioFormPageComponent implements OnInit {
   private readonly api = inject(AdminApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly fb = inject(FormBuilder);
 
+  readonly routePages = ADMIN_ROUTE_PAGES;
   readonly isEdit = signal(false);
   readonly saving = signal(false);
-  readonly savingServidor = signal(false);
   readonly error = signal<string | null>(null);
   readonly servidores = signal<ServidorListItem[]>([]);
-  readonly setores = signal<SetorListItem[]>([]);
   readonly perfis = signal<PerfilListItem[]>([]);
   readonly selectedPerfilIds = signal<string[]>([]);
+  readonly currentPath = signal('/usuarios/novo');
+
+  readonly form = this.fb.nonNullable.group({
+    servidorId: [''],
+    login: [''],
+    senha: [''],
+    nomeServidor: [''],
+    ativo: [true],
+  });
+
+  readonly servidorOptions = computed<PciSelectOption[]>(() =>
+    this.servidores().map((s) => ({
+      label: `${s.nome} — ${s.matricula}`,
+      value: s.id,
+    })),
+  );
+
+  readonly perfilItems = computed<PciSelectionListItem[]>(() =>
+    this.perfis().map((perfil) => ({
+      id: perfil.id,
+      label: `${perfil.nome} (${perfil.codigo})`,
+    })),
+  );
 
   private editId: string | null = null;
-  servidorId = '';
-  login = '';
-  senha = '';
-  nomeServidor = '';
-  bloqueado = false;
-  ativo = true;
-  novoServidor = {
-    nome: '',
-    matricula: '',
-    cpf: '',
-    cargo: '',
-    email: '',
-    setorId: '',
-  };
 
   ngOnInit(): void {
     this.editId = this.route.snapshot.paramMap.get('id');
     this.isEdit.set(!!this.editId);
+    this.currentPath.set(this.editId ? '/usuarios/editar/:id' : '/usuarios/novo');
     this.loadLookups();
 
+    if (!this.editId) {
+      this.form.controls.servidorId.setValidators([Validators.required]);
+      this.form.controls.login.setValidators([Validators.required]);
+      this.form.controls.senha.setValidators([Validators.required, Validators.minLength(8)]);
+    }
+
     if (this.editId) {
+      this.form.controls.login.disable();
+      this.form.controls.nomeServidor.disable();
       this.api.getUsuario(this.editId).subscribe({
         next: (usuario) => {
-          this.login = usuario.login;
-          this.nomeServidor = usuario.nomeServidor;
-          this.bloqueado = usuario.bloqueado;
-          this.ativo = usuario.ativo;
+          this.form.patchValue({
+            login: usuario.login,
+            nomeServidor: usuario.nomeServidor,
+            ativo: usuario.ativo,
+          });
           this.selectedPerfilIds.set(usuario.perfilIds ?? []);
         },
         error: () => this.error.set('Não foi possível carregar o usuário.'),
@@ -224,42 +104,35 @@ export class UsuarioFormPageComponent implements OnInit {
     }
   }
 
-  canSave(): boolean {
-    if (this.selectedPerfilIds().length === 0) {
-      return false;
-    }
-
-    if (this.isEdit()) {
-      return true;
-    }
-
-    return !!this.servidorId && !!this.login.trim() && this.senha.length >= 8;
-  }
-
-  togglePerfil(id: string, checked: boolean): void {
-    const current = new Set(this.selectedPerfilIds());
-    if (checked) {
-      current.add(id);
-    } else {
-      current.delete(id);
-    }
-    this.selectedPerfilIds.set([...current]);
-  }
-
   save(): void {
-    if (!this.canSave()) {
+    if (this.selectedPerfilIds().length === 0) {
+      this.error.set('Selecione ao menos um perfil.');
       return;
+    }
+
+    if (!this.isEdit()) {
+      this.form.controls.servidorId.markAsTouched();
+      this.form.controls.login.markAsTouched();
+      this.form.controls.senha.markAsTouched();
+      if (
+        this.form.controls.servidorId.invalid ||
+        this.form.controls.login.invalid ||
+        this.form.controls.senha.invalid
+      ) {
+        this.error.set('Preencha os campos obrigatórios antes de salvar.');
+        return;
+      }
     }
 
     this.saving.set(true);
     this.error.set(null);
+    const value = this.form.getRawValue();
 
     if (this.isEdit() && this.editId) {
       this.api
         .updateUsuario(this.editId, {
           perfilIds: this.selectedPerfilIds(),
-          bloqueado: this.bloqueado,
-          ativo: this.ativo,
+          ativo: value.ativo,
         })
         .subscribe({
           next: () => void this.router.navigateByUrl('/usuarios'),
@@ -273,9 +146,9 @@ export class UsuarioFormPageComponent implements OnInit {
 
     this.api
       .createUsuario({
-        servidorId: this.servidorId,
-        login: this.login.trim(),
-        senha: this.senha,
+        servidorId: value.servidorId,
+        login: value.login.trim(),
+        senha: value.senha,
         perfilIds: this.selectedPerfilIds(),
       })
       .subscribe({
@@ -287,27 +160,6 @@ export class UsuarioFormPageComponent implements OnInit {
       });
   }
 
-  createServidor(): void {
-    const payload = this.novoServidor;
-    if (!payload.nome || !payload.matricula || !payload.cpf || !payload.cargo || !payload.email || !payload.setorId) {
-      this.error.set('Preencha todos os campos do servidor.');
-      return;
-    }
-
-    this.savingServidor.set(true);
-    this.api.createServidor(payload).subscribe({
-      next: (servidor) => {
-        this.savingServidor.set(false);
-        this.servidorId = servidor.id;
-        this.loadLookups();
-      },
-      error: (err: { error?: { message?: string } }) => {
-        this.error.set(err.error?.message ?? 'Falha ao cadastrar servidor.');
-        this.savingServidor.set(false);
-      },
-    });
-  }
-
   cancel(): void {
     void this.router.navigateByUrl('/usuarios');
   }
@@ -315,9 +167,6 @@ export class UsuarioFormPageComponent implements OnInit {
   private loadLookups(): void {
     this.api.listServidores(true).subscribe({
       next: (items) => this.servidores.set(items),
-    });
-    this.api.listSetores().subscribe({
-      next: (items) => this.setores.set(items),
     });
     this.api.listPerfis({ page: 1, pageSize: 100 }).subscribe({
       next: (result) => this.perfis.set(result.items.filter((p) => p.ativo)),

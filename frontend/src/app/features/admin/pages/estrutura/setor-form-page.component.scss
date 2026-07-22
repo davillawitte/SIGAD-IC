@@ -1,0 +1,24 @@
+.pci-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.pci-field__required {
+  color: var(--pci-color-error, #b42318);
+}
+.pci-field__control--select {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--pci-color-border, #d0d5dd);
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.pci-field__mat-select {
+  width: 100%;
+}
+:host ::ng-deep .pci-field__control--select .mat-mdc-select-trigger {
+  min-height: 40px;
+  padding: 0 0.75rem;
+}

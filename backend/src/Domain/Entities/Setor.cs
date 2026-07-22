@@ -6,23 +6,31 @@ public class Setor : BaseEntity
 {
     public string Nome { get; private set; } = null!;
     public string Sigla { get; private set; } = null!;
-    public Guid? ChefeServidorId { get; private set; }
-    public bool Ativo { get; private set; } = true;
+    public string? Resumo { get; private set; }
+    public Guid? NucleoId { get; private set; }
 
-    public Servidor? ChefeServidor { get; private set; }
+    public Nucleo? Nucleo { get; private set; }
+    public ICollection<SetorChefia> Chefias { get; private set; } = [];
     public ICollection<Servidor> Servidores { get; private set; } = [];
 
     private Setor()
     {
     }
 
-    public static Setor Create(string nome, string sigla, string? createdBy = null, Guid? id = null)
+    public static Setor Create(
+        string nome,
+        string sigla,
+        Guid? nucleoId,
+        string? resumo = null,
+        string? createdBy = null,
+        Guid? id = null)
     {
         var setor = new Setor
         {
             Nome = nome.Trim(),
-            Sigla = sigla.Trim().ToUpperInvariant(),
-            Ativo = true,
+            Sigla = NormalizeSigla(sigla),
+            Resumo = string.IsNullOrWhiteSpace(resumo) ? null : resumo.Trim(),
+            NucleoId = nucleoId,
         };
 
         if (id.HasValue)
@@ -34,28 +42,20 @@ public class Setor : BaseEntity
         return setor;
     }
 
-    public void Atualizar(string nome, string sigla, string? updatedBy = null)
+    public void Atualizar(string nome, string sigla, string? resumo, Guid? nucleoId, string? updatedBy = null)
     {
         Nome = nome.Trim();
-        Sigla = sigla.Trim().ToUpperInvariant();
+        Sigla = NormalizeSigla(sigla);
+        Resumo = string.IsNullOrWhiteSpace(resumo) ? null : resumo.Trim();
+        NucleoId = nucleoId;
         MarkUpdated(updatedBy);
     }
 
-    public void DefinirChefe(Guid? chefeServidorId, string? updatedBy = null)
+    public void AtualizarResumo(string? resumo, string? updatedBy = null)
     {
-        ChefeServidorId = chefeServidorId;
+        Resumo = string.IsNullOrWhiteSpace(resumo) ? null : resumo.Trim();
         MarkUpdated(updatedBy);
     }
 
-    public void Ativar(string? updatedBy = null)
-    {
-        Ativo = true;
-        MarkUpdated(updatedBy);
-    }
-
-    public void Desativar(string? updatedBy = null)
-    {
-        Ativo = false;
-        MarkUpdated(updatedBy);
-    }
+    public static string NormalizeSigla(string sigla) => sigla.Trim();
 }

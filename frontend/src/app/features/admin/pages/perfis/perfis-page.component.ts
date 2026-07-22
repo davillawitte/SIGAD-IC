@@ -1,14 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   PciAlertComponent,
   PciColumn,
-  PciDataTableComponent,
-  PciStackComponent,
+  PciFilterField,
+  PciFilterValues,
+  PciListPageComponent,
+  PciRowAction,
+  filterRowsByPanelValues,
+  filterTableRowsByQuickSearch,
 } from '@davillawitte/pci-design-system';
 
+import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import {
   DEFAULT_PAGE_SIZE,
@@ -29,89 +33,59 @@ type PerfilRow = {
 
 @Component({
   selector: 'app-perfis-page',
-  imports: [CommonModule, FormsModule, PciAlertComponent, PciDataTableComponent, PciStackComponent],
-  template: `
-    <section class="page">
-      <pci-stack gap="6" [fullWidth]="true">
-        @if (error()) {
-          <pci-alert variant="error" title="Erro" [message]="error()!" />
-        }
-
-        <div class="pager-bar">
-          <label class="field field--inline">
-            <span>Registros por página</span>
-            <select
-              [ngModel]="pageSize()"
-              (ngModelChange)="onPageSizeChange($event)"
-              name="pageSize"
-            >
-              @for (size of pageSizeOptions; track size) {
-                <option [ngValue]="size">{{ size }}</option>
-              }
-            </select>
-          </label>
-        </div>
-
-        <pci-data-table
-          title="Perfis"
-          addLabel="Novo perfil"
-          [columns]="columns"
-          [rows]="rows()"
-          [total]="totalItems()"
-          [page]="page()"
-          [pageSize]="pageSize()"
-          [loading]="loading()"
-          [showToolbar]="true"
-          (addClicked)="goCreate()"
-          (rowAction)="goEdit($event.row)"
-          (pageChange)="onPageChange($event)"
-        />
-      </pci-stack>
-    </section>
-  `,
-  styles: `
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.875rem;
-    }
-
-    .field span {
-      color: var(--pci-color-text-secondary, #6b7280);
-      font-weight: 500;
-    }
-
-    .field--inline {
-      flex-direction: row;
-      align-items: center;
-    }
-
-    .pager-bar {
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    select {
-      height: 2.5rem;
-      border: 1px solid var(--pci-color-border, #e5e7eb);
-      border-radius: var(--pci-radius-md, 0.5rem);
-      padding: 0 0.75rem;
-      background: #fff;
-    }
-  `,
+  imports: [CommonModule, PciAlertComponent, PciListPageComponent],
+  templateUrl: './perfis-page.component.html',
 })
 export class PerfisPageComponent implements OnInit {
   private readonly api = inject(AdminApiService);
   private readonly router = inject(Router);
 
-  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  readonly routePages = ADMIN_ROUTE_PAGES;
   readonly page = signal(1);
   readonly pageSize = signal<PageSizeOption>(DEFAULT_PAGE_SIZE);
-  readonly totalItems = signal(0);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly rows = signal<PerfilRow[]>([]);
+  readonly allRows = signal<PerfilRow[]>([]);
+  readonly filterValues = signal<PciFilterValues>({});
+  readonly filtersExpanded = signal(true);
+  readonly searchTerm = signal('');
+
+  readonly filterFields: PciFilterField[] = [
+    {
+      key: 'nome',
+      label: 'Nome',
+      type: 'text',
+      placeholder: 'Buscar por nome',
+      columnKey: 'nome',
+    },
+    {
+      key: 'codigo',
+      label: 'Código',
+      type: 'text',
+      placeholder: 'Buscar por código',
+      columnKey: 'codigo',
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      columnKey: 'status',
+      options: [
+        { label: 'Ativo', value: 'Ativo' },
+        { label: 'Inativo', value: 'Inativo' },
+      ],
+    },
+    {
+      key: 'sistema',
+      label: 'Sistema',
+      type: 'select',
+      columnKey: 'sistema',
+      options: [
+        { label: 'Sim', value: 'Sim' },
+        { label: 'Não', value: 'Não' },
+      ],
+    },
+  ];
 
   readonly columns: PciColumn<PerfilRow>[] = [
     { key: 'nome', label: 'Nome', sortable: true },
@@ -122,6 +96,24 @@ export class PerfisPageComponent implements OnInit {
     { key: 'status', label: 'Status' },
   ];
 
+  readonly rowActions: PciRowAction<PerfilRow>[] = [
+    { id: 'edit', label: 'Editar', icon: 'edit', placement: 'inline' },
+  ];
+
+  readonly filteredRows = computed(() => {
+    const byPanel = filterRowsByPanelValues(
+      this.allRows(),
+      this.filterValues(),
+      this.filterFields,
+    );
+    return filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
+  });
+
+  readonly pagedRows = computed(() => {
+    const start = (this.page() - 1) * this.pageSize();
+    return this.filteredRows().slice(start, start + this.pageSize());
+  });
+
   ngOnInit(): void {
     this.reload();
   }
@@ -130,29 +122,38 @@ export class PerfisPageComponent implements OnInit {
     void this.router.navigateByUrl('/perfis/novo');
   }
 
-  goEdit(row: PerfilRow): void {
-    void this.router.navigateByUrl(`/perfis/editar/${row.id}`);
+  onRowAction(event: { action: string; row: PerfilRow }): void {
+    if (event.action === 'edit') {
+      void this.router.navigateByUrl(`/perfis/editar/${event.row.id}`);
+    }
   }
 
-  onPageChange(page: number): void {
-    this.page.set(page);
-    this.reload();
+  onFilterApply(values: PciFilterValues): void {
+    this.filterValues.set(values);
+    this.page.set(1);
   }
 
-  onPageSizeChange(size: string | number): void {
-    const parsed = Number(size) as PageSizeOption;
+  onFilterClear(): void {
+    this.filterValues.set({});
+    this.page.set(1);
+  }
+
+  onSearchChange(term: string): void {
+    this.searchTerm.set(term);
+    this.page.set(1);
+  }
+
+  onPageSizeChange(size: number): void {
+    const parsed = size as PageSizeOption;
     this.pageSize.set(PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE);
     this.page.set(1);
-    this.reload();
   }
 
   private reload(): void {
     this.loading.set(true);
-    this.api.listPerfis({ page: this.page(), pageSize: this.pageSize() }).subscribe({
+    this.api.listPerfis({ page: 1, pageSize: 100 }).subscribe({
       next: (result) => {
-        this.totalItems.set(result.totalItems);
-        this.page.set(result.page);
-        this.rows.set(
+        this.allRows.set(
           result.items.map((p: PerfilListItem) => ({
             id: p.id,
             nome: p.nome,

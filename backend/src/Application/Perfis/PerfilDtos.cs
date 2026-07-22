@@ -31,3 +31,9 @@ public record UpdatePerfilRequest(
     bool? Ativo);
 
 public record SetPerfilPermissoesRequest(IReadOnlyList<Guid> PermissaoIds);
+
+public record PerfilExclusaoImpactoDto(
+    int QuantidadeUsuarios,
+    bool RequerSubstituto);
+
+public record DesativarPerfilRequest(Guid? PerfilSubstitutoId);

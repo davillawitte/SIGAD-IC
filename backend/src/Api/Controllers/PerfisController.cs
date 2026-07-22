@@ -26,6 +26,14 @@ public class PerfisController(IPerfilService perfilService) : ControllerBase
         return result.Succeeded ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
 
+    [HttpGet("{id:guid}/exclusao-impacto")]
+    [RequiresPermission(PermissionCodes.PerfisExcluir)]
+    public async Task<IActionResult> GetExclusaoImpacto(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await perfilService.GetExclusaoImpactoAsync(id, cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
     [HttpPost]
     [RequiresPermission(PermissionCodes.PerfisCriar)]
     public async Task<IActionResult> Create([FromBody] CreatePerfilRequest request, CancellationToken cancellationToken)
@@ -47,11 +55,18 @@ public class PerfisController(IPerfilService perfilService) : ControllerBase
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    [HttpDelete("{id:guid}")]
+    [HttpPost("{id:guid}/desativar")]
     [RequiresPermission(PermissionCodes.PerfisExcluir)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Desativar(
+        Guid id,
+        [FromBody] DesativarPerfilRequest? request,
+        CancellationToken cancellationToken)
     {
-        var result = await perfilService.SoftDeleteAsync(id, User.GetLogin(), cancellationToken);
+        var result = await perfilService.DesativarAsync(
+            id,
+            request ?? new DesativarPerfilRequest(null),
+            User.GetLogin(),
+            cancellationToken);
         return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
     }
 

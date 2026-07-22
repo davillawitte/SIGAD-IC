@@ -9,6 +9,7 @@ public interface IPerfilService
     Task<Result<PerfilDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Result<PerfilDetailDto>> CreateAsync(CreatePerfilRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<PerfilDetailDto>> UpdateAsync(Guid id, UpdatePerfilRequest request, string actorLogin, CancellationToken cancellationToken = default);
-    Task<Result> SoftDeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
+    Task<Result<PerfilExclusaoImpactoDto>> GetExclusaoImpactoAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Result> DesativarAsync(Guid id, DesativarPerfilRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<PerfilDetailDto>> SetPermissoesAsync(Guid id, SetPerfilPermissoesRequest request, string actorLogin, CancellationToken cancellationToken = default);
 }

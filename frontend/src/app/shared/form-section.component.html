@@ -1,0 +1,11 @@
+<fieldset class="app-form-fieldset">
+  @if (title) {
+    <legend class="app-form-fieldset__legend">{{ title }}</legend>
+  }
+  <div class="pci-form-group">
+    @if (description) {
+      <p class="app-form-fieldset__description">{{ description }}</p>
+    }
+    <ng-content />
+  </div>
+</fieldset>

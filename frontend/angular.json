@@ -35,6 +35,9 @@
             ],
             "styles": [
               "node_modules/@davillawitte/pci-design-system/tokens/pci-tokens.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-form-layout.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-select.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-datepicker.css",
               "src/styles.scss"
             ],
             "scripts": []
@@ -98,6 +101,9 @@
             ],
             "styles": [
               "node_modules/@davillawitte/pci-design-system/tokens/pci-tokens.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-form-layout.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-select.css",
+              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-datepicker.css",
               "src/styles.scss"
             ],
             "scripts": []

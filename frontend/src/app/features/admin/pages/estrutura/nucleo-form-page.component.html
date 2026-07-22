@@ -1,0 +1,40 @@
+<pci-form-page
+  [title]="isEdit() ? 'Editar núcleo' : 'Novo núcleo'"
+  description="Cadastre o núcleo e, se houver, o chefe responsável."
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Identificação">
+      <pci-input [appFormCol]="12" label="Nome" formControlName="nome" [required]="true" />
+
+      <div [appFormCol]="12" class="nucleo-sigla-chefe">
+        <pci-input label="Sigla" formControlName="sigla" [required]="true" />
+        <label class="pci-field">
+          <span class="pci-field__label">Chefe</span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="chefeServidorId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              <mat-option [value]="''">Sem chefe</mat-option>
+              @for (option of servidorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+      </div>
+    </app-form-section>
+  </form>
+</pci-form-page>

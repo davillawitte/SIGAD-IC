@@ -14,13 +14,18 @@ public static class PermissionCodes
     public const string PerfisGerenciarPermissoes = "perfis.gerenciar_permissoes";
 
     public const string PermissoesListar = "permissoes.listar";
-    public const string PermissoesCriar = "permissoes.criar";
-    public const string PermissoesEditar = "permissoes.editar";
-    public const string PermissoesExcluir = "permissoes.excluir";
 
     public const string SetoresListar = "setores.listar";
     public const string SetoresCriar = "setores.criar";
     public const string SetoresEditar = "setores.editar";
+    public const string SetoresExcluir = "setores.excluir";
+
+    public const string NucleosListar = "nucleos.listar";
+    public const string NucleosCriar = "nucleos.criar";
+    public const string NucleosEditar = "nucleos.editar";
+    public const string NucleosExcluir = "nucleos.excluir";
+
+    public const string CargosListar = "cargos.listar";
 
     public const string ServidoresListar = "servidores.listar";
     public const string ServidoresCriar = "servidores.criar";
@@ -37,16 +42,76 @@ public static class PermissionCodes
         (PerfisEditar, "Editar perfis", "perfis", "Alterar dados de perfis"),
         (PerfisExcluir, "Excluir perfis", "perfis", "Desativar ou remover perfis"),
         (PerfisGerenciarPermissoes, "Gerenciar permissões do perfil", "perfis", "Associar ou remover permissões de um perfil"),
-        (PermissoesListar, "Listar permissões", "permissoes", "Visualizar catálogo de permissões"),
-        (PermissoesCriar, "Criar permissões", "permissoes", "Cadastrar novas permissões"),
-        (PermissoesEditar, "Editar permissões", "permissoes", "Alterar permissões"),
-        (PermissoesExcluir, "Excluir permissões", "permissoes", "Desativar permissões"),
+        (PermissoesListar, "Listar permissões", "permissoes", "Visualizar catálogo de permissões do sistema"),
+        (NucleosListar, "Listar núcleos", "nucleos", "Visualizar núcleos da estrutura organizacional"),
+        (NucleosCriar, "Criar núcleos", "nucleos", "Cadastrar núcleos"),
+        (NucleosEditar, "Editar núcleos", "nucleos", "Alterar núcleos"),
+        (NucleosExcluir, "Excluir núcleos", "nucleos", "Remover núcleos sem setores vinculados"),
         (SetoresListar, "Listar setores", "setores", "Visualizar setores"),
         (SetoresCriar, "Criar setores", "setores", "Cadastrar setores"),
         (SetoresEditar, "Editar setores", "setores", "Alterar setores"),
+        (SetoresExcluir, "Excluir setores", "setores", "Remover setores sem servidores lotados"),
+        (CargosListar, "Listar cargos", "cargos", "Visualizar cargos oficiais"),
         (ServidoresListar, "Listar servidores", "servidores", "Visualizar servidores"),
         (ServidoresCriar, "Criar servidores", "servidores", "Cadastrar servidores"),
         (ServidoresEditar, "Editar servidores", "servidores", "Alterar servidores"),
+    ];
+}
+
+public static class SetorSiglas
+{
+    public const string DirecaoIc = "Direção IC";
+    public const string DirecaoIcNome = "Direção do Instituto de Criminalística";
+
+    public static bool IsDirecaoIc(string? sigla)
+    {
+        if (string.IsNullOrWhiteSpace(sigla))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            Normalize(sigla),
+            Normalize(DirecaoIc),
+            StringComparison.Ordinal);
+    }
+
+    public static string Normalize(string value) =>
+        value.Trim()
+            .ToLowerInvariant()
+            .Replace('á', 'a')
+            .Replace('à', 'a')
+            .Replace('â', 'a')
+            .Replace('ã', 'a')
+            .Replace('é', 'e')
+            .Replace('ê', 'e')
+            .Replace('í', 'i')
+            .Replace('ó', 'o')
+            .Replace('ô', 'o')
+            .Replace('õ', 'o')
+            .Replace('ú', 'u')
+            .Replace('ç', 'c');
+}
+
+public static class CargoCodes
+{
+    public const string PeritoCriminal = "PERITO_CRIMINAL";
+    public const string AgenteTecnicoForense = "AGENTE_TECNICO_FORENSE";
+    public const string AgenteNecropsia = "AGENTE_NECROPSIA";
+    public const string AssistenteTecnicoForense = "ASSISTENTE_TECNICO_FORENSE";
+    public const string Estagiario = "ESTAGIARIO";
+    public const string Terceirizado = "TERCEIRIZADO";
+    public const string ServidorExterno = "SERVIDOR_EXTERNO";
+
+    public static readonly IReadOnlyList<(string Codigo, string Nome)> Catalog =
+    [
+        (PeritoCriminal, "Perito Criminal"),
+        (AgenteTecnicoForense, "Agente Técnico Forense"),
+        (AgenteNecropsia, "Agente de Necrópsia"),
+        (AssistenteTecnicoForense, "Assistente Técnico Forense"),
+        (Estagiario, "Estagiário"),
+        (Terceirizado, "Terceirizado"),
+        (ServidorExterno, "Servidor Externo"),
     ];
 }
 

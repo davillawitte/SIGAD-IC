@@ -8,7 +8,10 @@ namespace TemplateSistema.Persistence;
 /// </summary>
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
+    public DbSet<Nucleo> Nucleos => Set<Nucleo>();
     public DbSet<Setor> Setores => Set<Setor>();
+    public DbSet<SetorChefia> SetorChefias => Set<SetorChefia>();
+    public DbSet<Cargo> Cargos => Set<Cargo>();
     public DbSet<Servidor> Servidores => Set<Servidor>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Perfil> Perfis => Set<Perfil>();

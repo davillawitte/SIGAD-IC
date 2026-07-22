@@ -8,15 +8,3 @@ public record PermissaoDto(
     string Modulo,
     bool Sistema,
     bool Ativo);
-
-public record CreatePermissaoRequest(
-    string Codigo,
-    string Nome,
-    string Modulo,
-    string? Descricao);
-
-public record UpdatePermissaoRequest(
-    string Nome,
-    string Modulo,
-    string? Descricao,
-    bool? Ativo);

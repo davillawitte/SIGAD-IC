@@ -6,8 +6,103 @@
 
 body {
   margin: 0;
-  font-family: var(--pci-font-family, 'Segoe UI', system-ui, sans-serif);
-  background: var(--pci-color-background, #f4f6f8);
+  font-family: var(--pci-font-family-base, 'Inter', 'Segoe UI', system-ui, sans-serif);
+  background: var(--pci-color-background, #eef2f9);
   color: var(--pci-color-text-primary, #1a1a2e);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Sublinhado dourado nos títulos de página (eco do indicador do menu) */
+.pci-page-header__title {
+  display: inline-block;
+  position: relative;
+  padding-bottom: 0.4rem;
+}
+
+.pci-page-header__title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 2.75rem;
+  height: 3px;
+  border-radius: var(--pci-radius-full, 999px);
+  background: var(--pci-gold-600, #b8922e);
+  box-shadow: 0 0 8px #c8a04080;
+}
+
+/* Dropdown menu: estilos no overlay (conteúdo projetado / fora do encapsulation) */
+.pci-dropdown-menu__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 10rem;
+}
+
+.pci-dropdown-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--pci-radius-md, 0.375rem);
+  background: transparent;
+  color: var(--pci-color-text-primary, #101828);
+  font-family: var(--pci-font-family-base, inherit);
+  font-size: var(--pci-font-size-sm, 0.875rem);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pci-dropdown-menu__item:hover:not(:disabled) {
+  background: var(--pci-color-background-muted, #f2f4f7);
+}
+
+.pci-dropdown-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pci-dropdown-menu__item--danger {
+  color: var(--pci-color-error, #b42318);
+}
+
+.pci-dropdown-menu__item--danger:hover:not(:disabled) {
+  background: #dc262614;
+}
+
+/* Fieldsets de seção de formulário (app-form-section) */
+app-form-section {
+  display: block;
+}
+
+app-form-section + app-form-section {
+  margin-top: var(--pci-form-section-gap, 2rem);
+}
+
+.app-form-fieldset {
+  margin: 0;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--pci-color-border, #d0d5dd);
+  border-radius: var(--pci-radius-lg, 0.75rem);
+  background: color-mix(in srgb, var(--pci-color-surface-muted, #f9fafb) 55%, transparent);
+  min-inline-size: 0;
+}
+
+.app-form-fieldset__legend {
+  padding: 0 0.45rem;
+  margin-left: 0.15rem;
+  font-size: var(--pci-font-size-sm, 0.875rem);
+  font-weight: var(--pci-font-weight-semibold, 600);
+  line-height: 1.2;
+  color: var(--pci-color-text-primary, #101828);
+}
+
+.app-form-fieldset__description {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--pci-spacing-xs, 0.25rem);
+  font-size: var(--pci-text-body-sm, 0.8125rem);
+  line-height: var(--pci-text-line-body, 1.5);
+  color: var(--pci-color-text-secondary, #667085);
 }

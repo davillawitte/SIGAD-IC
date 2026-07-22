@@ -1,0 +1,104 @@
+<pci-form-page
+  [title]="isEdit() ? 'Editar servidor' : 'Novo servidor'"
+  description="Informe os dados funcionais e a lotação do servidor."
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Dados pessoais">
+      <pci-input label="Nome" formControlName="nome" [required]="true" />
+      <pci-input
+        label="Matrícula"
+        formControlName="matricula"
+        placeholder="000.000-0"
+        hint="Formato xxx.xxx-x (legado: xx.xxx-x)"
+        [required]="true"
+      />
+      <pci-input
+        label="CPF"
+        formControlName="cpf"
+        placeholder="000.000.000-00"
+        [required]="true"
+      />
+      <pci-datepicker
+        label="Data de nascimento"
+        formControlName="dataNascimento"
+        [required]="true"
+        [max]="maxNascimento"
+      />
+      <pci-input
+        label="E-mail"
+        type="email"
+        formControlName="email"
+        placeholder="nome@pci.rn.gov.br"
+        [required]="true"
+      />
+      <pci-input
+        label="Telefone"
+        formControlName="telefone"
+        placeholder="(84) 99999-9999"
+      />
+    </app-form-section>
+
+    <app-form-section title="Lotação">
+      <label class="pci-field">
+        <span class="pci-field__label">Cargo <span class="pci-field__required">*</span></span>
+        <div class="pci-field__control pci-field__control--select">
+          <mat-select
+            class="pci-field__mat-select"
+            formControlName="cargoId"
+            panelClass="pci-select-panel"
+            disableRipple
+            hideSingleSelectionIndicator
+          >
+            @for (option of cargoOptions(); track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </div>
+      </label>
+      <label class="pci-field">
+        <span class="pci-field__label">Setor <span class="pci-field__required">*</span></span>
+        <div class="pci-field__control pci-field__control--select">
+          <mat-select
+            class="pci-field__mat-select"
+            formControlName="setorId"
+            panelClass="pci-select-panel"
+            disableRipple
+            hideSingleSelectionIndicator
+          >
+            @for (option of setorOptions(); track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </div>
+      </label>
+    </app-form-section>
+
+    <app-form-section title="Status">
+      <label [appFormCol]="12" class="pci-field">
+        <span class="pci-field__label">Situação <span class="pci-field__required">*</span></span>
+        <div class="pci-field__control pci-field__control--select">
+          <mat-select
+            class="pci-field__mat-select"
+            formControlName="status"
+            panelClass="pci-select-panel"
+            disableRipple
+            hideSingleSelectionIndicator
+          >
+            @for (option of statusOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </div>
+      </label>
+    </app-form-section>
+  </form>
+</pci-form-page>

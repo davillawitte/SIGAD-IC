@@ -5,7 +5,6 @@ public record UsuarioListItemDto(
     string Login,
     string NomeServidor,
     string Matricula,
-    bool Bloqueado,
     bool Ativo,
     DateTime? UltimoLogin,
     IReadOnlyList<string> Perfis);
@@ -17,7 +16,6 @@ public record UsuarioDetailDto(
     string NomeServidor,
     string Matricula,
     string Email,
-    bool Bloqueado,
     bool Ativo,
     DateTime? UltimoLogin,
     IReadOnlyList<Guid> PerfilIds,
@@ -31,7 +29,6 @@ public record CreateUsuarioRequest(
 
 public record UpdateUsuarioRequest(
     IReadOnlyList<Guid>? PerfilIds,
-    bool? Bloqueado,
     bool? Ativo);
 
 public record ChangePasswordRequest(string NovaSenha);

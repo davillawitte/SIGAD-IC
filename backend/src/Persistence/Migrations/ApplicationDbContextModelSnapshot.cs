@@ -23,6 +23,94 @@ namespace TemplateSistema.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Cargo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("Nome");
+
+                    b.ToTable("Cargo", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Nucleo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChefeServidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Sigla")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChefeServidorId");
+
+                    b.HasIndex("Nome");
+
+                    b.HasIndex("Sigla")
+                        .IsUnique();
+
+                    b.ToTable("Nucleo", "public");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Perfil", b =>
                 {
                     b.Property<Guid>("Id")
@@ -149,13 +237,8 @@ namespace TemplateSistema.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("Ativo")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Cargo")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                    b.Property<Guid>("CargoId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Cpf")
                         .IsRequired()
@@ -168,6 +251,9 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<DateOnly>("DataNascimento")
+                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -187,6 +273,11 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<Guid>("SetorId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Telefone")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
@@ -200,6 +291,8 @@ namespace TemplateSistema.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CargoId");
+
                     b.HasIndex("Cpf")
                         .IsUnique();
 
@@ -210,6 +303,8 @@ namespace TemplateSistema.Persistence.Migrations
 
                     b.HasIndex("SetorId");
 
+                    b.HasIndex("Status");
+
                     b.ToTable("Servidor", "public");
                 });
 
@@ -217,12 +312,6 @@ namespace TemplateSistema.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Ativo")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("ChefeServidorId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
@@ -237,10 +326,17 @@ namespace TemplateSistema.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<Guid?>("NucleoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Resumo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Sigla")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -251,14 +347,33 @@ namespace TemplateSistema.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChefeServidorId");
-
                     b.HasIndex("Nome");
+
+                    b.HasIndex("NucleoId");
 
                     b.HasIndex("Sigla")
                         .IsUnique();
 
                     b.ToTable("Setor", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.SetorChefia", b =>
+                {
+                    b.Property<Guid>("SetorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TipoChefia")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("ServidorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SetorId", "TipoChefia");
+
+                    b.HasIndex("ServidorId");
+
+                    b.ToTable("SetorChefia", "public");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Usuario", b =>
@@ -329,6 +444,16 @@ namespace TemplateSistema.Persistence.Migrations
                     b.ToTable("UsuarioPerfil", "public");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Nucleo", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "ChefeServidor")
+                        .WithMany()
+                        .HasForeignKey("ChefeServidorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ChefeServidor");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.PerfilPermissao", b =>
                 {
                     b.HasOne("TemplateSistema.Domain.Entities.Perfil", "Perfil")
@@ -350,23 +475,50 @@ namespace TemplateSistema.Persistence.Migrations
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Servidor", b =>
                 {
+                    b.HasOne("TemplateSistema.Domain.Entities.Cargo", "Cargo")
+                        .WithMany("Servidores")
+                        .HasForeignKey("CargoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
                         .WithMany("Servidores")
                         .HasForeignKey("SetorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Cargo");
+
                     b.Navigation("Setor");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Setor", b =>
                 {
-                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "ChefeServidor")
-                        .WithMany()
-                        .HasForeignKey("ChefeServidorId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("TemplateSistema.Domain.Entities.Nucleo", "Nucleo")
+                        .WithMany("Setores")
+                        .HasForeignKey("NucleoId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("ChefeServidor");
+                    b.Navigation("Nucleo");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.SetorChefia", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Servidor")
+                        .WithMany()
+                        .HasForeignKey("ServidorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
+                        .WithMany("Chefias")
+                        .HasForeignKey("SetorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Servidor");
+
+                    b.Navigation("Setor");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Usuario", b =>
@@ -399,6 +551,16 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Cargo", b =>
+                {
+                    b.Navigation("Servidores");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Nucleo", b =>
+                {
+                    b.Navigation("Setores");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Perfil", b =>
                 {
                     b.Navigation("PerfilPermissoes");
@@ -418,6 +580,8 @@ namespace TemplateSistema.Persistence.Migrations
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Setor", b =>
                 {
+                    b.Navigation("Chefias");
+
                     b.Navigation("Servidores");
                 });
 

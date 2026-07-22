@@ -18,12 +18,13 @@ Stack: **Angular 20**, **.NET 10** (Clean Architecture) e **PostgreSQL**.
 
 ```
 gestao-ic/
-├── backend/          # API .NET (Clean Architecture)
-├── frontend/         # SPA Angular
-├── docker/           # Dockerfiles e compose
-├── docs/             # ADRs e documentação
-├── scripts/          # Scripts utilitários
-└── .github/          # Pipelines CI
+├── backend/              # API .NET (Clean Architecture)
+├── frontend/             # SPA Angular
+├── docker/               # Dockerfiles
+├── docker-compose.yml    # Stack local (usa .env da raiz)
+├── docs/                 # ADRs e documentação
+├── scripts/              # Scripts utilitários
+└── .github/              # Pipelines CI
 ```
 
 ### Backend
@@ -72,13 +73,26 @@ frontend/src/app/
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (opcional)
 - **PAT GitHub** com escopo `read:packages` (para o design system)
 
-## Design system (`@davillawitte/pci-design-system`)
+## Credenciais locais (`.env`)
 
-Publicado no **GitHub Packages**. Configure autenticação:
+Segredos **não** vão para o repositório. Uma vez por máquina:
 
 ```bash
-cp frontend/.npmrc.example frontend/.npmrc
-export NODE_AUTH_TOKEN=ghp_xxxxxxxx   # PAT com read:packages
+cp .env.example .env
+# edite .env e preencha NODE_AUTH_TOKEN com um PAT (escopo read:packages)
+```
+
+O `.env` já está no `.gitignore`. Os scripts (`setup-frontend`, `dev-frontend`, `docker-up`) carregam esse arquivo automaticamente — não precisa `export` a cada build.
+
+No CI, use o secret **`NODE_AUTH_TOKEN`** do repositório (nunca o `.env` local).
+
+Peers do design system (obrigatórios a partir da 0.3.2): `@angular/material` e `@angular/cdk`, além de `provideAnimationsAsync()` e `providePciMaterialFormControls()` no `app.config.ts`.
+
+## Design system (`@davillawitte/pci-design-system`)
+
+Publicado no **GitHub Packages**. Com o `.env` configurado:
+
+```bash
 ./scripts/setup-frontend.sh
 ```
 
@@ -101,7 +115,6 @@ dotnet run --project src/Api
 ### Frontend
 
 ```bash
-export NODE_AUTH_TOKEN=ghp_xxxxxxxx
 ./scripts/setup-frontend.sh
 npm start --prefix frontend
 ```
@@ -110,9 +123,10 @@ App: http://localhost:4200
 
 ### Docker (stack completa)
 
+Na **raiz** do repositório (com `.env` e `NODE_AUTH_TOKEN` preenchido):
+
 ```bash
-export NODE_AUTH_TOKEN=ghp_xxxxxxxx   # necessário para build do frontend
-./scripts/docker-up.sh
+docker compose up --build
 ```
 
 - Frontend: http://localhost:4200
@@ -120,7 +134,7 @@ export NODE_AUTH_TOKEN=ghp_xxxxxxxx   # necessário para build do frontend
 - Postgres (host): `localhost:5433` → banco `gestao_ic_dev`
 
 ```bash
-./scripts/docker-down.sh
+docker compose down
 ```
 
 ## Testes

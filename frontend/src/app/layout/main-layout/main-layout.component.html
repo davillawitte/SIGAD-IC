@@ -1,0 +1,18 @@
+<pci-app-layout
+  brandTitle="SIGAD-IC"
+  brandSubtitle="Instituto de Criminalística — RN"
+  brandLogoSrc="/assets/images/ic-icon.png"
+  [navGroups]="navGroups()"
+  [activeItemId]="activeItemId()"
+  [userName]="userName()"
+  [userMeta]="userMeta()"
+  [userAvatarName]="userAvatarName()"
+  [collapsed]="collapsed()"
+  [mobileOpen]="mobileOpen()"
+  (collapsedChange)="collapsed.set($event)"
+  (mobileOpenChange)="mobileOpen.set($event)"
+  (activeItemChange)="onNavChange($event)"
+  (logout)="onLogout()"
+>
+  <router-outlet />
+</pci-app-layout>

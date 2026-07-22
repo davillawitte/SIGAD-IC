@@ -2,18 +2,11 @@ import { Routes } from '@angular/router';
 
 import { superAdminGuard } from '../../core/auth/auth.guard';
 
-const adminSection = 'Administração do Sistema';
-
 export const ADMIN_ROUTES: Routes = [
   {
     path: 'usuarios',
     canActivate: [superAdminGuard],
-    data: {
-      title: 'Usuários',
-      breadcrumb: 'Usuários',
-      section: adminSection,
-      navId: 'usuarios',
-    },
+    data: { navId: 'usuarios' },
     children: [
       {
         path: '',
@@ -22,7 +15,6 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'novo',
-        data: { title: 'Novo usuário', breadcrumb: 'Novo' },
         loadComponent: () =>
           import('./pages/usuarios/usuario-form-page.component').then(
             (m) => m.UsuarioFormPageComponent,
@@ -30,7 +22,6 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'editar/:id',
-        data: { title: 'Editar usuário', breadcrumb: 'Editar' },
         loadComponent: () =>
           import('./pages/usuarios/usuario-form-page.component').then(
             (m) => m.UsuarioFormPageComponent,
@@ -41,12 +32,7 @@ export const ADMIN_ROUTES: Routes = [
   {
     path: 'perfis',
     canActivate: [superAdminGuard],
-    data: {
-      title: 'Perfis',
-      breadcrumb: 'Perfis',
-      section: adminSection,
-      navId: 'perfis',
-    },
+    data: { navId: 'perfis' },
     children: [
       {
         path: '',
@@ -55,49 +41,82 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'novo',
-        data: { title: 'Novo perfil', breadcrumb: 'Novo' },
         loadComponent: () =>
           import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
       },
       {
         path: 'editar/:id',
-        data: { title: 'Editar perfil', breadcrumb: 'Editar' },
         loadComponent: () =>
           import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
       },
     ],
   },
   {
-    path: 'permissoes',
+    path: 'servidores',
     canActivate: [superAdminGuard],
-    data: {
-      title: 'Permissões',
-      breadcrumb: 'Permissões',
-      section: adminSection,
-      navId: 'permissoes',
-    },
+    data: { navId: 'servidores' },
     children: [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/permissoes/permissoes-page.component').then(
-            (m) => m.PermissoesPageComponent,
+          import('./pages/servidores/servidores-page.component').then(
+            (m) => m.ServidoresPageComponent,
           ),
       },
       {
         path: 'novo',
-        data: { title: 'Nova permissão', breadcrumb: 'Nova' },
         loadComponent: () =>
-          import('./pages/permissoes/permissao-form-page.component').then(
-            (m) => m.PermissaoFormPageComponent,
+          import('./pages/servidores/servidor-form-page.component').then(
+            (m) => m.ServidorFormPageComponent,
           ),
       },
       {
         path: 'editar/:id',
-        data: { title: 'Editar permissão', breadcrumb: 'Editar' },
         loadComponent: () =>
-          import('./pages/permissoes/permissao-form-page.component').then(
-            (m) => m.PermissaoFormPageComponent,
+          import('./pages/servidores/servidor-form-page.component').then(
+            (m) => m.ServidorFormPageComponent,
+          ),
+      },
+    ],
+  },
+  {
+    path: 'estrutura-organizacional',
+    canActivate: [superAdminGuard],
+    data: { navId: 'estrutura-organizacional' },
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/estrutura/estrutura-organizacional-page.component').then(
+            (m) => m.EstruturaOrganizacionalPageComponent,
+          ),
+      },
+      {
+        path: 'nucleos/novo',
+        loadComponent: () =>
+          import('./pages/estrutura/nucleo-form-page.component').then(
+            (m) => m.NucleoFormPageComponent,
+          ),
+      },
+      {
+        path: 'nucleos/editar/:id',
+        loadComponent: () =>
+          import('./pages/estrutura/nucleo-form-page.component').then(
+            (m) => m.NucleoFormPageComponent,
+          ),
+      },
+      {
+        path: 'setores/novo',
+        loadComponent: () =>
+          import('./pages/estrutura/setor-form-page.component').then(
+            (m) => m.SetorFormPageComponent,
+          ),
+      },
+      {
+        path: 'setores/editar/:id',
+        loadComponent: () =>
+          import('./pages/estrutura/setor-form-page.component').then(
+            (m) => m.SetorFormPageComponent,
           ),
       },
     ],

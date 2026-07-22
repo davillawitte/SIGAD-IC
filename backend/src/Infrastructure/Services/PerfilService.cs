@@ -112,12 +112,81 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         return Result<PerfilDetailDto>.Success(MapDetail(perfil));
     }
 
-    public async Task<Result> SoftDeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default)
+    public async Task<Result<PerfilExclusaoImpactoDto>> GetExclusaoImpactoAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var perfil = await db.Perfis.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (perfil is null)
+        {
+            return Result<PerfilExclusaoImpactoDto>.Failure("Perfil não encontrado.");
+        }
+
+        if (perfil.Sistema)
+        {
+            return Result<PerfilExclusaoImpactoDto>.Failure("Perfis de sistema não podem ser desativados.");
+        }
+
+        var quantidadeUsuarios = await db.UsuarioPerfis.CountAsync(x => x.PerfilId == id, cancellationToken);
+        return Result<PerfilExclusaoImpactoDto>.Success(
+            new PerfilExclusaoImpactoDto(quantidadeUsuarios, quantidadeUsuarios > 0));
+    }
+
+    public async Task<Result> DesativarAsync(
+        Guid id,
+        DesativarPerfilRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
     {
         var perfil = await db.Perfis.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (perfil is null)
         {
             return Result.Failure("Perfil não encontrado.");
+        }
+
+        if (perfil.Sistema || perfil.Codigo == PerfilCodes.SuperAdministrador)
+        {
+            return Result.Failure("Perfis de sistema não podem ser desativados.");
+        }
+
+        var vinculos = await db.UsuarioPerfis.Where(x => x.PerfilId == id).ToListAsync(cancellationToken);
+        if (vinculos.Count > 0)
+        {
+            if (request.PerfilSubstitutoId is null)
+            {
+                return Result.Failure(
+                    $"Existem {vinculos.Count} conta(s) vinculada(s) a este perfil. Informe um perfil substituto para reatribuí-las antes de desativar.");
+            }
+
+            if (request.PerfilSubstitutoId == id)
+            {
+                return Result.Failure("O perfil substituto deve ser diferente do perfil a desativar.");
+            }
+
+            var substituto = await db.Perfis.FirstOrDefaultAsync(
+                x => x.Id == request.PerfilSubstitutoId && x.Ativo,
+                cancellationToken);
+            if (substituto is null)
+            {
+                return Result.Failure("Perfil substituto não encontrado ou inativo.");
+            }
+
+            var usuarioIds = vinculos.Select(x => x.UsuarioId).Distinct().ToList();
+            var jaPossuemSubstituto = await db.UsuarioPerfis
+                .Where(x => usuarioIds.Contains(x.UsuarioId) && x.PerfilId == substituto.Id)
+                .Select(x => x.UsuarioId)
+                .ToListAsync(cancellationToken);
+            var comSubstituto = jaPossuemSubstituto.ToHashSet();
+
+            db.UsuarioPerfis.RemoveRange(vinculos);
+
+            foreach (var usuarioId in usuarioIds)
+            {
+                if (comSubstituto.Add(usuarioId))
+                {
+                    db.UsuarioPerfis.Add(UsuarioPerfil.Create(usuarioId, substituto.Id));
+                }
+            }
         }
 
         try
@@ -143,6 +212,12 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         if (perfil is null)
         {
             return Result<PerfilDetailDto>.Failure("Perfil não encontrado.");
+        }
+
+        if (perfil.Codigo == PerfilCodes.SuperAdministrador)
+        {
+            return Result<PerfilDetailDto>.Failure(
+                "As permissões do Super Administrador não podem ser alteradas. Este perfil possui acesso total.");
         }
 
         var validIds = await ValidatePermissaoIdsAsync(request.PermissaoIds, cancellationToken);

@@ -77,7 +77,7 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
         }
 
         var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == request.ServidorId, cancellationToken);
-        if (servidor is null || !servidor.Ativo)
+        if (servidor is null || !servidor.EstaAtivo)
         {
             return Result<UsuarioDetailDto>.Failure("Servidor inválido ou inativo.");
         }
@@ -144,15 +144,6 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.MarkUpdated(actorLogin);
         }
 
-        if (request.Bloqueado == true)
-        {
-            usuario.Bloquear(actorLogin);
-        }
-        else if (request.Bloqueado == false)
-        {
-            usuario.Desbloquear(actorLogin);
-        }
-
         if (request.Ativo == true)
         {
             usuario.Ativar(actorLogin);
@@ -201,7 +192,6 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.Login,
             usuario.Servidor.Nome,
             usuario.Servidor.Matricula,
-            usuario.Bloqueado,
             usuario.Ativo,
             usuario.UltimoLogin,
             usuario.UsuarioPerfis.Select(x => x.Perfil.Codigo).OrderBy(x => x).ToList());
@@ -214,7 +204,6 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.Servidor.Nome,
             usuario.Servidor.Matricula,
             usuario.Servidor.Email,
-            usuario.Bloqueado,
             usuario.Ativo,
             usuario.UltimoLogin,
             usuario.UsuarioPerfis.Select(x => x.PerfilId).ToList(),

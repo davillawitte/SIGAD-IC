@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Domain.Entities;
+using TemplateSistema.Domain.Enums;
 
 namespace TemplateSistema.Persistence.Seed;
 
@@ -15,6 +16,8 @@ public static class AuthSeed
     public static readonly Guid PerfilChefeSetorId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     public static readonly Guid PerfilServidorId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
+    public static readonly Guid CargoPeritoCriminalId = CreateDeterministicGuid($"cargo:{CargoCodes.PeritoCriminal}");
+
     public const string SuperUserLogin = "vitorlopes";
     public const string SuperUserPassword = "Vitor@123";
 
@@ -22,9 +25,10 @@ public static class AuthSeed
     {
         await SeedPermissoesAsync(context, cancellationToken);
         await SeedPerfisAsync(context, cancellationToken);
+        await SeedCargosAsync(context, cancellationToken);
         await SeedSetorServidorUsuarioAsync(context, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Auth seed applied (perfis, permissões e superusuário).");
+        logger.LogInformation("Auth seed applied (cargos, perfis, permissões e superusuário).");
     }
 
     private static async Task SeedPermissoesAsync(ApplicationDbContext context, CancellationToken cancellationToken)
@@ -48,6 +52,27 @@ public static class AuthSeed
                 createdBy: hasherCreatedBy,
                 id: CreateDeterministicGuid(codigo)));
         }
+    }
+
+    private static async Task SeedCargosAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    {
+        var existing = await context.Cargos.Select(x => x.Codigo).ToListAsync(cancellationToken);
+
+        foreach (var (codigo, nome) in CargoCodes.Catalog)
+        {
+            if (existing.Contains(codigo))
+            {
+                continue;
+            }
+
+            context.Cargos.Add(Cargo.Create(
+                nome,
+                codigo,
+                createdBy: "seed",
+                id: CreateDeterministicGuid($"cargo:{codigo}")));
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedPerfisAsync(ApplicationDbContext context, CancellationToken cancellationToken)
@@ -87,17 +112,21 @@ public static class AuthSeed
 
         await context.SaveChangesAsync(cancellationToken);
 
-        var allPermissaoIds = await context.Permissoes
-            .Where(x => x.Ativo)
+        var catalogCodes = PermissionCodes.Catalog.Select(x => x.Codigo).ToHashSet(StringComparer.Ordinal);
+        var allCatalogPermissaoIds = await context.Permissoes
+            .Where(x => x.Ativo && catalogCodes.Contains(x.Codigo))
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
 
-        await EnsurePerfilPermissoesAsync(context, PerfilSuperAdminId, allPermissaoIds, cancellationToken);
+        // Super Administrador sempre com o catálogo completo (não editável pela UI).
+        await SyncPerfilPermissoesAsync(context, PerfilSuperAdminId, allCatalogPermissaoIds, cancellationToken);
 
         var chefePermissoes = await context.Permissoes
             .Where(x => x.Ativo && (
                 x.Codigo == PermissionCodes.UsuariosListar ||
+                x.Codigo == PermissionCodes.NucleosListar ||
                 x.Codigo == PermissionCodes.SetoresListar ||
+                x.Codigo == PermissionCodes.CargosListar ||
                 x.Codigo == PermissionCodes.ServidoresListar ||
                 x.Codigo == PermissionCodes.ServidoresCriar ||
                 x.Codigo == PermissionCodes.ServidoresEditar ||
@@ -111,6 +140,7 @@ public static class AuthSeed
         var servidorPermissoes = await context.Permissoes
             .Where(x => x.Ativo && (
                 x.Codigo == PermissionCodes.SetoresListar ||
+                x.Codigo == PermissionCodes.CargosListar ||
                 x.Codigo == PermissionCodes.ServidoresListar))
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
@@ -135,34 +165,84 @@ public static class AuthSeed
         }
     }
 
+    private static async Task SyncPerfilPermissoesAsync(
+        ApplicationDbContext context,
+        Guid perfilId,
+        IReadOnlyCollection<Guid> permissaoIds,
+        CancellationToken cancellationToken)
+    {
+        var desired = permissaoIds.ToHashSet();
+        var existing = await context.PerfilPermissoes
+            .Where(x => x.PerfilId == perfilId)
+            .ToListAsync(cancellationToken);
+
+        var extras = existing.Where(x => !desired.Contains(x.PermissaoId)).ToList();
+        if (extras.Count > 0)
+        {
+            context.PerfilPermissoes.RemoveRange(extras);
+        }
+
+        var existingIds = existing.Select(x => x.PermissaoId).ToHashSet();
+        foreach (var permissaoId in desired.Except(existingIds))
+        {
+            context.PerfilPermissoes.Add(PerfilPermissao.Create(perfilId, permissaoId));
+        }
+    }
+
     private static async Task SeedSetorServidorUsuarioAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
-        if (!await context.Setores.AnyAsync(x => x.Id == SetorDiretoriaId, cancellationToken))
+        var setorDirecao = await context.Setores
+            .Include(x => x.Chefias)
+            .FirstOrDefaultAsync(x => x.Id == SetorDiretoriaId, cancellationToken);
+
+        if (setorDirecao is null)
         {
             context.Setores.Add(Setor.Create(
-                "Diretoria",
-                "DIR",
+                SetorSiglas.DirecaoIcNome,
+                SetorSiglas.DirecaoIc,
+                nucleoId: null,
+                resumo: "Direção geral do Instituto de Criminalística",
                 createdBy: "seed",
                 id: SetorDiretoriaId));
             await context.SaveChangesAsync(cancellationToken);
+            setorDirecao = await context.Setores
+                .Include(x => x.Chefias)
+                .FirstAsync(x => x.Id == SetorDiretoriaId, cancellationToken);
+        }
+        else
+        {
+            setorDirecao.Atualizar(
+                SetorSiglas.DirecaoIcNome,
+                SetorSiglas.DirecaoIc,
+                "Direção geral do Instituto de Criminalística",
+                nucleoId: null,
+                updatedBy: "seed");
         }
 
         if (!await context.Servidores.AnyAsync(x => x.Id == ServidorVitorId, cancellationToken))
         {
             context.Servidores.Add(Servidor.Create(
                 nome: "Vitor Lopes",
-                matricula: "000001",
+                matricula: "000.001-0",
                 cpf: "00000000000",
-                cargo: "Super Administrador",
+                cargoId: CargoPeritoCriminalId,
                 email: "vitorlopes@pci.rn.gov.br",
                 setorId: SetorDiretoriaId,
+                dataNascimento: new DateOnly(1990, 1, 1),
                 telefone: null,
                 createdBy: "seed",
                 id: ServidorVitorId));
             await context.SaveChangesAsync(cancellationToken);
+        }
 
-            var setor = await context.Setores.FirstAsync(x => x.Id == SetorDiretoriaId, cancellationToken);
-            setor.DefinirChefe(ServidorVitorId, "seed");
+        var diretor = setorDirecao.Chefias.FirstOrDefault(x => x.TipoChefia == TipoChefia.Diretor);
+        if (diretor is null)
+        {
+            context.SetorChefias.Add(SetorChefia.Create(SetorDiretoriaId, ServidorVitorId, TipoChefia.Diretor));
+        }
+        else if (diretor.ServidorId != ServidorVitorId)
+        {
+            diretor.TrocarServidor(ServidorVitorId);
         }
 
         if (!await context.Usuarios.AnyAsync(x => x.Id == UsuarioVitorId, cancellationToken))

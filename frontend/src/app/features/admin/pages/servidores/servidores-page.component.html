@@ -1,0 +1,35 @@
+@if (error()) {
+  <pci-alert variant="error" title="Erro" [message]="error()!" />
+}
+
+<pci-list-page
+  title="Servidores"
+  description="Cadastro de servidores lotados nos setores do IC."
+  currentPath="/servidores"
+  [routePages]="routePages"
+  [filterFields]="filterFields()"
+  [filterValues]="filterValues()"
+  [filtersExpanded]="filtersExpanded()"
+  [columns]="columns"
+  [rows]="pagedRows()"
+  [exportDataSource]="filteredRows()"
+  [total]="filteredRows().length"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [loading]="loading()"
+  [showCreateButton]="true"
+  [enableExportPdf]="true"
+  createLabel="Novo servidor"
+  [rowActions]="rowActions"
+  sortMode="server"
+  quickSearchMode="server"
+  (createClicked)="goCreate()"
+  (filterApply)="onFilterApply($event)"
+  (filterClear)="onFilterClear()"
+  (filterValuesChange)="filterValues.set($event)"
+  (filtersExpandedChange)="filtersExpanded.set($event)"
+  (searchChange)="onSearchChange($event)"
+  (pageChange)="page.set($event)"
+  (pageSizeChange)="onPageSizeChange($event)"
+  (rowAction)="onRowAction($event)"
+/>

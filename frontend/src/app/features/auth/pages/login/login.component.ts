@@ -10,17 +10,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 @Component({
   selector: 'app-login',
   imports: [PciLoginPageComponent],
-  template: `
-    <pci-login-page
-      crestSrc="/assets/images/logo-pci-govrn.png"
-      appLogoSrc="/assets/images/ic-icon.png"
-      appNamePrefix="SIGAD"
-      appNameAccent="IC"
-      [loading]="loading()"
-      [errorMessage]="errorMessage()"
-      (submitted)="onSubmit($event)"
-    />
-  `,
+  templateUrl: './login.component.html',
 })
 export class LoginComponent {
   private readonly auth = inject(AuthService);

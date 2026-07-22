@@ -1,0 +1,39 @@
+.nucleo-sigla-chefe {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 8.5rem) minmax(0, 1fr);
+  gap: var(--pci-form-field-gap, 1rem);
+  align-items: start;
+  width: 100%;
+}
+
+.pci-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pci-field__control--select {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--pci-color-border, #d0d5dd);
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.pci-field__mat-select {
+  width: 100%;
+}
+
+:host ::ng-deep .pci-field__control--select .mat-mdc-select-trigger {
+  min-height: 40px;
+  padding: 0 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .nucleo-sigla-chefe {
+    grid-template-columns: 1fr;
+  }
+}

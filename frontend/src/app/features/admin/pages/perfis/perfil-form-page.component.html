@@ -1,0 +1,105 @@
+<pci-form-page
+  [title]="isEdit() ? 'Editar perfil' : 'Novo perfil'"
+  [description]="
+    isSuperAdmin()
+      ? 'O Super Administrador possui todas as permissões do sistema e não pode ser alterado.'
+      : 'Defina o perfil e associe as permissões disponíveis no catálogo do sistema.'
+  "
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Dados do perfil">
+      <pci-input label="Nome" formControlName="nome" [required]="true" />
+      <pci-input
+        label="Código"
+        formControlName="codigo"
+        hint="Ex.: ANALISTA"
+        [required]="true"
+      />
+      <pci-input [appFormCol]="12" label="Descrição" formControlName="descricao" />
+    </app-form-section>
+
+    <app-form-section title="Permissões">
+      @if (isSuperAdmin()) {
+        <pci-alert
+          [appFormCol]="12"
+          variant="info"
+          title="Acesso total"
+          message="Este perfil recebe automaticamente todas as permissões do catálogo. A associação não pode ser editada nem removida."
+        />
+      }
+
+      <pci-selection-list
+        [appFormCol]="12"
+        title="Permissões do perfil"
+        ariaLabel="Permissões do perfil"
+        variant="divided"
+        [items]="permissaoItems()"
+        [selectedIds]="selectedPermissaoIds()"
+        (selectedIdsChange)="onPermissoesChange($event)"
+      />
+    </app-form-section>
+
+    @if (showDesativarPanel()) {
+      <app-form-section title="Desativar perfil">
+        @if (!desativarConfirmado()) {
+          <pci-stack [appFormCol]="12" gap="3">
+            <pci-button variant="danger" icon="trash" [loading]="saving()" (clicked)="iniciarDesativacao()">
+              Desativar
+            </pci-button>
+          </pci-stack>
+        } @else {
+          <pci-alert
+            [appFormCol]="12"
+            variant="warning"
+            title="Confirmar desativação"
+            [message]="desativarMensagem()"
+          />
+
+          @if (requerSubstituto()) {
+            <label [appFormCol]="12" class="pci-field">
+              <span class="pci-field__label"
+                >Perfil substituto <span class="pci-field__required">*</span></span
+              >
+              <div class="pci-field__control pci-field__control--select">
+                <mat-select
+                  class="pci-field__mat-select"
+                  placeholder="Selecione o perfil que receberá as contas"
+                  [value]="perfilSubstitutoId()"
+                  (valueChange)="perfilSubstitutoId.set($event)"
+                  panelClass="pci-select-panel"
+                  disableRipple
+                  hideSingleSelectionIndicator
+                >
+                  @for (option of substitutoOptions(); track option.value) {
+                    <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                  }
+                </mat-select>
+              </div>
+            </label>
+          }
+
+          <pci-stack [appFormCol]="12" gap="3" direction="horizontal">
+            <pci-button variant="secondary" (clicked)="cancelarDesativacao()">Cancelar</pci-button>
+            <pci-button
+              variant="danger"
+              icon="trash"
+              [loading]="saving()"
+              (clicked)="confirmarDesativacao()"
+            >
+              Confirmar desativação
+            </pci-button>
+          </pci-stack>
+        }
+      </app-form-section>
+    }
+  </form>
+</pci-form-page>

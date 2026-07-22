@@ -1,0 +1,124 @@
+<pci-form-page
+  [title]="pageTitle()"
+  [description]="pageDescription()"
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Identificação">
+      <pci-input
+        label="Nome do Setor"
+        formControlName="nome"
+        [required]="!isDirecaoIc()"
+      />
+      <pci-input label="Sigla" formControlName="sigla" [required]="!isDirecaoIc()" />
+      <pci-input [appFormCol]="12" label="Descrição" formControlName="resumo" />
+    </app-form-section>
+
+    <app-form-section title="Vínculos">
+      @if (!isDirecaoIc()) {
+        <label [appFormCol]="12" class="pci-field">
+          <span class="pci-field__label">
+            Núcleo <span class="pci-field__required">*</span>
+          </span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="nucleoId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              <mat-option [value]="''">Selecione</mat-option>
+              @for (option of nucleoOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+
+        <label class="pci-field">
+          <span class="pci-field__label">
+            Chefia imediata <span class="pci-field__required">*</span>
+          </span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="chefiaPrimariaId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              @for (option of servidorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+
+        <label class="pci-field">
+          <span class="pci-field__label">Chefia substituta</span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="chefiaSecundariaId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              <mat-option [value]="''">Nenhum</mat-option>
+              @for (option of servidorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+      } @else {
+        <label class="pci-field">
+          <span class="pci-field__label">
+            Diretor <span class="pci-field__required">*</span>
+          </span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="chefiaPrimariaId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              @for (option of servidorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+
+        <label class="pci-field">
+          <span class="pci-field__label">Subcoordenador</span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="chefiaSecundariaId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              <mat-option [value]="''">Nenhum</mat-option>
+              @for (option of servidorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+      }
+    </app-form-section>
+
+  </form>
+</pci-form-page>

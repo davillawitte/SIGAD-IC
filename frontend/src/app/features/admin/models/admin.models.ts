@@ -3,7 +3,6 @@ export interface UsuarioListItem {
   login: string;
   nomeServidor: string;
   matricula: string;
-  bloqueado: boolean;
   ativo: boolean;
   ultimoLogin?: string | null;
   perfis: string[];
@@ -16,7 +15,6 @@ export interface UsuarioDetail {
   nomeServidor: string;
   matricula: string;
   email: string;
-  bloqueado: boolean;
   ativo: boolean;
   ultimoLogin?: string | null;
   perfilIds: string[];
@@ -32,7 +30,6 @@ export interface CreateUsuarioPayload {
 
 export interface UpdateUsuarioPayload {
   perfilIds?: string[];
-  bloqueado?: boolean | null;
   ativo?: boolean | null;
 }
 
@@ -64,6 +61,15 @@ export interface UpdatePerfilPayload {
   ativo?: boolean | null;
 }
 
+export interface PerfilExclusaoImpacto {
+  quantidadeUsuarios: number;
+  requerSubstituto: boolean;
+}
+
+export interface DesativarPerfilPayload {
+  perfilSubstitutoId?: string | null;
+}
+
 export interface PermissaoItem {
   id: string;
   codigo: string;
@@ -74,48 +80,140 @@ export interface PermissaoItem {
   ativo: boolean;
 }
 
-export interface CreatePermissaoPayload {
-  codigo: string;
-  nome: string;
-  modulo: string;
-  descricao?: string | null;
-}
-
-export interface UpdatePermissaoPayload {
-  nome: string;
-  modulo: string;
-  descricao?: string | null;
-  ativo?: boolean | null;
-}
+export type StatusServidor = 'Ativo' | 'Afastado' | 'Cedido';
 
 export interface ServidorListItem {
   id: string;
   nome: string;
   matricula: string;
   cpf: string;
+  cargoId: string;
   cargo: string;
   email: string;
   telefone?: string | null;
+  dataNascimento: string;
   setorId: string;
   setorNome: string;
   possuiUsuario: boolean;
-  ativo: boolean;
+  status: StatusServidor;
 }
 
 export interface CreateServidorPayload {
   nome: string;
   matricula: string;
   cpf: string;
-  cargo: string;
+  cargoId: string;
   email: string;
   setorId: string;
+  dataNascimento: string;
   telefone?: string | null;
+  status?: StatusServidor | null;
+}
+
+export interface UpdateServidorPayload {
+  nome: string;
+  matricula: string;
+  cpf: string;
+  cargoId: string;
+  email: string;
+  setorId: string;
+  dataNascimento: string;
+  telefone?: string | null;
+  status: StatusServidor;
+}
+
+export type TipoChefia =
+  | 'ChefiaImediata'
+  | 'ChefiaSubstituta'
+  | 'Diretor'
+  | 'Subcoordenador';
+
+export interface SetorChefia {
+  tipoChefia: TipoChefia;
+  servidorId: string;
+  servidorNome?: string | null;
+}
+
+export interface SetorChefiaInput {
+  tipoChefia: TipoChefia;
+  servidorId: string;
 }
 
 export interface SetorListItem {
   id: string;
   nome: string;
   sigla: string;
+  resumo?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  isDirecaoIc: boolean;
+  chefias: SetorChefia[];
+}
+
+export interface CreateSetorPayload {
+  nome: string;
+  sigla: string;
+  resumo?: string | null;
+  nucleoId?: string | null;
+  chefias: SetorChefiaInput[];
+}
+
+export interface UpdateSetorPayload {
+  nome: string;
+  sigla: string;
+  resumo?: string | null;
+  nucleoId?: string | null;
+  chefias: SetorChefiaInput[];
+}
+
+export interface NucleoListItem {
+  id: string;
+  nome: string;
+  sigla: string;
+  chefeServidorId?: string | null;
+  chefeNome?: string | null;
+  quantidadeSetores: number;
+}
+
+export interface NucleoDetail {
+  id: string;
+  nome: string;
+  sigla: string;
+  chefeServidorId?: string | null;
+  chefeNome?: string | null;
+  setorIds: string[];
+}
+
+export interface CreateNucleoPayload {
+  nome: string;
+  sigla: string;
+  chefeServidorId?: string | null;
+}
+
+export interface UpdateNucleoPayload {
+  nome: string;
+  sigla: string;
+  chefeServidorId?: string | null;
+}
+
+export interface NucleoComSetores {
+  id: string;
+  nome: string;
+  sigla: string;
+  chefeServidorId?: string | null;
+  chefeNome?: string | null;
+  setores: SetorListItem[];
+}
+
+export interface EstruturaOrganizacional {
+  nucleos: NucleoComSetores[];
+  direcaoIc?: SetorListItem | null;
+}
+
+export interface CargoListItem {
+  id: string;
+  nome: string;
+  codigo: string;
   ativo: boolean;
 }
 
