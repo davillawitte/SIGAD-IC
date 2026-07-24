@@ -9,6 +9,7 @@ public record ServidorListItemDto(
     string Cpf,
     Guid CargoId,
     string Cargo,
+    string CargoCodigo,
     string Email,
     string? Telefone,
     DateOnly DataNascimento,
@@ -38,3 +39,11 @@ public record UpdateServidorRequest(
     DateOnly DataNascimento,
     string? Telefone,
     StatusServidor Status);
+
+public record ServidorExclusaoImpactoDto(
+    int Escalas,
+    int Afastamentos,
+    int Chefias,
+    int Usuarios,
+    int NucleosComoChefe,
+    bool PodeExcluir);

@@ -31,7 +31,8 @@ export class LoginComponent {
           return;
         }
 
-        void this.router.navigateByUrl('/');
+        const target = this.auth.deveAlterarSenha() ? '/trocar-senha' : '/';
+        void this.router.navigateByUrl(target);
         this.loading.set(false);
       },
       error: () => {

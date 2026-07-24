@@ -22,7 +22,41 @@ export const guestGuard: CanActivateFn = () => {
     return true;
   }
 
+  if (auth.deveAlterarSenha()) {
+    return router.createUrlTree(['/trocar-senha']);
+  }
+
   return router.createUrlTree(['/']);
+};
+
+export const mustChangePasswordGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+
+  if (!auth.deveAlterarSenha()) {
+    return router.createUrlTree(['/']);
+  }
+
+  return true;
+};
+
+export const passwordOkGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+
+  if (auth.deveAlterarSenha()) {
+    return router.createUrlTree(['/trocar-senha']);
+  }
+
+  return true;
 };
 
 export const superAdminGuard: CanActivateFn = () => {
@@ -34,4 +68,33 @@ export const superAdminGuard: CanActivateFn = () => {
   }
 
   return router.createUrlTree(['/']);
+};
+
+export const permissionGuard = (code: string): CanActivateFn => {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+
+    if (auth.isAuthenticated() && (auth.isSuperAdmin() || auth.hasPermission(code))) {
+      return true;
+    }
+
+    return router.createUrlTree(['/']);
+  };
+};
+
+export const anyPermissionGuard = (...codes: string[]): CanActivateFn => {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+
+    if (
+      auth.isAuthenticated() &&
+      (auth.isSuperAdmin() || codes.some((code) => auth.hasPermission(code)))
+    ) {
+      return true;
+    }
+
+    return router.createUrlTree(['/']);
+  };
 };

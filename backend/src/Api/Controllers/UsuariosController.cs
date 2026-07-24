@@ -56,14 +56,11 @@ public class UsuariosController(
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    [HttpPost("{id:guid}/senha")]
+    [HttpPost("{id:guid}/reset-senha")]
     [RequiresPermission(PermissionCodes.UsuariosEditar)]
-    public async Task<IActionResult> ChangePassword(
-        Guid id,
-        [FromBody] ChangePasswordRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetPassword(Guid id, CancellationToken cancellationToken)
     {
-        var result = await usuarioService.ChangePasswordAsync(id, request, User.GetLogin(), cancellationToken);
-        return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
+        var result = await usuarioService.ResetPasswordAsync(id, User.GetLogin(), cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 }

@@ -13,4 +13,11 @@ public record UsuarioAuthDto(
     string Nome,
     string? Email,
     IReadOnlyList<string> Perfis,
-    IReadOnlyList<string> Permissoes);
+    IReadOnlyList<string> Permissoes,
+    Guid ServidorId,
+    Guid? SetorLotacaoId,
+    string? SetorLotacaoNome,
+    IReadOnlyList<Guid> SetoresGerenciadosIds,
+    bool DeveAlterarSenha);
+
+public record AlterarSenhaRequest(string SenhaAtual, string NovaSenha);

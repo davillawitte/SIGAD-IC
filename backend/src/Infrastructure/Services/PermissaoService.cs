@@ -51,6 +51,7 @@ public class PermissaoService(ApplicationDbContext db) : IPermissaoService
             permissao.Nome,
             permissao.Descricao,
             permissao.Modulo,
+            permissao.Area,
             permissao.Sistema,
             permissao.Ativo);
 }

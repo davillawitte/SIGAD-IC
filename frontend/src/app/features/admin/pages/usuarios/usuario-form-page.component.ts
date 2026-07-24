@@ -5,7 +5,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
+  PciButtonComponent,
   PciCheckboxComponent,
+  PciFeedbackModalService,
   PciFormPageComponent,
   PciInputComponent,
   PciSelectionListComponent,
@@ -25,6 +27,7 @@ import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared
     ReactiveFormsModule,
     MatSelectModule,
     PciAlertComponent,
+    PciButtonComponent,
     PciCheckboxComponent,
     PciFormPageComponent,
     PciInputComponent,
@@ -41,11 +44,14 @@ export class UsuarioFormPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
   readonly isEdit = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly createdLogin = signal<string | null>(null);
+  readonly createdPassword = signal<string | null>(null);
   readonly servidores = signal<ServidorListItem[]>([]);
   readonly perfis = signal<PerfilListItem[]>([]);
   readonly selectedPerfilIds = signal<string[]>([]);
@@ -54,14 +60,13 @@ export class UsuarioFormPageComponent implements OnInit {
   readonly form = this.fb.nonNullable.group({
     servidorId: [''],
     login: [''],
-    senha: [''],
     nomeServidor: [''],
     ativo: [true],
   });
 
   readonly servidorOptions = computed<PciSelectOption[]>(() =>
     this.servidores().map((s) => ({
-      label: `${s.nome} — ${s.matricula}`,
+      label: `${s.nome} — ${s.matricula} — CPF ${s.cpf}`,
       value: s.id,
     })),
   );
@@ -69,7 +74,7 @@ export class UsuarioFormPageComponent implements OnInit {
   readonly perfilItems = computed<PciSelectionListItem[]>(() =>
     this.perfis().map((perfil) => ({
       id: perfil.id,
-      label: `${perfil.nome} (${perfil.codigo})`,
+      label: perfil.nome,
     })),
   );
 
@@ -83,8 +88,6 @@ export class UsuarioFormPageComponent implements OnInit {
 
     if (!this.editId) {
       this.form.controls.servidorId.setValidators([Validators.required]);
-      this.form.controls.login.setValidators([Validators.required]);
-      this.form.controls.senha.setValidators([Validators.required, Validators.minLength(8)]);
     }
 
     if (this.editId) {
@@ -105,6 +108,11 @@ export class UsuarioFormPageComponent implements OnInit {
   }
 
   save(): void {
+    if (this.createdPassword()) {
+      void this.router.navigateByUrl('/usuarios');
+      return;
+    }
+
     if (this.selectedPerfilIds().length === 0) {
       this.error.set('Selecione ao menos um perfil.');
       return;
@@ -112,14 +120,8 @@ export class UsuarioFormPageComponent implements OnInit {
 
     if (!this.isEdit()) {
       this.form.controls.servidorId.markAsTouched();
-      this.form.controls.login.markAsTouched();
-      this.form.controls.senha.markAsTouched();
-      if (
-        this.form.controls.servidorId.invalid ||
-        this.form.controls.login.invalid ||
-        this.form.controls.senha.invalid
-      ) {
-        this.error.set('Preencha os campos obrigatórios antes de salvar.');
+      if (this.form.controls.servidorId.invalid) {
+        this.error.set('Selecione o servidor antes de salvar.');
         return;
       }
     }
@@ -135,7 +137,10 @@ export class UsuarioFormPageComponent implements OnInit {
           ativo: value.ativo,
         })
         .subscribe({
-          next: () => void this.router.navigateByUrl('/usuarios'),
+          next: () => {
+            this.feedback.showSuccess('Usuário atualizado com sucesso.');
+            void this.router.navigateByUrl('/usuarios');
+          },
           error: (err: { error?: { message?: string } }) => {
             this.error.set(err.error?.message ?? 'Falha ao atualizar usuário.');
             this.saving.set(false);
@@ -147,12 +152,15 @@ export class UsuarioFormPageComponent implements OnInit {
     this.api
       .createUsuario({
         servidorId: value.servidorId,
-        login: value.login.trim(),
-        senha: value.senha,
         perfilIds: this.selectedPerfilIds(),
       })
       .subscribe({
-        next: () => void this.router.navigateByUrl('/usuarios'),
+        next: (created) => {
+          this.createdLogin.set(created.login);
+          this.createdPassword.set(created.senhaTemporaria);
+          this.saving.set(false);
+          this.feedback.showSuccess('Usuário criado com sucesso.');
+        },
         error: (err: { error?: { message?: string } }) => {
           this.error.set(err.error?.message ?? 'Falha ao criar usuário.');
           this.saving.set(false);

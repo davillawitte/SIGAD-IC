@@ -8,6 +8,7 @@ public class Permissao : BaseEntity
     public string Nome { get; private set; } = null!;
     public string? Descricao { get; private set; }
     public string Modulo { get; private set; } = null!;
+    public string Area { get; private set; } = null!;
     public bool Sistema { get; private set; }
     public bool Ativo { get; private set; } = true;
 
@@ -21,6 +22,7 @@ public class Permissao : BaseEntity
         string codigo,
         string nome,
         string modulo,
+        string area,
         string? descricao = null,
         bool sistema = true,
         string? createdBy = null,
@@ -31,6 +33,7 @@ public class Permissao : BaseEntity
             Codigo = NormalizeCodigo(codigo),
             Nome = nome.Trim(),
             Modulo = modulo.Trim().ToLowerInvariant(),
+            Area = area.Trim(),
             Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim(),
             Sistema = sistema,
             Ativo = true,
@@ -45,10 +48,11 @@ public class Permissao : BaseEntity
         return permissao;
     }
 
-    public void Atualizar(string nome, string modulo, string? descricao, string? updatedBy = null)
+    public void Atualizar(string nome, string modulo, string area, string? descricao, string? updatedBy = null)
     {
         Nome = nome.Trim();
         Modulo = modulo.Trim().ToLowerInvariant();
+        Area = area.Trim();
         Descricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao.Trim();
         MarkUpdated(updatedBy);
     }

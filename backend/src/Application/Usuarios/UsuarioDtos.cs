@@ -5,6 +5,7 @@ public record UsuarioListItemDto(
     string Login,
     string NomeServidor,
     string Matricula,
+    string Cpf,
     bool Ativo,
     DateTime? UltimoLogin,
     IReadOnlyList<string> Perfis);
@@ -21,14 +22,29 @@ public record UsuarioDetailDto(
     IReadOnlyList<Guid> PerfilIds,
     IReadOnlyList<string> Perfis);
 
-public record CreateUsuarioRequest(
+public record UsuarioComSenhaDto(
+    Guid Id,
     Guid ServidorId,
     string Login,
-    string Senha,
+    string NomeServidor,
+    string Matricula,
+    string Email,
+    bool Ativo,
+    DateTime? UltimoLogin,
+    IReadOnlyList<Guid> PerfilIds,
+    IReadOnlyList<string> Perfis,
+    string SenhaTemporaria);
+
+public record CreateUsuarioRequest(
+    Guid ServidorId,
     IReadOnlyList<Guid> PerfilIds);
 
 public record UpdateUsuarioRequest(
     IReadOnlyList<Guid>? PerfilIds,
     bool? Ativo);
 
-public record ChangePasswordRequest(string NovaSenha);
+public record ResetSenhaResultDto(
+    Guid Id,
+    string Login,
+    string NomeServidor,
+    string SenhaTemporaria);

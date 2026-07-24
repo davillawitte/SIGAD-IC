@@ -18,6 +18,16 @@ public class ServidoresController(IServidorService servidorService) : Controller
     public async Task<IActionResult> List([FromQuery] bool? semUsuario, CancellationToken cancellationToken) =>
         Ok(await servidorService.ListAsync(semUsuario, cancellationToken));
 
+    [HttpGet("meus")]
+    [RequiresAnyPermission(
+        PermissionCodes.ServidoresListar,
+        PermissionCodes.EscalasCriar,
+        PermissionCodes.EscalasListar,
+        PermissionCodes.AfastamentosCriar,
+        PermissionCodes.AfastamentosListar)]
+    public async Task<IActionResult> ListMeus([FromQuery] bool? semUsuario, CancellationToken cancellationToken) =>
+        Ok(await servidorService.ListMeusAsync(User.GetLogin(), semUsuario, cancellationToken));
+
     [HttpGet("{id:guid}")]
     [RequiresPermission(PermissionCodes.ServidoresListar)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
@@ -42,5 +52,21 @@ public class ServidoresController(IServidorService servidorService) : Controller
     {
         var result = await servidorService.UpdateAsync(id, request, User.GetLogin(), cancellationToken);
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    [HttpGet("{id:guid}/exclusao-impacto")]
+    [RequiresPermission(PermissionCodes.ServidoresExcluir)]
+    public async Task<IActionResult> GetExclusaoImpacto(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await servidorService.GetExclusaoImpactoAsync(id, cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    [HttpDelete("{id:guid}")]
+    [RequiresPermission(PermissionCodes.ServidoresExcluir)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await servidorService.DeleteAsync(id, cancellationToken);
+        return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
     }
 }

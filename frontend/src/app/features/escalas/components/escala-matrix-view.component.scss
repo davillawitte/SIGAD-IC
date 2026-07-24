@@ -1,0 +1,202 @@
+.escala-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #f3f4f6;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.escala-doc__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.escala-doc__brand-center {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+
+.escala-doc__brasao {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.escala-doc__brand {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #344054;
+}
+
+.escala-doc__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.7rem;
+  color: #667085;
+}
+
+.escala-doc__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.escala-doc__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  padding: 0.75rem;
+  background: #e5e7eb;
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.escala-doc__scroll {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #111;
+}
+
+.escala-doc__table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 0.72rem;
+}
+
+.escala-doc__table th,
+.escala-doc__table td {
+  border: 1px solid #111;
+  padding: 0.2rem 0.25rem;
+  text-align: center;
+  white-space: pre-line;
+}
+
+.escala-doc__table th {
+  background: #d0d5dd;
+  font-weight: 600;
+}
+
+.escala-doc__sticky {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+  min-width: 4.5rem;
+  /* border-collapse + sticky some a borda compartilhada ao rolar */
+  box-shadow: 1px 0 0 0 #111;
+}
+
+.escala-doc__sticky--2 {
+  left: 4.5rem;
+  min-width: 9rem;
+  box-shadow: 1px 0 0 0 #111;
+}
+
+.escala-doc__table thead .escala-doc__sticky {
+  background: #d0d5dd;
+  z-index: 4;
+}
+
+.escala-doc__table thead .escala-doc__sticky--2 {
+  z-index: 3;
+}
+
+.escala-doc__table tbody .escala-doc__sticky--2 {
+  z-index: 1;
+}
+
+.escala-doc__day {
+  min-width: 1.6rem;
+}
+
+.escala-doc__table th.is-weekend,
+.escala-doc__table td.is-weekend {
+  background: #fef08a;
+}
+
+.escala-doc__table td.is-lm {
+  background: #fecaca;
+}
+
+.escala-doc__table td.is-fr {
+  background: #bfdbfe;
+}
+
+.escala-doc__table td.is-selected {
+  outline: 2px solid #b8860b;
+  outline-offset: -2px;
+}
+
+.escala-doc__cell {
+  width: 100%;
+  min-width: 2rem;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font: inherit;
+}
+
+.escala-doc__cell:focus {
+  outline: 1px solid #b8860b;
+}
+
+.escala-doc__sub {
+  font-size: 0.65rem;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.escala-doc__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.72rem;
+}
+
+.escala-doc--compact {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  gap: 1rem;
+}
+
+.escala-doc--compact .escala-doc__header {
+  margin-bottom: 0.25rem;
+}
+
+.escala-doc--compact .escala-doc__brand {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.escala-doc--compact .escala-doc__legend {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e4e7ec;
+  gap: 0.5rem 1.25rem;
+}
+
+.escala-doc__table--vertical th {
+  white-space: normal;
+  min-width: 7rem;
+}
+
+@media (max-width: 900px) {
+  .escala-doc__meta {
+    grid-template-columns: 1fr;
+  }
+}

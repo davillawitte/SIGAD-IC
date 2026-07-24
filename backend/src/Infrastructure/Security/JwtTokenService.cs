@@ -24,6 +24,13 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
             new("login", usuario.Login),
         };
 
+        claims.Add(new Claim("servidorId", usuario.ServidorId.ToString()));
+        if (usuario.SetorLotacaoId is Guid setorLotacao)
+        {
+            claims.Add(new Claim("setorLotacaoId", setorLotacao.ToString()));
+        }
+
+        claims.AddRange(usuario.SetoresGerenciadosIds.Select(id => new Claim("setorGerenciadoId", id.ToString())));
         claims.AddRange(usuario.Perfis.Select(perfil => new Claim(ClaimTypes.Role, perfil)));
         claims.AddRange(usuario.Permissoes.Select(permissao => new Claim("permission", permissao)));
 

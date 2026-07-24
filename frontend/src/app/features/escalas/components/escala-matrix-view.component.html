@@ -1,0 +1,148 @@
+<div
+  class="escala-doc"
+  [class.escala-doc--editable]="editable()"
+  [class.escala-doc--compact]="compactHeader()"
+>
+  <header class="escala-doc__header">
+    @if (compactHeader()) {
+      <p class="escala-doc__brand">ESCALA</p>
+    } @else {
+      <div class="escala-doc__brand-row">
+        <img
+          class="escala-doc__brasao"
+          src="/assets/images/logo-pci-govrn-footer.png"
+          alt="Brasão Polícia Científica"
+          width="48"
+          height="48"
+        />
+        <div class="escala-doc__brand-center">
+          <p class="escala-doc__brand">POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</p>
+          <p class="escala-doc__subtitle">
+            SIGAD IC - Sistema de Gestão Administrativa do Instituto de Criminalística
+          </p>
+        </div>
+        <img
+          class="escala-doc__brasao"
+          src="/assets/images/brasao-rn.png"
+          alt="Brasão do Rio Grande do Norte"
+          width="48"
+          height="48"
+        />
+      </div>
+      <h2 class="escala-doc__title">{{ titulo() }}</h2>
+      <div class="escala-doc__meta">
+        <div>
+          <div><strong>Ano:</strong> {{ escala().ano }}</div>
+          <div><strong>Instituto/Regional:</strong> IC/Natal</div>
+        </div>
+        <div>
+          <div><strong>Mês:</strong> {{ mesNome() }}</div>
+          <div><strong>Setor/Núcleo:</strong> {{ escala().setorNome }} ({{ escala().setorSigla }})</div>
+        </div>
+        <div>
+          <div><strong>Responsável:</strong> {{ escala().createdBy || '—' }}</div>
+          <div><strong>Cargos:</strong> {{ cargosParticipantes() }}</div>
+        </div>
+      </div>
+    }
+  </header>
+
+  @if (layout() === 'matriz') {
+    <div class="escala-doc__scroll">
+      <table class="escala-doc__table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="escala-doc__sticky">Matrícula</th>
+            <th rowspan="2" class="escala-doc__sticky escala-doc__sticky--2">Nome do Servidor</th>
+            <th rowspan="2">Cargo</th>
+            @for (day of days(); track day) {
+              <th class="escala-doc__day" [class.is-weekend]="isWeekend(day)">{{ dayNumber(day) }}</th>
+            }
+            <th rowspan="2">CH Presencial</th>
+            <th rowspan="2">CH Remota</th>
+          </tr>
+          <tr>
+            @for (day of days(); track day) {
+              <th class="escala-doc__day" [class.is-weekend]="isWeekend(day)">{{ dayLetter(day) }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of escala().servidores; track s.servidorId) {
+            <tr>
+              <td class="escala-doc__sticky">{{ s.matricula }}</td>
+              <td class="escala-doc__sticky escala-doc__sticky--2">{{ s.servidorNome }}</td>
+              <td>{{ s.cargoCodigo || s.cargoNome || '—' }}</td>
+              @for (day of days(); track day) {
+                <td
+                  [class.is-weekend]="isWeekend(day)"
+                  [class.is-lm]="code(s.servidorId, day) === 'LM'"
+                  [class.is-fr]="code(s.servidorId, day) === 'FR'"
+                  [class.is-selected]="selected(s.servidorId, day)"
+                  (mousedown)="onMouseDown(s.servidorId, day, $event)"
+                >
+                  @if (editable()) {
+                    <input
+                      class="escala-doc__cell"
+                      [value]="code(s.servidorId, day)"
+                      (input)="onCellInput($event)"
+                      (blur)="onBlur(s.servidorId, day, $event)"
+                      (keydown)="onKeydown(s.servidorId, day, $event)"
+                    />
+                  } @else {
+                    {{ cellLabel(s.servidorId, day) }}
+                  }
+                </td>
+              }
+              <td>{{ chPres(s.servidorId) }}</td>
+              <td>{{ chRem(s.servidorId) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="escala-doc__scroll">
+      <table class="escala-doc__table escala-doc__table--vertical">
+        <thead>
+          <tr>
+            <th>Data</th>
+            @for (s of escala().servidores; track s.servidorId) {
+              <th>
+                {{ s.cargoCodigo || s.cargoNome || '—' }}
+                <br />
+                {{ s.servidorNome }}
+                <br />
+                <span class="escala-doc__sub">Mat. {{ s.matricula }} · P {{ chPres(s.servidorId) }}h · R {{ chRem(s.servidorId) }}h</span>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (day of days(); track day) {
+            <tr>
+              <td [class.is-weekend]="isWeekend(day)">
+                {{ formatVerticalDate(day) }}
+              </td>
+              @for (s of escala().servidores; track s.servidorId) {
+                <td
+                  [class.is-weekend]="isWeekend(day)"
+                  [class.is-lm]="code(s.servidorId, day) === 'LM'"
+                  [class.is-fr]="code(s.servidorId, day) === 'FR'"
+                >
+                  {{ cellLabel(s.servidorId, day) || '—' }}
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <ul class="escala-doc__legend">
+    @for (item of legend; track item.codigo) {
+      <li><strong>{{ item.codigo }}</strong>: {{ item.nome }}</li>
+    }
+  </ul>
+</div>

@@ -5,6 +5,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
+  PciFeedbackModalService,
   PciFormPageComponent,
   PciInputComponent,
 } from '@davillawitte/pci-design-system';
@@ -35,6 +36,7 @@ export class NucleoFormPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
   readonly isEdit = signal(false);
@@ -100,14 +102,20 @@ export class NucleoFormPageComponent implements OnInit {
 
     if (this.isEdit() && this.editId) {
       this.api.updateNucleo(this.editId, payload).subscribe({
-        next: () => void this.router.navigateByUrl('/estrutura-organizacional'),
+        next: () => {
+          this.feedback.showSuccess('Núcleo atualizado com sucesso.');
+          void this.router.navigateByUrl('/estrutura-organizacional');
+        },
         error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
       });
       return;
     }
 
     this.api.createNucleo(payload).subscribe({
-      next: () => void this.router.navigateByUrl('/estrutura-organizacional'),
+      next: () => {
+        this.feedback.showSuccess('Núcleo criado com sucesso.');
+        void this.router.navigateByUrl('/estrutura-organizacional');
+      },
       error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
     });
   }

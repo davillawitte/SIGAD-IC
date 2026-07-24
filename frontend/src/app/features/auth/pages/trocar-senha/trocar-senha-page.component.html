@@ -1,0 +1,37 @@
+<pci-auth-layout>
+  <div class="trocar-senha">
+    <h1>Trocar senha</h1>
+    <p>Por segurança, defina uma nova senha antes de continuar.</p>
+
+    @if (error()) {
+      <pci-alert variant="error" title="Atenção" [message]="error()!" />
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <pci-stack gap="3" [fullWidth]="true">
+        <pci-input
+          label="Senha atual"
+          type="password"
+          formControlName="senhaAtual"
+          [required]="true"
+        />
+        <pci-input
+          label="Nova senha"
+          type="password"
+          formControlName="novaSenha"
+          hint="Mínimo de 8 caracteres"
+          [required]="true"
+        />
+        <pci-input
+          label="Confirmar nova senha"
+          type="password"
+          formControlName="confirmarSenha"
+          [required]="true"
+        />
+        <pci-button variant="primary" [loading]="loading()" (clicked)="submit()">
+          Salvar nova senha
+        </pci-button>
+      </pci-stack>
+    </form>
+  </div>
+</pci-auth-layout>

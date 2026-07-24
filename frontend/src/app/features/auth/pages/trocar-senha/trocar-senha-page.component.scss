@@ -1,0 +1,21 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.trocar-senha {
+  width: min(100%, 26rem);
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.trocar-senha h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.trocar-senha p {
+  margin: 0;
+  opacity: 0.85;
+}

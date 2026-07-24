@@ -1,0 +1,334 @@
+<div class="escala-wizard">
+  <pci-page-header [title]="pageTitle()" description="Assistente de escala em 4 etapas.">
+    <pci-stack slot="actions" gap="2" direction="horizontal">
+      @if (dirty()) {
+        <pci-button variant="secondary" [loading]="working()" (clicked)="salvarRascunho()">
+          Salvar rascunho
+        </pci-button>
+      }
+      <pci-button variant="ghost" (clicked)="cancelar()">Cancelar</pci-button>
+    </pci-stack>
+  </pci-page-header>
+
+  @if (error()) {
+    <pci-alert variant="error" title="Atenção" [message]="error()!" />
+  }
+
+  <pci-stepper
+    class="wizard-stepper"
+    [linear]="false"
+    [selectedIndex]="stepperIndex()"
+    (selectedIndexChange)="onStepperIndexChange($event)"
+  >
+    <pci-step label="Período" [completed]="step() > 1"></pci-step>
+    <pci-step label="Regimes e servidores" [completed]="step() > 2"></pci-step>
+    <pci-step label="Afastamentos e ocorrências" [completed]="step() > 3"></pci-step>
+    <pci-step label="Revisão" [completed]="false"></pci-step>
+  </pci-stepper>
+
+  <!-- ===================== STEP 1 ===================== -->
+  @if (step() === 1) {
+    <div class="wizard-panel">
+      <form [formGroup]="step1Form">
+        <app-form-section title="Período da escala">
+          @if (showSetorSelect()) {
+            <pci-select
+              [appFormCol]="12"
+              label="Setor"
+              [required]="true"
+              formControlName="setorId"
+              [options]="setorOptions()"
+              placeholder="Selecione o setor"
+            />
+          } @else if (setorUnicoLabel(); as setorNome) {
+            <p [appFormCol]="12" class="wizard-hint">Setor: <strong>{{ setorNome }}</strong></p>
+          }
+
+          <pci-select
+            [appFormCol]="6"
+            label="Mês"
+            [required]="true"
+            formControlName="mes"
+            [options]="mesOptions"
+            placeholder="Selecione o mês"
+          />
+
+          <pci-input [appFormCol]="6" label="Ano" formControlName="ano" type="number" [required]="true" />
+        </app-form-section>
+      </form>
+
+      @if (periodoDuplicado()) {
+        <pci-alert
+          variant="error"
+          title="Período indisponível"
+          message="Já existe escala para este setor neste mês/ano. Escolha outro período ou edite a escala existente."
+        />
+      }
+
+      @if (anteriorChecked()) {
+        @if (escalaAnterior(); as ant) {
+          <pci-alert
+            variant="info"
+            title="Escala anterior encontrada"
+            [message]="ant.identificacao + ' · ' + ant.quantidadeServidores + ' servidor(es) · Status: ' + ant.status + ' · Tipo: ' + ant.tipoFuncionamento"
+          />
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button
+              variant="secondary"
+              [loading]="working()"
+              [disabled]="periodoDuplicado()"
+              (clicked)="naoCopiar()"
+            >
+              Não copiar
+            </pci-button>
+            <pci-button
+              variant="primary"
+              [loading]="working()"
+              [disabled]="periodoDuplicado()"
+              (clicked)="copiarAnterior()"
+            >
+              Copiar escala anterior
+            </pci-button>
+          </pci-stack>
+        } @else {
+          <pci-button
+            variant="primary"
+            [loading]="working()"
+            [disabled]="step1Form.invalid || periodoDuplicado()"
+            (clicked)="continuar1()"
+          >
+            Continuar
+          </pci-button>
+        }
+      } @else {
+        <p class="wizard-hint">Verificando escala do mês anterior…</p>
+      }
+    </div>
+  }
+
+  <!-- ===================== STEP 2 ===================== -->
+  @if (step() === 2) {
+    <div class="wizard-panel">
+      <app-form-section title="Regimes de trabalho" description="Selecione um ou mais regimes utilizados nesta escala.">
+        <div [appFormCol]="12" class="wizard-checkbox-row">
+          @for (opt of regimeOptions; track opt.codigo) {
+            <pci-checkbox
+              [label]="opt.label"
+              [checked]="isRegimeSelected(opt.codigo)"
+              (changed)="toggleRegime(opt.codigo)"
+            />
+          }
+        </div>
+      </app-form-section>
+
+      <app-form-section title="Servidores do setor" description="Selecione os servidores que participam da escala do mês referência.">
+        <div [appFormCol]="12" class="wizard-servidor-list" [formGroup]="inicioCicloForm">
+          @for (s of servidoresSetor(); track s.id) {
+            <div class="wizard-servidor-row">
+              <pci-checkbox
+                [label]="s.nome + ' — ' + s.matricula"
+                [checked]="isServidorSelected(s.id)"
+                (changed)="toggleServidor(s.id)"
+              />
+              @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id)) {
+                <div class="wizard-servidor-tarde">
+                  <span class="wizard-servidor-tarde__label">Expediente tarde (T)</span>
+                  <div class="wizard-checkbox-row">
+                    @for (wd of weekdayOptions; track wd.value) {
+                      <pci-checkbox
+                        [label]="wd.label"
+                        [checked]="isExpedienteTardeDay(s.id, wd.value)"
+                        (changed)="toggleExpedienteTardeDay(s.id, wd.value)"
+                      />
+                    }
+                  </div>
+                </div>
+              }
+              @if (needsInicioCiclo() && isServidorSelected(s.id) && inicioCicloForm.contains(s.id)) {
+                <pci-select
+                  class="wizard-inicio-ciclo"
+                  label="Início do ciclo"
+                  [required]="true"
+                  [options]="inicioCicloOptions()"
+                  [formControlName]="s.id"
+                  placeholder="Selecione o dia"
+                />
+              }
+            </div>
+          } @empty {
+            <p class="wizard-hint">Nenhum servidor encontrado para este setor.</p>
+          }
+        </div>
+      </app-form-section>
+
+      <pci-stack gap="2" direction="horizontal">
+        @if (!periodLocked()) {
+          <pci-button variant="ghost" (clicked)="voltarStep(1)">Voltar</pci-button>
+        }
+        <pci-button variant="primary" [loading]="working()" (clicked)="continuar2()">Continuar</pci-button>
+      </pci-stack>
+    </div>
+  }
+
+  <!-- ===================== STEP 3 ===================== -->
+  @if (step() === 3) {
+    <div class="wizard-panel">
+      <app-form-section title="Afastamentos no período">
+        <div [appFormCol]="12">
+          <pci-button variant="secondary" size="sm" (clicked)="openAfastamentoModal()">
+            Adicionar afastamento
+          </pci-button>
+        </div>
+        <div [appFormCol]="12">
+          @if (afastamentos().length) {
+            <table class="wizard-table">
+              <thead>
+                <tr>
+                  <th>Servidor</th>
+                  <th>Período</th>
+                  <th>Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of afastamentos(); track a.id) {
+                  <tr>
+                    <td>{{ a.servidorNome }}</td>
+                    <td>{{ fmt(a.dataInicio) }} – {{ fmt(a.dataFim) }}</td>
+                    <td>{{ a.tipoOcorrenciaNome }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="wizard-hint">Nenhum afastamento registrado para os servidores desta escala no período.</p>
+          }
+        </div>
+      </app-form-section>
+
+      @if (hoServidores().length) {
+        <app-form-section
+          title="Home office (expediente administrativo)"
+          description="Selecione os dias da semana em teletrabalho por servidor e aplique. Servidores sem dias marcados não são alterados."
+        >
+          <div [appFormCol]="12" class="wizard-ho-list">
+            @for (s of hoServidores(); track s.servidorId) {
+              <div class="wizard-ho-row">
+                <strong>{{ s.servidorNome }}</strong>
+                <div class="wizard-checkbox-row">
+                  @for (wd of weekdayOptions; track wd.value) {
+                    <pci-checkbox
+                      [label]="wd.label"
+                      [checked]="isHomeOfficeDay(s.servidorId, wd.value)"
+                      (changed)="toggleHomeOfficeDay(s.servidorId, wd.value)"
+                    />
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          <pci-button [appFormCol]="12" variant="secondary" (clicked)="aplicarHomeOffice()">
+            Aplicar home office
+          </pci-button>
+        </app-form-section>
+      }
+
+      <pci-tabs [selectedIndex]="step3TabIndex()" (selectedIndexChange)="onStep3TabIndexChange($event)">
+        <pci-tab label="Matriz"></pci-tab>
+        <pci-tab label="Formulário"></pci-tab>
+      </pci-tabs>
+
+      @if (step3Tab() === 'matriz' && escala(); as e) {
+        <div class="wizard-panel__inner">
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button variant="ghost" size="sm" (clicked)="copySelection()">Copiar</pci-button>
+            <pci-button variant="ghost" size="sm" (clicked)="pasteSelection()">Colar</pci-button>
+          </pci-stack>
+          <app-escala-matrix-view
+            [escala]="e"
+            layout="matriz"
+            [editable]="true"
+            [codeChange]="onMatrizCodeChangeBound"
+            [cellMouseDown]="onCellMouseDownBound"
+            [cellKeydown]="onCellKeydownBound"
+            [isCellSelected]="isSelectedBound"
+          />
+        </div>
+      }
+
+      @if (step3Tab() === 'formulario') {
+        <div class="wizard-panel__inner">
+          <pci-select
+            label="Servidor"
+            [options]="formServidorOptions()"
+            [formControl]="formServidorControl"
+            placeholder="Selecione o servidor"
+          />
+
+          @if (formServidor(); as s) {
+            <table class="wizard-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Código</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (oc of s.ocorrencias; track oc.data) {
+                  <tr>
+                    <td>{{ fmt(oc.data) }}</td>
+                    <td>
+                      <input
+                        class="wizard-form-input"
+                        [value]="oc.tipoOcorrenciaCodigo"
+                        (input)="onFormCodigoInput($event)"
+                        (blur)="onFormCodigoBlur(oc.data.slice(0, 10), $event)"
+                      />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+      }
+
+      <pci-stack gap="2" direction="horizontal">
+        <pci-button variant="ghost" (clicked)="voltarStep(2)">Voltar</pci-button>
+        <pci-button variant="primary" (clicked)="continuar3()">Continuar</pci-button>
+      </pci-stack>
+    </div>
+  }
+
+  <!-- ===================== STEP 4 ===================== -->
+  @if (step() === 4) {
+    <div class="wizard-panel">
+      @if (escala(); as e) {
+        <pci-tabs [selectedIndex]="reviewTabIndex()" (selectedIndexChange)="onReviewTabIndexChange($event)">
+          <pci-tab label="Matriz"></pci-tab>
+          <pci-tab label="Vertical"></pci-tab>
+        </pci-tabs>
+
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button variant="secondary" icon="print" (clicked)="imprimir()">
+            Exportar em PDF
+          </pci-button>
+        </pci-stack>
+
+        @if (reviewTab() === 'matriz') {
+          <app-escala-matrix-view [escala]="e" layout="matriz" />
+        }
+        @if (reviewTab() === 'vertical') {
+          <app-escala-matrix-view [escala]="e" layout="vertical" />
+        }
+
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button variant="ghost" (clicked)="voltarStep(3)">Voltar</pci-button>
+          <pci-button variant="secondary" [loading]="working()" (clicked)="salvarRascunho()">
+            Salvar rascunho
+          </pci-button>
+          <pci-button variant="primary" [loading]="working()" (clicked)="finalizar()">Finalizar</pci-button>
+        </pci-stack>
+      }
+    </div>
+  }
+</div>

@@ -27,19 +27,30 @@ public static class AuthSeed
         await SeedPerfisAsync(context, cancellationToken);
         await SeedCargosAsync(context, cancellationToken);
         await SeedSetorServidorUsuarioAsync(context, cancellationToken);
+        await TipoOcorrenciaSeed.SeedAsync(context, cancellationToken);
+        await PadraoEscalaSeed.SeedAsync(context, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Auth seed applied (cargos, perfis, permissões e superusuário).");
+        logger.LogInformation("Auth seed applied (cargos, perfis, permissões, tipos de ocorrência e superusuário).");
     }
 
     private static async Task SeedPermissoesAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
-        var existing = await context.Permissoes.Select(x => x.Codigo).ToListAsync(cancellationToken);
+        var existing = await context.Permissoes.ToListAsync(cancellationToken);
+        var existingByCodigo = existing.ToDictionary(x => x.Codigo, StringComparer.Ordinal);
         var hasherCreatedBy = "seed";
 
-        foreach (var (codigo, nome, modulo, descricao) in PermissionCodes.Catalog)
+        foreach (var (codigo, nome, modulo, area, descricao) in PermissionCodes.Catalog)
         {
-            if (existing.Contains(codigo))
+            if (existingByCodigo.TryGetValue(codigo, out var atual))
             {
+                if (!string.Equals(atual.Area, area, StringComparison.Ordinal)
+                    || !string.Equals(atual.Nome, nome, StringComparison.Ordinal)
+                    || !string.Equals(atual.Modulo, modulo, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(atual.Descricao, descricao, StringComparison.Ordinal))
+                {
+                    atual.Atualizar(nome, modulo, area, descricao, hasherCreatedBy);
+                }
+
                 continue;
             }
 
@@ -47,29 +58,97 @@ public static class AuthSeed
                 codigo,
                 nome,
                 modulo,
+                area,
                 descricao,
                 sistema: true,
                 createdBy: hasherCreatedBy,
                 id: CreateDeterministicGuid(codigo)));
         }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedCargosAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
-        var existing = await context.Cargos.Select(x => x.Codigo).ToListAsync(cancellationToken);
+        var cargos = await context.Cargos.ToListAsync(cancellationToken);
+        var byCodigo = cargos.ToDictionary(x => x.Codigo, StringComparer.OrdinalIgnoreCase);
 
         foreach (var (codigo, nome) in CargoCodes.Catalog)
         {
-            if (existing.Contains(codigo))
+            if (byCodigo.TryGetValue(codigo, out var existing))
+            {
+                if (!existing.Ativo)
+                {
+                    existing.Ativar("seed");
+                }
+
+                if (!string.Equals(existing.Nome, nome, StringComparison.Ordinal))
+                {
+                    existing.Atualizar(nome, "seed");
+                }
+
+                continue;
+            }
+
+            var created = Cargo.Create(
+                nome,
+                codigo,
+                createdBy: "seed",
+                id: CreateDeterministicGuid($"cargo:{codigo}"));
+            context.Cargos.Add(created);
+            cargos.Add(created);
+            byCodigo[codigo] = created;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        // Remapear FKs dos códigos longos legados para as siglas e desativar os obsoletos.
+        cargos = await context.Cargos.ToListAsync(cancellationToken);
+        byCodigo = cargos.ToDictionary(x => x.Codigo, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var obsolete in cargos.Where(c => CargoCodes.ObsoleteToSigla.ContainsKey(c.Codigo)).ToList())
+        {
+            if (!CargoCodes.ObsoleteToSigla.TryGetValue(obsolete.Codigo, out var sigla)
+                || !byCodigo.TryGetValue(sigla, out var target))
             {
                 continue;
             }
 
-            context.Cargos.Add(Cargo.Create(
-                nome,
-                codigo,
-                createdBy: "seed",
-                id: CreateDeterministicGuid($"cargo:{codigo}")));
+            var servidores = await context.Servidores
+                .Where(x => x.CargoId == obsolete.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var servidor in servidores)
+            {
+                servidor.Atualizar(
+                    servidor.Nome,
+                    servidor.Matricula,
+                    servidor.Cpf,
+                    target.Id,
+                    servidor.Email,
+                    servidor.SetorId,
+                    servidor.DataNascimento,
+                    servidor.Telefone,
+                    "seed");
+            }
+
+            var escalaServidores = await context.EscalaServidores
+                .Where(x => x.CargoId == obsolete.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var es in escalaServidores)
+            {
+                es.AtualizarSnapshot(
+                    target.Id,
+                    es.ServidorNome,
+                    es.Matricula,
+                    target.Nome,
+                    target.Codigo,
+                    "seed");
+            }
+
+            if (obsolete.Ativo)
+            {
+                obsolete.Desativar("seed");
+            }
         }
 
         await context.SaveChangesAsync(cancellationToken);
@@ -121,21 +200,28 @@ public static class AuthSeed
         // Super Administrador sempre com o catálogo completo (não editável pela UI).
         await SyncPerfilPermissoesAsync(context, PerfilSuperAdminId, allCatalogPermissaoIds, cancellationToken);
 
+        // Perfis com criar/editar servidores também recebem excluir.
+        await EnsureServidoresExcluirForGestoresAsync(context, cancellationToken);
+
         var chefePermissoes = await context.Permissoes
             .Where(x => x.Ativo && (
-                x.Codigo == PermissionCodes.UsuariosListar ||
-                x.Codigo == PermissionCodes.NucleosListar ||
-                x.Codigo == PermissionCodes.SetoresListar ||
-                x.Codigo == PermissionCodes.CargosListar ||
-                x.Codigo == PermissionCodes.ServidoresListar ||
-                x.Codigo == PermissionCodes.ServidoresCriar ||
-                x.Codigo == PermissionCodes.ServidoresEditar ||
-                x.Codigo == PermissionCodes.PerfisListar ||
-                x.Codigo == PermissionCodes.PermissoesListar))
+                x.Codigo == PermissionCodes.EscalasListar ||
+                x.Codigo == PermissionCodes.EscalasCriar ||
+                x.Codigo == PermissionCodes.EscalasEditar ||
+                x.Codigo == PermissionCodes.EscalasFinalizar ||
+                x.Codigo == PermissionCodes.EscalasPublicar ||
+                x.Codigo == PermissionCodes.EscalasExcluir ||
+                x.Codigo == PermissionCodes.EscalasSolicitarDevolucao ||
+                x.Codigo == PermissionCodes.EscalasExportar ||
+                x.Codigo == PermissionCodes.AfastamentosListar ||
+                x.Codigo == PermissionCodes.AfastamentosCriar ||
+                x.Codigo == PermissionCodes.AfastamentosEditar ||
+                x.Codigo == PermissionCodes.AfastamentosExcluir))
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
 
-        await EnsurePerfilPermissoesAsync(context, PerfilChefeSetorId, chefePermissoes, cancellationToken);
+        // Chefe de Setor: somente Gestão do Setor (sincroniza, remove extras).
+        await SyncPerfilPermissoesAsync(context, PerfilChefeSetorId, chefePermissoes, cancellationToken);
 
         var servidorPermissoes = await context.Permissoes
             .Where(x => x.Ativo && (
@@ -146,6 +232,60 @@ public static class AuthSeed
             .ToListAsync(cancellationToken);
 
         await EnsurePerfilPermissoesAsync(context, PerfilServidorId, servidorPermissoes, cancellationToken);
+    }
+
+    private static async Task EnsureServidoresExcluirForGestoresAsync(
+        ApplicationDbContext context,
+        CancellationToken cancellationToken)
+    {
+        var excluir = await context.Permissoes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Ativo && x.Codigo == PermissionCodes.ServidoresExcluir, cancellationToken);
+        if (excluir is null)
+        {
+            return;
+        }
+
+        var gestorPermissaoIds = await context.Permissoes
+            .AsNoTracking()
+            .Where(x =>
+                x.Ativo &&
+                (x.Codigo == PermissionCodes.ServidoresCriar || x.Codigo == PermissionCodes.ServidoresEditar))
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (gestorPermissaoIds.Count == 0)
+        {
+            return;
+        }
+
+        var gestorPerfilIds = await context.PerfilPermissoes
+            .AsNoTracking()
+            .Where(x =>
+                gestorPermissaoIds.Contains(x.PermissaoId) &&
+                x.PerfilId != PerfilSuperAdminId)
+            .Select(x => x.PerfilId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (gestorPerfilIds.Count == 0)
+        {
+            return;
+        }
+
+        await EnsurePerfilPermissoesAsync(context, gestorPerfilIds, [excluir.Id], cancellationToken);
+    }
+
+    private static async Task EnsurePerfilPermissoesAsync(
+        ApplicationDbContext context,
+        IReadOnlyCollection<Guid> perfilIds,
+        IReadOnlyCollection<Guid> permissaoIds,
+        CancellationToken cancellationToken)
+    {
+        foreach (var perfilId in perfilIds)
+        {
+            await EnsurePerfilPermissoesAsync(context, perfilId, permissaoIds, cancellationToken);
+        }
     }
 
     private static async Task EnsurePerfilPermissoesAsync(
@@ -159,7 +299,14 @@ public static class AuthSeed
             .Select(x => x.PermissaoId)
             .ToListAsync(cancellationToken);
 
-        foreach (var permissaoId in permissaoIds.Except(existing))
+        var pending = context.ChangeTracker.Entries<PerfilPermissao>()
+            .Where(e =>
+                e.Entity.PerfilId == perfilId &&
+                (e.State == EntityState.Added || e.State == EntityState.Unchanged || e.State == EntityState.Modified))
+            .Select(e => e.Entity.PermissaoId);
+
+        var known = existing.Concat(pending).ToHashSet();
+        foreach (var permissaoId in permissaoIds.Except(known))
         {
             context.PerfilPermissoes.Add(PerfilPermissao.Create(perfilId, permissaoId));
         }
@@ -221,11 +368,14 @@ public static class AuthSeed
 
         if (!await context.Servidores.AnyAsync(x => x.Id == ServidorVitorId, cancellationToken))
         {
+            var cargoPc = await context.Cargos
+                .FirstAsync(x => x.Codigo == CargoCodes.PeritoCriminal, cancellationToken);
+
             context.Servidores.Add(Servidor.Create(
                 nome: "Vitor Lopes",
                 matricula: "000.001-0",
                 cpf: "00000000000",
-                cargoId: CargoPeritoCriminalId,
+                cargoId: cargoPc.Id,
                 email: "vitorlopes@pci.rn.gov.br",
                 setorId: SetorDiretoriaId,
                 dataNascimento: new DateOnly(1990, 1, 1),
@@ -233,6 +383,15 @@ public static class AuthSeed
                 createdBy: "seed",
                 id: ServidorVitorId));
             await context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Remove chefias órfãs na Direção IC (ex.: Subcoordenador indevido) e garante só Vitor como Diretor.
+        var chefiasNaoDiretor = setorDirecao.Chefias
+            .Where(x => x.TipoChefia != TipoChefia.Diretor)
+            .ToList();
+        if (chefiasNaoDiretor.Count > 0)
+        {
+            context.SetorChefias.RemoveRange(chefiasNaoDiretor);
         }
 
         var diretor = setorDirecao.Chefias.FirstOrDefault(x => x.TipoChefia == TipoChefia.Diretor);
@@ -245,6 +404,8 @@ public static class AuthSeed
             diretor.TrocarServidor(ServidorVitorId);
         }
 
+        await EnforceSingleSetorChefiaPerServidorAsync(context, cancellationToken);
+
         if (!await context.Usuarios.AnyAsync(x => x.Id == UsuarioVitorId, cancellationToken))
         {
             var hasher = new PasswordHasher<object>();
@@ -255,10 +416,58 @@ public static class AuthSeed
                 SuperUserLogin,
                 hash,
                 createdBy: "seed",
-                id: UsuarioVitorId);
+                id: UsuarioVitorId,
+                deveAlterarSenha: false);
 
             usuario.DefinirPerfis([PerfilSuperAdminId], "seed");
             context.Usuarios.Add(usuario);
+        }
+    }
+
+    /// <summary>
+    /// Um servidor só pode ser chefe de um setor. Remove vínculos extras (prefere o setor de lotação).
+    /// </summary>
+    private static async Task EnforceSingleSetorChefiaPerServidorAsync(
+        ApplicationDbContext context,
+        CancellationToken cancellationToken)
+    {
+        var chefias = await context.SetorChefias
+            .Include(x => x.Servidor)
+            .ToListAsync(cancellationToken);
+
+        var toRemove = new List<SetorChefia>();
+        foreach (var group in chefias.GroupBy(x => x.ServidorId))
+        {
+            var setorIds = group.Select(x => x.SetorId).Distinct().ToList();
+            if (setorIds.Count <= 1)
+            {
+                continue;
+            }
+
+            var lotacaoId = group.First().Servidor?.SetorId;
+            Guid keepSetorId;
+            if (lotacaoId is Guid lotacao && setorIds.Contains(lotacao))
+            {
+                keepSetorId = lotacao;
+            }
+            else
+            {
+                keepSetorId = group
+                    .Where(x => x.TipoChefia is TipoChefia.Diretor or TipoChefia.ChefiaImediata)
+                    .Select(x => x.SetorId)
+                    .FirstOrDefault();
+                if (keepSetorId == Guid.Empty)
+                {
+                    keepSetorId = setorIds[0];
+                }
+            }
+
+            toRemove.AddRange(group.Where(x => x.SetorId != keepSetorId));
+        }
+
+        if (toRemove.Count > 0)
+        {
+            context.SetorChefias.RemoveRange(toRemove);
         }
     }
 

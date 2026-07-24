@@ -1,0 +1,52 @@
+<div class="escala-matrix">
+  @if (escala(); as e) {
+    <pci-page-header title="Visão calendário" [description]="e.identificacao">
+      <pci-stack slot="actions" gap="2" direction="horizontal">
+        <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
+        @if (e.status === 'Rascunho' || e.status === 'Finalizada') {
+          <pci-button variant="primary" icon="edit" (clicked)="editar()">Editar</pci-button>
+        }
+      </pci-stack>
+    </pci-page-header>
+
+    <div class="escala-matrix__scroll">
+      <table class="escala-matrix__table">
+        <thead>
+          <tr>
+            <th>Matrícula</th>
+            <th>Nome</th>
+            <th>Cargo</th>
+            @for (day of days(); track day) {
+              <th [class.is-weekend]="isWeekend(day)">{{ dayLabel(day) }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of e.servidores; track s.servidorId) {
+            <tr>
+              <td>{{ s.matricula }}</td>
+              <td>{{ s.servidorNome }}</td>
+              <td>{{ s.cargoCodigo }}</td>
+              @for (day of days(); track day) {
+                <td [class.is-weekend]="isWeekend(day)">
+                  <button
+                    type="button"
+                    class="escala-matrix__cell"
+                    [class.is-clickable]="isEditable()"
+                    (click)="onCellClick(s.servidorId, day)"
+                  >
+                    {{ codeFor(s.servidorId, day) }}
+                  </button>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else if (loading()) {
+    <p>Carregando…</p>
+  } @else if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+</div>

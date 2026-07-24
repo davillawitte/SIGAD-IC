@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
   PciDatepickerComponent,
+  PciFeedbackModalService,
   PciFormPageComponent,
   PciInputComponent,
 } from '@davillawitte/pci-design-system';
@@ -47,7 +48,7 @@ function cpfValidator(control: AbstractControl): ValidationErrors | null {
 
 function emailFormatValidator(control: AbstractControl): ValidationErrors | null {
   const v = (control.value ?? '').toString().trim();
-  if (!v) return { required: true };
+  if (!v) return null;
   return isEmailValid(v) ? null : { email: true };
 }
 
@@ -95,6 +96,7 @@ export class ServidorFormPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly feedback = inject(PciFeedbackModalService);
   private readonly subs = new Subscription();
 
   readonly routePages = ADMIN_ROUTE_PAGES;
@@ -196,14 +198,20 @@ export class ServidorFormPageComponent implements OnInit, OnDestroy {
 
     if (this.isEdit() && this.editId) {
       this.api.updateServidor(this.editId, payload).subscribe({
-        next: () => void this.router.navigateByUrl('/servidores'),
+        next: () => {
+          this.feedback.showSuccess('Servidor atualizado com sucesso.');
+          void this.router.navigateByUrl('/servidores');
+        },
         error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
       });
       return;
     }
 
     this.api.createServidor(payload).subscribe({
-      next: () => void this.router.navigateByUrl('/servidores'),
+      next: () => {
+        this.feedback.showSuccess('Servidor criado com sucesso.');
+        void this.router.navigateByUrl('/servidores');
+      },
       error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
     });
   }

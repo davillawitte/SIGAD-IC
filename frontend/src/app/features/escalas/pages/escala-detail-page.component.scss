@@ -1,0 +1,54 @@
+.escala-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 0 2rem;
+}
+
+.escala-detail__header-actions {
+  align-items: center;
+}
+
+.escala-detail__resumo {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+  color: var(--pci-color-text-muted, #667085);
+}
+
+.escala-detail__dot {
+  opacity: 0.6;
+}
+
+.escala-detail__obs {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--pci-color-text-muted, #667085);
+}
+
+.escala-detail__actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.escala-detail__preview-fieldset {
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--pci-color-border, #d0d5dd);
+  border-radius: var(--pci-radius-lg, 0.5rem);
+  min-width: 0;
+}
+
+.escala-detail__preview-fieldset > legend {
+  padding: 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pci-color-text, #344054);
+}
+
+.escala-detail__preview {
+  margin-top: 0.75rem;
+}

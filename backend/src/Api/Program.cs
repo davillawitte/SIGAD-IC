@@ -80,7 +80,9 @@ try
 
     var app = builder.Build();
 
-    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
+    if (app.Environment.IsDevelopment()
+        || app.Environment.IsEnvironment("Docker")
+        || app.Environment.IsProduction())
     {
         await DatabaseInitializer.MigrateAsync(app.Services);
     }
@@ -104,8 +106,16 @@ try
 
     app.MapControllers();
 
-    app.MapGet("/", () => Results.Redirect("/swagger"))
-        .ExcludeFromDescription();
+    if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
+    {
+        app.MapGet("/", () => Results.Redirect("/swagger"))
+            .ExcludeFromDescription();
+    }
+    else
+    {
+        app.MapGet("/", () => Results.Ok(new { service = "SIGAD-IC API", status = "ok" }))
+            .ExcludeFromDescription();
+    }
 
     app.Run();
 }

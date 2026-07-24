@@ -26,6 +26,54 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         return items.Select(Map).ToList();
     }
 
+    public async Task<IReadOnlyList<ServidorListItemDto>> ListMeusAsync(
+        string actorLogin,
+        bool? semUsuario = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = actorLogin.Trim().ToLowerInvariant();
+        var usuario = await db.Usuarios
+            .AsNoTracking()
+            .Include(x => x.UsuarioPerfis).ThenInclude(x => x.Perfil)
+            .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
+
+        if (usuario is null)
+        {
+            return [];
+        }
+
+        var isSuper = usuario.UsuarioPerfis.Any(x =>
+            x.Perfil.Ativo && x.Perfil.Codigo == PerfilCodes.SuperAdministrador);
+
+        // SuperAdmin: todos. Demais (inclui Direção IC): somente setores de chefia —
+        // criar/editar afastamento não usa visão global.
+        if (isSuper)
+        {
+            return await ListAsync(semUsuario, cancellationToken);
+        }
+
+        var setorIds = await db.SetorChefias
+            .AsNoTracking()
+            .Where(x => x.ServidorId == usuario.ServidorId)
+            .Select(x => x.SetorId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (setorIds.Count == 0)
+        {
+            return [];
+        }
+
+        var query = LoadQuery().Where(x => setorIds.Contains(x.SetorId));
+        if (semUsuario == true)
+        {
+            query = query.Where(x => x.Usuario == null && x.Status == StatusServidor.Ativo);
+        }
+
+        var items = await query.OrderBy(x => x.Nome).ToListAsync(cancellationToken);
+        return items.Select(Map).ToList();
+    }
+
     public async Task<Result<ServidorListItemDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var servidor = await LoadQuery().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -122,6 +170,61 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         return await GetByIdAsync(id, cancellationToken);
     }
 
+    public async Task<Result<ServidorExclusaoImpactoDto>> GetExclusaoImpactoAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await db.Servidores.AsNoTracking().AnyAsync(x => x.Id == id, cancellationToken);
+        if (!exists)
+        {
+            return Result<ServidorExclusaoImpactoDto>.Failure("Servidor não encontrado.");
+        }
+
+        var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
+        return Result<ServidorExclusaoImpactoDto>.Success(impacto);
+    }
+
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (servidor is null)
+        {
+            return Result.Failure("Servidor não encontrado.");
+        }
+
+        var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
+        if (!impacto.PodeExcluir)
+        {
+            return Result.Failure(
+                "Não é possível excluir o servidor enquanto houver vínculos (escalas, afastamentos, chefias ou usuário). Remova os vínculos antes de excluir.");
+        }
+
+        // Nucleo.ChefeServidorId usa SetNull no banco — não bloqueia a exclusão.
+        db.Servidores.Remove(servidor);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
+    private async Task<ServidorExclusaoImpactoDto> BuildExclusaoImpactoAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var escalas = await db.EscalaServidores.CountAsync(x => x.ServidorId == id, cancellationToken);
+        var afastamentos = await db.Afastamentos.CountAsync(x => x.ServidorId == id, cancellationToken);
+        var chefias = await db.SetorChefias.CountAsync(x => x.ServidorId == id, cancellationToken);
+        var usuarios = await db.Usuarios.CountAsync(x => x.ServidorId == id, cancellationToken);
+        var nucleosComoChefe = await db.Nucleos.CountAsync(x => x.ChefeServidorId == id, cancellationToken);
+        var podeExcluir = escalas == 0 && afastamentos == 0 && chefias == 0 && usuarios == 0;
+
+        return new ServidorExclusaoImpactoDto(
+            escalas,
+            afastamentos,
+            chefias,
+            usuarios,
+            nucleosComoChefe,
+            podeExcluir);
+    }
+
     private async Task<string?> ValidateAsync(
         string nome,
         string cpfRaw,
@@ -214,6 +317,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             servidor.Cpf,
             servidor.CargoId,
             servidor.Cargo.Nome,
+            servidor.Cargo.Codigo,
             servidor.Email,
             servidor.Telefone,
             servidor.DataNascimento,
@@ -226,9 +330,10 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
 
     private static bool IsEmailValido(string? email)
     {
+        // E-mail é opcional; vazio é válido.
         if (string.IsNullOrWhiteSpace(email))
         {
-            return false;
+            return true;
         }
 
         try

@@ -5,6 +5,11 @@ export interface AuthUser {
   email?: string | null;
   perfis: string[];
   permissoes: string[];
+  servidorId: string;
+  setorLotacaoId?: string | null;
+  setorLotacaoNome?: string | null;
+  setoresGerenciadosIds: string[];
+  deveAlterarSenha: boolean;
   meta: string;
 }
 
@@ -18,6 +23,11 @@ export interface LoginResponse {
     email?: string | null;
     perfis: string[];
     permissoes: string[];
+    servidorId: string;
+    setorLotacaoId?: string | null;
+    setorLotacaoNome?: string | null;
+    setoresGerenciadosIds: string[];
+    deveAlterarSenha: boolean;
   };
 }
 

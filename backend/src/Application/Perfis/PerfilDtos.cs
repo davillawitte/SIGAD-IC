@@ -21,7 +21,7 @@ public record PerfilDetailDto(
 
 public record CreatePerfilRequest(
     string Nome,
-    string Codigo,
+    string? Codigo,
     string? Descricao,
     IReadOnlyList<Guid>? PermissaoIds);
 
@@ -34,6 +34,6 @@ public record SetPerfilPermissoesRequest(IReadOnlyList<Guid> PermissaoIds);
 
 public record PerfilExclusaoImpactoDto(
     int QuantidadeUsuarios,
-    bool RequerSubstituto);
+    bool TemUsuariosVinculados);
 
-public record DesativarPerfilRequest(Guid? PerfilSubstitutoId);
+public record DesativarPerfilRequest(Guid? PerfilSubstitutoId, bool RemoverVinculosSemSubstituto = false);

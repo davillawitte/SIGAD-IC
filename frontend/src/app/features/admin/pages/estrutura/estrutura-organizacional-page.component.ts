@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import {
   PciAlertComponent,
@@ -9,6 +10,7 @@ import {
   PciDropdownMenuComponent,
   PciDropdownPanelDirective,
   PciDropdownTriggerDirective,
+  PciFeedbackModalService,
   PciIconButtonComponent,
   PciIconComponent,
   PciLayoutBreadcrumbService,
@@ -17,8 +19,10 @@ import {
   PciTooltipChildDirective,
   PciTooltipComponent,
 } from '@davillawitte/pci-design-system';
+import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
+import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import type { EstruturaOrganizacional, NucleoComSetores, SetorListItem } from '../../models/admin.models';
@@ -27,6 +31,7 @@ import type { EstruturaOrganizacional, NucleoComSetores, SetorListItem } from '.
   selector: 'app-estrutura-organizacional-page',
   imports: [
     CommonModule,
+    MatDialogModule,
     PciAlertComponent,
     PciBadgeComponent,
     PciButtonComponent,
@@ -47,6 +52,8 @@ export class EstruturaOrganizacionalPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+  private readonly feedback = inject(PciFeedbackModalService);
   private readonly breadcrumb = inject(PciBreadcrumbService);
   private readonly layoutBreadcrumb = inject(PciLayoutBreadcrumbService);
 
@@ -149,19 +156,24 @@ export class EstruturaOrganizacionalPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const ok = window.confirm(
-      `Excluir o núcleo "${nucleo.nome}"? Esta ação não pode ser desfeita.`,
-    );
-    if (!ok) {
-      return;
-    }
-
-    this.error.set(null);
-    this.api.deleteNucleo(nucleo.id).subscribe({
-      next: () => this.reload(),
-      error: (err: { error?: { message?: string } }) =>
-        this.error.set(err.error?.message ?? 'Operação inválida ao excluir o núcleo.'),
-    });
+    openConfirmDialog(this.dialog, {
+      title: 'Excluir núcleo',
+      message: `Excluir o núcleo "${nucleo.nome}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
+      .pipe(filter(Boolean))
+      .subscribe(() => {
+        this.error.set(null);
+        this.api.deleteNucleo(nucleo.id).subscribe({
+          next: () => {
+            this.feedback.showSuccess('Núcleo excluído com sucesso.');
+            this.reload();
+          },
+          error: (err: { error?: { message?: string } }) =>
+            this.error.set(err.error?.message ?? 'Operação inválida ao excluir o núcleo.'),
+        });
+      });
   }
 
   excluirSetor(setor: SetorListItem): void {
@@ -169,19 +181,24 @@ export class EstruturaOrganizacionalPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const ok = window.confirm(
-      `Excluir o setor "${setor.nome}"? Esta ação não pode ser desfeita.`,
-    );
-    if (!ok) {
-      return;
-    }
-
-    this.error.set(null);
-    this.api.deleteSetor(setor.id).subscribe({
-      next: () => this.reload(),
-      error: (err: { error?: { message?: string } }) =>
-        this.error.set(err.error?.message ?? 'Operação inválida ao excluir o setor.'),
-    });
+    openConfirmDialog(this.dialog, {
+      title: 'Excluir setor',
+      message: `Excluir o setor "${setor.nome}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
+      .pipe(filter(Boolean))
+      .subscribe(() => {
+        this.error.set(null);
+        this.api.deleteSetor(setor.id).subscribe({
+          next: () => {
+            this.feedback.showSuccess('Setor excluído com sucesso.');
+            this.reload();
+          },
+          error: (err: { error?: { message?: string } }) =>
+            this.error.set(err.error?.message ?? 'Operação inválida ao excluir o setor.'),
+        });
+      });
   }
 
   private reload(): void {

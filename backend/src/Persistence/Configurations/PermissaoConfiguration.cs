@@ -15,10 +15,12 @@ public class PermissaoConfiguration : IEntityTypeConfiguration<Permissao>
         builder.Property(x => x.Nome).HasMaxLength(150).IsRequired();
         builder.Property(x => x.Descricao).HasMaxLength(500);
         builder.Property(x => x.Modulo).HasMaxLength(80).IsRequired();
+        builder.Property(x => x.Area).HasMaxLength(80).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(100);
         builder.Property(x => x.UpdatedBy).HasMaxLength(100);
 
         builder.HasIndex(x => x.Codigo).IsUnique();
         builder.HasIndex(x => x.Modulo);
+        builder.HasIndex(x => x.Area);
     }
 }

@@ -106,3 +106,48 @@ app-form-section + app-form-section {
   line-height: var(--pci-text-line-body, 1.5);
   color: var(--pci-color-text-secondary, #667085);
 }
+
+/* Dialogs no padrão visual PCI */
+.pci-app-dialog-panel .mat-mdc-dialog-container,
+.pci-app-dialog-panel .mdc-dialog__surface {
+  padding: 0 !important;
+  border-radius: var(--pci-radius-lg, 12px);
+  overflow: hidden;
+}
+
+.pci-app-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-4, 1rem);
+  padding: var(--pci-space-6, 1.5rem);
+  min-width: min(520px, 92vw);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.pci-app-dialog__title {
+  margin: 0;
+  font-size: var(--pci-font-size-lg, 1.125rem);
+  font-weight: var(--pci-font-weight-semibold, 600);
+  color: var(--pci-color-text-primary, #101828);
+}
+
+.pci-app-dialog__message {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--pci-font-size-sm, 0.875rem);
+  line-height: 1.5;
+  color: var(--pci-color-text-secondary, #667085);
+}
+
+/* Células longas: quebra de linha em vez de esticar a tabela horizontalmente */
+.pci-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+/* Propaga restrição de largura do th (PciColumn.width) para as células do corpo */
+.pci-table thead th[style*='width'] {
+  max-width: inherit;
+}

@@ -24,6 +24,8 @@ public class ServidorConfiguration : IEntityTypeConfiguration<Servidor>
         builder.Property(x => x.CreatedBy).HasMaxLength(100);
         builder.Property(x => x.UpdatedBy).HasMaxLength(100);
 
+        builder.Ignore(x => x.EstaAtivo);
+
         builder.HasIndex(x => x.Matricula).IsUnique();
         builder.HasIndex(x => x.Cpf).IsUnique();
         builder.HasIndex(x => x.Email);

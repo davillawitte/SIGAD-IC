@@ -1,0 +1,96 @@
+<pci-form-page
+  title="Nova escala"
+  description="Informe o período e o tipo de funcionamento. O sistema gera a escala a partir de padrões e ciclos."
+  currentPath="/escalas/nova"
+  [routePages]="routePages"
+  [loading]="saving()"
+  [saveLabel]="escalaAnterior() ? 'Criar nova (sem copiar)' : 'Salvar'"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  @if (escalaAnterior(); as ant) {
+    <pci-alert
+      variant="info"
+      title="Escala do mês anterior encontrada"
+      [message]="'Existe ' + ant.identificacao + '. Deseja utilizá-la como base? Os ciclos serão continuados no novo mês.'"
+    />
+    <pci-stack gap="2" direction="horizontal">
+      <pci-button variant="primary" [loading]="saving()" (clicked)="copiarAnterior()">
+        Copiar escala anterior
+      </pci-button>
+      <pci-button variant="secondary" [loading]="saving()" (clicked)="createNova()">
+        Criar nova escala
+      </pci-button>
+    </pci-stack>
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Período">
+      @if (showSetorSelect()) {
+        <label [appFormCol]="12" class="pci-field">
+          <span class="pci-field__label">Setor <span class="pci-field__required">*</span></span>
+          <div class="pci-field__control pci-field__control--select">
+            <mat-select
+              class="pci-field__mat-select"
+              formControlName="setorId"
+              panelClass="pci-select-panel"
+              disableRipple
+              hideSingleSelectionIndicator
+            >
+              @for (option of setorOptions(); track option.value) {
+                <mat-option [value]="option.value">{{ option.label }}</mat-option>
+              }
+            </mat-select>
+          </div>
+        </label>
+      } @else if (setorUnicoLabel(); as setorNome) {
+        <p [appFormCol]="12" class="pci-field">
+          <span class="pci-field__label">Setor</span>
+          <span class="pci-field__control">{{ setorNome }}</span>
+        </p>
+      }
+
+      <label [appFormCol]="6" class="pci-field">
+        <span class="pci-field__label">Mês <span class="pci-field__required">*</span></span>
+        <div class="pci-field__control pci-field__control--select">
+          <mat-select
+            class="pci-field__mat-select"
+            formControlName="mes"
+            panelClass="pci-select-panel"
+            disableRipple
+            hideSingleSelectionIndicator
+          >
+            @for (option of mesOptions; track option.value) {
+              <mat-option [value]="+option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </div>
+      </label>
+
+      <pci-input [appFormCol]="6" label="Ano" formControlName="ano" type="number" [required]="true" />
+
+      <label [appFormCol]="12" class="pci-field">
+        <span class="pci-field__label">Tipo de funcionamento <span class="pci-field__required">*</span></span>
+        <div class="pci-field__control pci-field__control--select">
+          <mat-select
+            class="pci-field__mat-select"
+            formControlName="tipoFuncionamento"
+            panelClass="pci-select-panel"
+            disableRipple
+            hideSingleSelectionIndicator
+          >
+            @for (option of tipoOptions; track option.value) {
+              <mat-option [value]="option.value">{{ option.label }}</mat-option>
+            }
+          </mat-select>
+        </div>
+      </label>
+
+      <pci-input [appFormCol]="12" label="Observação" formControlName="observacao" />
+    </app-form-section>
+  </form>
+</pci-form-page>

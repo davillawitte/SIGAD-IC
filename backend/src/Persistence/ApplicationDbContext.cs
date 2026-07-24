@@ -18,6 +18,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Permissao> Permissoes => Set<Permissao>();
     public DbSet<PerfilPermissao> PerfilPermissoes => Set<PerfilPermissao>();
     public DbSet<UsuarioPerfil> UsuarioPerfis => Set<UsuarioPerfil>();
+    public DbSet<TipoOcorrencia> TiposOcorrencia => Set<TipoOcorrencia>();
+    public DbSet<PadraoEscala> PadroesEscala => Set<PadraoEscala>();
+    public DbSet<Escala> Escalas => Set<Escala>();
+    public DbSet<EscalaServidor> EscalaServidores => Set<EscalaServidor>();
+    public DbSet<EscalaJornada> EscalaJornadas => Set<EscalaJornada>();
+    public DbSet<EscalaOcorrencia> EscalaOcorrencias => Set<EscalaOcorrencia>();
+    public DbSet<SolicitacaoDevolucaoEscala> SolicitacoesDevolucaoEscala => Set<SolicitacaoDevolucaoEscala>();
+    public DbSet<Afastamento> Afastamentos => Set<Afastamento>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,0 +1,10 @@
+.solicitacoes-trocas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.solicitacoes-trocas__placeholder {
+  margin: 0;
+  opacity: 0.75;
+}

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TemplateSistema.Api.Extensions;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Auth;
 
@@ -10,7 +11,8 @@ namespace TemplateSistema.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(
     IAuthService authService,
-    IValidator<LoginRequest> loginValidator) : ControllerBase
+    IValidator<LoginRequest> loginValidator,
+    IValidator<AlterarSenhaRequest> alterarSenhaValidator) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -29,5 +31,21 @@ public class AuthController(
         }
 
         return Ok(result.Value);
+    }
+
+    [HttpPost("alterar-senha")]
+    [Authorize]
+    public async Task<IActionResult> AlterarSenha(
+        [FromBody] AlterarSenhaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var validation = await alterarSenhaValidator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        var result = await authService.AlterarSenhaAsync(User.GetLogin(), request, cancellationToken);
+        return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
     }
 }

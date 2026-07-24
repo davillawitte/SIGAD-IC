@@ -1,0 +1,193 @@
+@if (devolucoes().length > 0) {
+  <section class="escalas-devolucoes">
+    <h2 class="escalas-devolucoes__title">Solicitações de devolução pendentes</h2>
+    @for (item of devolucoes(); track item.id) {
+      <div class="escalas-devolucoes__card">
+        <p class="escalas-devolucoes__line">
+          <strong>{{ item.escalaIdentificacao }}</strong> — {{ item.setorSigla }}
+        </p>
+        <p class="escalas-devolucoes__line">Solicitante: {{ item.solicitanteNome }}</p>
+        <p class="escalas-devolucoes__line">Justificativa: {{ item.justificativa }}</p>
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button
+            variant="primary"
+            [loading]="devolucaoWorking()"
+            (clicked)="aprovarDevolucao(item)"
+          >
+            Aprovar
+          </pci-button>
+          <pci-button
+            variant="ghost"
+            [loading]="devolucaoWorking()"
+            (clicked)="recusarDevolucao(item)"
+          >
+            Recusar
+          </pci-button>
+        </pci-stack>
+      </div>
+    }
+  </section>
+}
+
+<div class="escalas-page">
+  <pci-page-header title="Escalas" description="Gerencie as escalas mensais dos setores.">
+    <pci-stack slot="actions" gap="2" direction="horizontal">
+      @if (canCreate) {
+        <pci-button variant="primary" icon="plus" (clicked)="onCreate()">Nova escala</pci-button>
+      }
+    </pci-stack>
+  </pci-page-header>
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <pci-filter-panel
+    [fields]="filterFields"
+    [values]="filterValues()"
+    [expanded]="filtersExpanded()"
+    (valuesChange)="filterValues.set($event)"
+    (expandedChange)="filtersExpanded.set($event)"
+    (apply)="onFilterApply($event)"
+    (clear)="onFilterClear()"
+  />
+
+  <div class="pci-table-wrapper">
+    <div class="pci-table-toolbar">
+      <div class="pci-table-toolbar__left">
+        <h3 class="pci-table-title">Resultados</h3>
+      </div>
+      <div class="pci-table-actions">
+        <input
+          class="pci-table-search"
+          type="search"
+          placeholder="Buscar por setor…"
+          [value]="searchTerm()"
+          (input)="onSearchInput($event)"
+          aria-label="Busca rápida"
+        />
+      </div>
+    </div>
+
+    <div class="pci-table-scroll">
+      <table class="pci-table">
+        <thead>
+          <tr>
+            <th>Período de Referência</th>
+            <th>Setor</th>
+            <th>Status</th>
+            <th>Publicada em</th>
+            <th>Criada em</th>
+            <th>Responsável</th>
+            <th class="pci-table__actions-cell">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (loading()) {
+            <tr>
+              <td colspan="7" class="pci-table__empty">Carregando…</td>
+            </tr>
+          } @else if (!rows().length) {
+            <tr>
+              <td colspan="7" class="pci-table__empty">Nenhuma escala encontrada.</td>
+            </tr>
+          } @else {
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td class="pci-table__primary">{{ row.periodoReferencia }}</td>
+                <td>{{ row.setor }}</td>
+                <td>
+                  <pci-badge [variant]="statusVariant(row.status)">{{ statusLabel(row.status) }}</pci-badge>
+                </td>
+                <td>{{ row.publicadaEm }}</td>
+                <td>{{ row.criadoEm }}</td>
+                <td>{{ row.criadoPor }}</td>
+                <td class="pci-table__actions-cell">
+                  <div class="pci-table__row-actions">
+                    @for (action of inlineActions(row); track action.id) {
+                      <pci-tooltip [text]="action.label">
+                        <pci-icon-button
+                          pciTooltipChild
+                          variant="outline"
+                          size="sm"
+                          [icon]="action.icon"
+                          [ariaLabel]="action.label"
+                          (clicked)="onRowAction(action.id, row)"
+                        />
+                      </pci-tooltip>
+                    }
+                    @if (menuActions(row).length) {
+                      <pci-dropdown-menu
+                        align="end"
+                        [panelMinWidth]="180"
+                        [open]="openMenuRowId() === row.id"
+                        (openChange)="openMenuRowId.set($event ? row.id : null)"
+                      >
+                        <pci-icon-button
+                          pciDropdownTrigger
+                          variant="outline"
+                          size="sm"
+                          icon="more-vertical"
+                          ariaLabel="Mais ações"
+                        />
+                        <ul pciDropdownPanel class="pci-dropdown-menu__list">
+                          @for (action of menuActions(row); track action.id) {
+                            <li role="none">
+                              <button
+                                type="button"
+                                class="pci-dropdown-menu__item"
+                                role="menuitem"
+                                (click)="onRowAction(action.id, row)"
+                              >
+                                <pci-icon [name]="action.icon" size="sm" />
+                                <span>{{ action.label }}</span>
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      </pci-dropdown-menu>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pci-table-footer">
+      <span class="pci-table-range">{{ rangeLabel() }}</span>
+      <div class="pci-table-pager">
+        <label class="pci-table-page-size">
+          Por página
+          <select [value]="pageSize()" (change)="onPageSizeChange($event)">
+            <option [value]="10">10</option>
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </label>
+        <pci-button
+          variant="ghost"
+          size="sm"
+          [disabled]="page() <= 1"
+          (clicked)="onPageChange(page() - 1)"
+        >
+          Anterior
+        </pci-button>
+        <span class="pci-table-page-indicator">
+          {{ page() }} / {{ totalPages() || 1 }}
+        </span>
+        <pci-button
+          variant="ghost"
+          size="sm"
+          [disabled]="totalPages() === 0 || page() >= totalPages()"
+          (clicked)="onPageChange(page() + 1)"
+        >
+          Próxima
+        </pci-button>
+      </div>
+    </div>
+  </div>
+</div>

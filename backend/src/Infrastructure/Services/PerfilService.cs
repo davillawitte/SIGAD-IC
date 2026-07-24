@@ -52,7 +52,7 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
-        var codigo = Perfil.NormalizeCodigo(request.Codigo);
+        var codigo = await GenerateUniqueCodigoAsync(request.Nome, request.Codigo, cancellationToken);
         if (await db.Perfis.AnyAsync(x => x.Codigo == codigo, cancellationToken))
         {
             return Result<PerfilDetailDto>.Failure("Código de perfil já existe.");
@@ -152,40 +152,46 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         var vinculos = await db.UsuarioPerfis.Where(x => x.PerfilId == id).ToListAsync(cancellationToken);
         if (vinculos.Count > 0)
         {
-            if (request.PerfilSubstitutoId is null)
+            if (request.PerfilSubstitutoId is Guid substitutoId)
+            {
+                if (substitutoId == id)
+                {
+                    return Result.Failure("O perfil substituto deve ser diferente do perfil a desativar.");
+                }
+
+                var substituto = await db.Perfis.FirstOrDefaultAsync(
+                    x => x.Id == substitutoId && x.Ativo,
+                    cancellationToken);
+                if (substituto is null)
+                {
+                    return Result.Failure("Perfil substituto não encontrado ou inativo.");
+                }
+
+                var usuarioIds = vinculos.Select(x => x.UsuarioId).Distinct().ToList();
+                var jaPossuemSubstituto = await db.UsuarioPerfis
+                    .Where(x => usuarioIds.Contains(x.UsuarioId) && x.PerfilId == substituto.Id)
+                    .Select(x => x.UsuarioId)
+                    .ToListAsync(cancellationToken);
+                var comSubstituto = jaPossuemSubstituto.ToHashSet();
+
+                db.UsuarioPerfis.RemoveRange(vinculos);
+
+                foreach (var usuarioId in usuarioIds)
+                {
+                    if (comSubstituto.Add(usuarioId))
+                    {
+                        db.UsuarioPerfis.Add(UsuarioPerfil.Create(usuarioId, substituto.Id));
+                    }
+                }
+            }
+            else if (request.RemoverVinculosSemSubstituto)
+            {
+                db.UsuarioPerfis.RemoveRange(vinculos);
+            }
+            else
             {
                 return Result.Failure(
-                    $"Existem {vinculos.Count} conta(s) vinculada(s) a este perfil. Informe um perfil substituto para reatribuí-las antes de desativar.");
-            }
-
-            if (request.PerfilSubstitutoId == id)
-            {
-                return Result.Failure("O perfil substituto deve ser diferente do perfil a desativar.");
-            }
-
-            var substituto = await db.Perfis.FirstOrDefaultAsync(
-                x => x.Id == request.PerfilSubstitutoId && x.Ativo,
-                cancellationToken);
-            if (substituto is null)
-            {
-                return Result.Failure("Perfil substituto não encontrado ou inativo.");
-            }
-
-            var usuarioIds = vinculos.Select(x => x.UsuarioId).Distinct().ToList();
-            var jaPossuemSubstituto = await db.UsuarioPerfis
-                .Where(x => usuarioIds.Contains(x.UsuarioId) && x.PerfilId == substituto.Id)
-                .Select(x => x.UsuarioId)
-                .ToListAsync(cancellationToken);
-            var comSubstituto = jaPossuemSubstituto.ToHashSet();
-
-            db.UsuarioPerfis.RemoveRange(vinculos);
-
-            foreach (var usuarioId in usuarioIds)
-            {
-                if (comSubstituto.Add(usuarioId))
-                {
-                    db.UsuarioPerfis.Add(UsuarioPerfil.Create(usuarioId, substituto.Id));
-                }
+                    $"Existem {vinculos.Count} conta(s) vinculada(s) a este perfil. Informe um perfil substituto ou escolha remover os vínculos (usuários ficam sem perfil).");
             }
         }
 
@@ -237,6 +243,39 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
 
         var updated = await LoadAsync(id, cancellationToken);
         return Result<PerfilDetailDto>.Success(MapDetail(updated!));
+    }
+
+    private async Task<string> GenerateUniqueCodigoAsync(
+        string nome,
+        string? requestedCodigo,
+        CancellationToken cancellationToken)
+    {
+        var baseCodigo = string.IsNullOrWhiteSpace(requestedCodigo)
+            ? Perfil.NormalizeCodigo(nome)
+            : Perfil.NormalizeCodigo(requestedCodigo);
+
+        if (string.IsNullOrWhiteSpace(baseCodigo))
+        {
+            baseCodigo = "PERFIL";
+        }
+
+        if (baseCodigo.Length > 40)
+        {
+            baseCodigo = baseCodigo[..40];
+        }
+
+        var candidate = baseCodigo;
+        var suffix = 0;
+        while (await db.Perfis.AnyAsync(x => x.Codigo == candidate, cancellationToken))
+        {
+            suffix++;
+            var suffixText = $"_{suffix}";
+            var maxBase = Math.Max(1, 60 - suffixText.Length);
+            var truncated = baseCodigo.Length > maxBase ? baseCodigo[..maxBase] : baseCodigo;
+            candidate = truncated + suffixText;
+        }
+
+        return candidate;
     }
 
     private async Task<List<Guid>?> ValidatePermissaoIdsAsync(

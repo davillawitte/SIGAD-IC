@@ -1,0 +1,35 @@
+@if (error()) {
+  <pci-alert variant="error" title="Erro" [message]="error()!" />
+}
+
+<pci-list-page
+  title="Afastamentos"
+  description="Cadastre férias, licenças médicas e demais afastamentos dos servidores."
+  currentPath="/afastamentos"
+  [routePages]="routePages"
+  [filterFields]="filterFields"
+  [filterValues]="filterValues()"
+  [filtersExpanded]="filtersExpanded()"
+  [columns]="columns"
+  [rows]="pagedRows()"
+  [total]="filteredRows().length"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [loading]="loading()"
+  [showCreateButton]="canCreate"
+  createLabel="Novo afastamento"
+  [rowActions]="rowActions()"
+  sortMode="server"
+  quickSearchMode="server"
+  [sort]="sort()"
+  (createClicked)="goCreate()"
+  (filterApply)="onFilterApply($event)"
+  (filterClear)="onFilterClear()"
+  (filterValuesChange)="filterValues.set($event)"
+  (filtersExpandedChange)="filtersExpanded.set($event)"
+  (searchChange)="onSearchChange($event)"
+  (sortChange)="onSortChange($event)"
+  (pageChange)="page.set($event)"
+  (pageSizeChange)="pageSize.set($event)"
+  (rowAction)="onRowAction($event)"
+/>

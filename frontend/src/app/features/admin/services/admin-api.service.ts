@@ -11,16 +11,20 @@ import {
   PermissaoItem,
   PerfilDetail,
   PerfilExclusaoImpacto,
+  ServidorExclusaoImpacto,
   PerfilListItem,
   CreateNucleoPayload,
   CreatePerfilPayload,
   CreateServidorPayload,
+  ChefiaConflito,
   CreateSetorPayload,
   CreateUsuarioPayload,
   CargoListItem,
   EstruturaOrganizacional,
+  SetorChefiaInput,
   NucleoDetail,
   NucleoListItem,
+  ResetSenhaResult,
   ServidorListItem,
   SetorListItem,
   UpdateNucleoPayload,
@@ -28,6 +32,7 @@ import {
   UpdateServidorPayload,
   UpdateSetorPayload,
   UpdateUsuarioPayload,
+  UsuarioComSenha,
   UsuarioDetail,
   UsuarioListItem,
 } from '../models/admin.models';
@@ -48,12 +53,16 @@ export class AdminApiService {
     return this.http.get<UsuarioDetail>(`${this.base}/api/usuarios/${id}`);
   }
 
-  createUsuario(payload: CreateUsuarioPayload): Observable<UsuarioListItem> {
-    return this.http.post<UsuarioListItem>(`${this.base}/api/usuarios`, payload);
+  createUsuario(payload: CreateUsuarioPayload): Observable<UsuarioComSenha> {
+    return this.http.post<UsuarioComSenha>(`${this.base}/api/usuarios`, payload);
   }
 
   updateUsuario(id: string, payload: UpdateUsuarioPayload): Observable<UsuarioDetail> {
     return this.http.put<UsuarioDetail>(`${this.base}/api/usuarios/${id}`, payload);
+  }
+
+  resetUsuarioSenha(id: string): Observable<ResetSenhaResult> {
+    return this.http.post<ResetSenhaResult>(`${this.base}/api/usuarios/${id}/reset-senha`, {});
   }
 
   listPerfis(query: PaginationQuery = {}): Observable<PagedResult<PerfilListItem>> {
@@ -99,6 +108,12 @@ export class AdminApiService {
     return this.http.get<ServidorListItem[]>(`${this.base}/api/servidores${query}`);
   }
 
+  /** Servidores dos setores gerenciados pelo usuário (ou todos se SuperAdmin). */
+  listMeusServidores(semUsuario = false): Observable<ServidorListItem[]> {
+    const query = semUsuario ? '?semUsuario=true' : '';
+    return this.http.get<ServidorListItem[]>(`${this.base}/api/servidores/meus${query}`);
+  }
+
   getServidor(id: string): Observable<ServidorListItem> {
     return this.http.get<ServidorListItem>(`${this.base}/api/servidores/${id}`);
   }
@@ -111,8 +126,21 @@ export class AdminApiService {
     return this.http.put<ServidorListItem>(`${this.base}/api/servidores/${id}`, payload);
   }
 
+  getServidorExclusaoImpacto(id: string): Observable<ServidorExclusaoImpacto> {
+    return this.http.get<ServidorExclusaoImpacto>(`${this.base}/api/servidores/${id}/exclusao-impacto`);
+  }
+
+  deleteServidor(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/servidores/${id}`);
+  }
+
   listSetores(): Observable<SetorListItem[]> {
     return this.http.get<SetorListItem[]>(`${this.base}/api/setores`);
+  }
+
+  /** Setores acessíveis ao usuário (chefia) ou todos se SuperAdmin. */
+  listMeusSetores(): Observable<SetorListItem[]> {
+    return this.http.get<SetorListItem[]>(`${this.base}/api/setores/meus`);
   }
 
   getSetor(id: string): Observable<SetorListItem> {
@@ -121,6 +149,13 @@ export class AdminApiService {
 
   getEstruturaOrganizacional(): Observable<EstruturaOrganizacional> {
     return this.http.get<EstruturaOrganizacional>(`${this.base}/api/setores/estrutura`);
+  }
+
+  previewChefiasConflitos(payload: {
+    setorId?: string | null;
+    chefias: SetorChefiaInput[];
+  }): Observable<ChefiaConflito[]> {
+    return this.http.post<ChefiaConflito[]>(`${this.base}/api/setores/chefias-conflitos`, payload);
   }
 
   createSetor(payload: CreateSetorPayload): Observable<SetorListItem> {

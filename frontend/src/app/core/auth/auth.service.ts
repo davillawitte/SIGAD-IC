@@ -15,6 +15,7 @@ export class AuthService {
 
   readonly currentUser = this.currentUserSignal.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
+  readonly deveAlterarSenha = computed(() => this.currentUserSignal()?.deveAlterarSenha === true);
 
   constructor() {
     this.restoreSession();
@@ -40,6 +41,28 @@ export class AuthService {
       );
   }
 
+  alterarSenha(
+    senhaAtual: string,
+    novaSenha: string,
+  ): Observable<{ ok: true } | { ok: false; message: string }> {
+    return this.http
+      .post<void>(`${environment.apiUrl}/api/auth/alterar-senha`, {
+        senhaAtual,
+        novaSenha,
+      })
+      .pipe(
+        tap(() => this.clearDeveAlterarSenha()),
+        map(() => ({ ok: true as const })),
+        catchError((error: { error?: { message?: string; errors?: string[] } }) => {
+          const message =
+            error?.error?.message ??
+            error?.error?.errors?.[0] ??
+            'Não foi possível alterar a senha.';
+          return of({ ok: false as const, message });
+        }),
+      );
+  }
+
   logout(): void {
     localStorage.removeItem(SESSION_KEY);
     this.accessToken = null;
@@ -51,12 +74,38 @@ export class AuthService {
   }
 
   hasPermission(code: string): boolean {
+    if (this.isSuperAdmin()) {
+      return true;
+    }
+
     const user = this.currentUserSignal();
     return !!user?.permissoes.includes(code);
   }
 
+  hasAnyPermission(codes: string[]): boolean {
+    return codes.some((code) => this.hasPermission(code));
+  }
+
   isSuperAdmin(): boolean {
     return this.currentUserSignal()?.perfis.includes('SUPERADMINISTRADOR') ?? false;
+  }
+
+  private clearDeveAlterarSenha(): void {
+    const user = this.currentUserSignal();
+    if (!user) return;
+
+    const updated = { ...user, deveAlterarSenha: false };
+    this.currentUserSignal.set(updated);
+
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      const session = JSON.parse(raw) as AuthSession;
+      session.user = updated;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } catch {
+      // ignore persistence errors
+    }
   }
 
   private persistFromResponse(response: LoginResponse): void {
@@ -67,7 +116,12 @@ export class AuthService {
       email: response.usuario.email,
       perfis: response.usuario.perfis ?? [],
       permissoes: response.usuario.permissoes ?? [],
-      meta: (response.usuario.perfis ?? [])[0] ?? 'SIGAD-IC',
+      servidorId: response.usuario.servidorId,
+      setorLotacaoId: response.usuario.setorLotacaoId ?? null,
+      setorLotacaoNome: response.usuario.setorLotacaoNome ?? null,
+      setoresGerenciadosIds: response.usuario.setoresGerenciadosIds ?? [],
+      deveAlterarSenha: response.usuario.deveAlterarSenha === true,
+      meta: response.usuario.setorLotacaoNome ?? (response.usuario.perfis ?? [])[0] ?? 'SIGAD-IC',
     };
 
     const session: AuthSession = {
@@ -100,7 +154,21 @@ export class AuthService {
       }
 
       this.accessToken = session.accessToken;
-      this.currentUserSignal.set(session.user);
+      this.currentUserSignal.set({
+        ...session.user,
+        servidorId: session.user.servidorId ?? '',
+        setorLotacaoId: session.user.setorLotacaoId ?? null,
+        setorLotacaoNome: session.user.setorLotacaoNome ?? null,
+        setoresGerenciadosIds: session.user.setoresGerenciadosIds ?? [],
+        permissoes: session.user.permissoes ?? [],
+        perfis: session.user.perfis ?? [],
+        deveAlterarSenha: session.user.deveAlterarSenha === true,
+        meta:
+          session.user.setorLotacaoNome ??
+          session.user.meta ??
+          session.user.perfis?.[0] ??
+          'SIGAD-IC',
+      });
     } catch {
       this.logout();
     }

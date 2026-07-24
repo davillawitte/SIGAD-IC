@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Application.Usuarios;
+using TemplateSistema.Domain.Common;
 using TemplateSistema.Domain.Entities;
 using TemplateSistema.Persistence;
 
@@ -22,7 +23,8 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             query = query.Where(x =>
                 x.Login.ToLower().Contains(term) ||
                 x.Servidor.Nome.ToLower().Contains(term) ||
-                x.Servidor.Matricula.ToLower().Contains(term));
+                x.Servidor.Matricula.ToLower().Contains(term) ||
+                x.Servidor.Cpf.Contains(term));
         }
 
         var ordered = query.OrderBy(x => x.Login);
@@ -64,27 +66,31 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             : Result<UsuarioDetailDto>.Success(MapDetail(usuario));
     }
 
-    public async Task<Result<UsuarioDetailDto>> CreateAsync(
+    public async Task<Result<UsuarioComSenhaDto>> CreateAsync(
         CreateUsuarioRequest request,
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
-        var login = request.Login.Trim().ToLowerInvariant();
-
-        if (await db.Usuarios.AnyAsync(x => x.Login == login, cancellationToken))
-        {
-            return Result<UsuarioDetailDto>.Failure("Login já está em uso.");
-        }
-
         var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == request.ServidorId, cancellationToken);
         if (servidor is null || !servidor.EstaAtivo)
         {
-            return Result<UsuarioDetailDto>.Failure("Servidor inválido ou inativo.");
+            return Result<UsuarioComSenhaDto>.Failure("Servidor inválido ou inativo.");
+        }
+
+        if (string.IsNullOrWhiteSpace(servidor.Cpf) || servidor.Cpf.Length != 11)
+        {
+            return Result<UsuarioComSenhaDto>.Failure("O servidor precisa ter CPF válido para gerar o login.");
+        }
+
+        var login = servidor.Cpf;
+        if (await db.Usuarios.AnyAsync(x => x.Login == login, cancellationToken))
+        {
+            return Result<UsuarioComSenhaDto>.Failure("Já existe um usuário com este CPF como login.");
         }
 
         if (await db.Usuarios.AnyAsync(x => x.ServidorId == request.ServidorId, cancellationToken))
         {
-            return Result<UsuarioDetailDto>.Failure("Este servidor já possui usuário vinculado.");
+            return Result<UsuarioComSenhaDto>.Failure("Este servidor já possui usuário vinculado.");
         }
 
         var perfisValidos = await db.Perfis
@@ -94,21 +100,23 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
 
         if (perfisValidos.Count != request.PerfilIds.Distinct().Count())
         {
-            return Result<UsuarioDetailDto>.Failure("Um ou mais perfis são inválidos.");
+            return Result<UsuarioComSenhaDto>.Failure("Um ou mais perfis são inválidos.");
         }
 
+        var senhaTemporaria = SenhaTemporaria.Gerar(servidor.Nome, servidor.Cpf);
         var usuario = Usuario.Create(
             request.ServidorId,
             login,
-            passwordHasher.Hash(request.Senha),
-            actorLogin);
+            passwordHasher.Hash(senhaTemporaria),
+            actorLogin,
+            deveAlterarSenha: true);
 
         usuario.DefinirPerfis(perfisValidos, actorLogin);
         db.Usuarios.Add(usuario);
         await db.SaveChangesAsync(cancellationToken);
 
         var created = await LoadAsync(usuario.Id, cancellationToken);
-        return Result<UsuarioDetailDto>.Success(MapDetail(created!));
+        return Result<UsuarioComSenhaDto>.Success(MapComSenha(created!, senhaTemporaria));
     }
 
     public async Task<Result<UsuarioDetailDto>> UpdateAsync(
@@ -157,26 +165,29 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
         return Result<UsuarioDetailDto>.Success(MapDetail(usuario));
     }
 
-    public async Task<Result> ChangePasswordAsync(
+    public async Task<Result<ResetSenhaResultDto>> ResetPasswordAsync(
         Guid id,
-        ChangePasswordRequest request,
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
-        var usuario = await db.Usuarios.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var usuario = await db.Usuarios
+            .Include(x => x.Servidor)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
         if (usuario is null)
         {
-            return Result.Failure("Usuário não encontrado.");
+            return Result<ResetSenhaResultDto>.Failure("Usuário não encontrado.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.NovaSenha) || request.NovaSenha.Length < 8)
-        {
-            return Result.Failure("A nova senha deve ter ao menos 8 caracteres.");
-        }
-
-        usuario.AlterarSenha(passwordHasher.Hash(request.NovaSenha), actorLogin);
+        var senhaTemporaria = SenhaTemporaria.Gerar(usuario.Servidor.Nome, usuario.Servidor.Cpf);
+        usuario.AlterarSenha(passwordHasher.Hash(senhaTemporaria), exigirTrocaNoProximoLogin: true, actorLogin);
         await db.SaveChangesAsync(cancellationToken);
-        return Result.Success();
+
+        return Result<ResetSenhaResultDto>.Success(new ResetSenhaResultDto(
+            usuario.Id,
+            usuario.Login,
+            usuario.Servidor.Nome,
+            senhaTemporaria));
     }
 
     private async Task<Usuario?> LoadAsync(Guid id, CancellationToken cancellationToken) =>
@@ -192,6 +203,7 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.Login,
             usuario.Servidor.Nome,
             usuario.Servidor.Matricula,
+            usuario.Servidor.Cpf,
             usuario.Ativo,
             usuario.UltimoLogin,
             usuario.UsuarioPerfis.Select(x => x.Perfil.Codigo).OrderBy(x => x).ToList());
@@ -208,4 +220,18 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.UltimoLogin,
             usuario.UsuarioPerfis.Select(x => x.PerfilId).ToList(),
             usuario.UsuarioPerfis.Select(x => x.Perfil.Codigo).OrderBy(x => x).ToList());
+
+    private static UsuarioComSenhaDto MapComSenha(Usuario usuario, string senhaTemporaria) =>
+        new(
+            usuario.Id,
+            usuario.ServidorId,
+            usuario.Login,
+            usuario.Servidor.Nome,
+            usuario.Servidor.Matricula,
+            usuario.Servidor.Email,
+            usuario.Ativo,
+            usuario.UltimoLogin,
+            usuario.UsuarioPerfis.Select(x => x.PerfilId).ToList(),
+            usuario.UsuarioPerfis.Select(x => x.Perfil.Codigo).OrderBy(x => x).ToList(),
+            senhaTemporaria);
 }

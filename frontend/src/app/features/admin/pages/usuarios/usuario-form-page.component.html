@@ -3,11 +3,12 @@
   [description]="
     isEdit()
       ? 'Atualize perfis e status do usuário.'
-      : 'Todo usuário precisa estar vinculado a um servidor sem login. Cadastre o servidor em Gestão Institucional antes.'
+      : 'O login será o CPF do servidor. A senha temporária é gerada automaticamente.'
   "
   [currentPath]="currentPath()"
   [routePages]="routePages"
   [loading]="saving()"
+  [saveLabel]="createdPassword() ? 'Ir para listagem' : 'Salvar'"
   (cancelClicked)="cancel()"
   (saveClicked)="save()"
 >
@@ -15,73 +16,82 @@
     <pci-alert variant="error" title="Erro" [message]="error()!" />
   }
 
-  <form [formGroup]="form">
-    @if (!isEdit()) {
-      <app-form-section title="Vínculo">
-        @if (servidores().length === 0) {
+  @if (createdPassword(); as senha) {
+    <pci-alert
+      variant="success"
+      title="Usuário criado"
+      [message]="
+        'Usuário criado para o servidor. Senha temporária: ' +
+        senha +
+        '. Anote e informe ao servidor — no primeiro acesso será solicitada a troca.'
+      "
+    />
+    <pci-stack gap="2" direction="horizontal">
+      <pci-button variant="primary" (clicked)="cancel()">Voltar à listagem</pci-button>
+    </pci-stack>
+  } @else {
+    <form [formGroup]="form">
+      @if (!isEdit()) {
+        <app-form-section title="Vínculo">
+          @if (servidores().length === 0) {
+            <pci-alert
+              [appFormCol]="12"
+              variant="info"
+              title="Nenhum servidor disponível"
+              message="Cadastre um servidor em Gestão Institucional → Servidores antes de criar o usuário."
+            />
+          }
+          <label [appFormCol]="12" class="pci-field">
+            <span class="pci-field__label">Servidor <span class="pci-field__required">*</span></span>
+            <div class="pci-field__control pci-field__control--select">
+              <mat-select
+                class="pci-field__mat-select"
+                placeholder="Selecione um servidor"
+                formControlName="servidorId"
+                panelClass="pci-select-panel"
+                disableRipple
+                hideSingleSelectionIndicator
+              >
+                @for (option of servidorOptions(); track option.value) {
+                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                }
+              </mat-select>
+            </div>
+          </label>
           <pci-alert
             [appFormCol]="12"
             variant="info"
-            title="Nenhum servidor disponível"
-            message="Cadastre um servidor em Gestão Institucional → Servidores antes de criar o usuário."
+            title="Credenciais automáticas"
+            message="Login = CPF do servidor. Senha = primeiro nome + último nome + 3 primeiros dígitos do CPF."
           />
-        }
-        <label [appFormCol]="12" class="pci-field">
-          <span class="pci-field__label">Servidor <span class="pci-field__required">*</span></span>
-          <div class="pci-field__control pci-field__control--select">
-            <mat-select
-              class="pci-field__mat-select"
-              placeholder="Selecione um servidor"
-              formControlName="servidorId"
-              panelClass="pci-select-panel"
-              disableRipple
-              hideSingleSelectionIndicator
-            >
-              @for (option of servidorOptions(); track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
-              }
-            </mat-select>
-          </div>
-        </label>
-      </app-form-section>
+        </app-form-section>
+      } @else {
+        <app-form-section title="Identificação">
+          <pci-input [appFormCol]="12" label="Servidor" formControlName="nomeServidor" />
+        </app-form-section>
 
-      <app-form-section title="Credenciais">
-        <pci-input label="Login" formControlName="login" [required]="true" />
-        <pci-input
-          label="Senha"
-          type="password"
-          formControlName="senha"
-          hint="Mínimo de 8 caracteres"
-          [required]="true"
+        <app-form-section title="Status">
+          <pci-stack [appFormCol]="12" gap="3" [fullWidth]="true">
+            <pci-checkbox
+              label="Ativo"
+              [checked]="form.controls.ativo.value"
+              (changed)="form.controls.ativo.setValue($event)"
+            />
+          </pci-stack>
+        </app-form-section>
+      }
+
+      <app-form-section title="Perfis">
+        <pci-selection-list
+          [appFormCol]="12"
+          title="Perfis do usuário"
+          ariaLabel="Perfis do usuário"
+          variant="divided"
+          [items]="perfilItems()"
+          [selectedIds]="selectedPerfilIds()"
+          (selectedIdsChange)="selectedPerfilIds.set($event)"
         />
       </app-form-section>
-    } @else {
-      <app-form-section title="Identificação">
-        <pci-input label="Login" formControlName="login" />
-        <pci-input [appFormCol]="8" label="Servidor" formControlName="nomeServidor" />
-      </app-form-section>
-
-      <app-form-section title="Status">
-        <pci-stack [appFormCol]="12" gap="3" [fullWidth]="true">
-          <pci-checkbox
-            label="Ativo"
-            [checked]="form.controls.ativo.value"
-            (changed)="form.controls.ativo.setValue($event)"
-          />
-        </pci-stack>
-      </app-form-section>
-    }
-
-    <app-form-section title="Perfis">
-      <pci-selection-list
-        [appFormCol]="12"
-        title="Perfis do usuário"
-        ariaLabel="Perfis do usuário"
-        variant="divided"
-        [items]="perfilItems()"
-        [selectedIds]="selectedPerfilIds()"
-        (selectedIdsChange)="selectedPerfilIds.set($event)"
-      />
-    </app-form-section>
-  </form>
+    </form>
+  }
 </pci-form-page>

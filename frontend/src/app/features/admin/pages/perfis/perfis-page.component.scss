@@ -1,0 +1,12 @@
+:host ::ng-deep .pci-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+/* Descrição (2ª col) — width só no th do DS */
+:host ::ng-deep .pci-table th:nth-child(2),
+:host ::ng-deep .pci-table td:nth-child(2) {
+  width: 18rem;
+  max-width: 18rem;
+}

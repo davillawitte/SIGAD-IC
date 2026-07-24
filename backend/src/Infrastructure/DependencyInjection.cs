@@ -58,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<ISetorService, SetorService>();
         services.AddScoped<ICargoService, CargoService>();
         services.AddScoped<IServidorService, ServidorService>();
+        services.AddScoped<IEscalaService, EscalaService>();
+        services.AddScoped<IEscalaPdfService, EscalaPdfService>();
+        services.AddScoped<IAfastamentoService, AfastamentoService>();
 
         return services;
     }

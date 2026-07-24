@@ -8,8 +8,10 @@ import {
   PciFilterValues,
   PciListPageComponent,
   PciRowAction,
+  PciSortChange,
   filterRowsByPanelValues,
   filterTableRowsByQuickSearch,
+  sortTableRows,
 } from '@davillawitte/pci-design-system';
 
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
@@ -24,17 +26,16 @@ import {
 type PerfilRow = {
   id: string;
   nome: string;
-  codigo: string;
   descricao: string;
   permissoes: string;
   status: string;
-  sistema: string;
 };
 
 @Component({
   selector: 'app-perfis-page',
   imports: [CommonModule, PciAlertComponent, PciListPageComponent],
   templateUrl: './perfis-page.component.html',
+  styleUrl: './perfis-page.component.scss',
 })
 export class PerfisPageComponent implements OnInit {
   private readonly api = inject(AdminApiService);
@@ -49,6 +50,7 @@ export class PerfisPageComponent implements OnInit {
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
+  readonly sort = signal<PciSortChange<PerfilRow> | null>(null);
 
   readonly filterFields: PciFilterField[] = [
     {
@@ -57,13 +59,6 @@ export class PerfisPageComponent implements OnInit {
       type: 'text',
       placeholder: 'Buscar por nome',
       columnKey: 'nome',
-    },
-    {
-      key: 'codigo',
-      label: 'Código',
-      type: 'text',
-      placeholder: 'Buscar por código',
-      columnKey: 'codigo',
     },
     {
       key: 'status',
@@ -75,24 +70,12 @@ export class PerfisPageComponent implements OnInit {
         { label: 'Inativo', value: 'Inativo' },
       ],
     },
-    {
-      key: 'sistema',
-      label: 'Sistema',
-      type: 'select',
-      columnKey: 'sistema',
-      options: [
-        { label: 'Sim', value: 'Sim' },
-        { label: 'Não', value: 'Não' },
-      ],
-    },
   ];
 
   readonly columns: PciColumn<PerfilRow>[] = [
     { key: 'nome', label: 'Nome', sortable: true },
-    { key: 'codigo', label: 'Código', sortable: true },
-    { key: 'descricao', label: 'Descrição' },
+    { key: 'descricao', label: 'Descrição', width: '18rem' },
     { key: 'permissoes', label: 'Qtd. permissões' },
-    { key: 'sistema', label: 'Sistema' },
     { key: 'status', label: 'Status' },
   ];
 
@@ -106,7 +89,9 @@ export class PerfisPageComponent implements OnInit {
       this.filterValues(),
       this.filterFields,
     );
-    return filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
+    const searched = filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
+    const sort = this.sort();
+    return sort ? sortTableRows(searched, sort, this.columns) : searched;
   });
 
   readonly pagedRows = computed(() => {
@@ -143,6 +128,10 @@ export class PerfisPageComponent implements OnInit {
     this.page.set(1);
   }
 
+  onSortChange(sort: PciSortChange<PerfilRow> | null): void {
+    this.sort.set(sort);
+  }
+
   onPageSizeChange(size: number): void {
     const parsed = size as PageSizeOption;
     this.pageSize.set(PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE);
@@ -157,10 +146,8 @@ export class PerfisPageComponent implements OnInit {
           result.items.map((p: PerfilListItem) => ({
             id: p.id,
             nome: p.nome,
-            codigo: p.codigo,
             descricao: p.descricao || '—',
             permissoes: String(p.quantidadePermissoes),
-            sistema: p.sistema ? 'Sim' : 'Não',
             status: p.ativo ? 'Ativo' : 'Inativo',
           })),
         );

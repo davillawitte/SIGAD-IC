@@ -6,5 +6,6 @@ public record PermissaoDto(
     string Nome,
     string? Descricao,
     string Modulo,
+    string Area,
     bool Sistema,
     bool Ativo);

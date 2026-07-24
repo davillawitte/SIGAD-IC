@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
+using TemplateSistema.Domain.Common;
 using TemplateSistema.Persistence;
 
 namespace TemplateSistema.Infrastructure.Services;
@@ -13,10 +14,11 @@ public class AuthService(
 {
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var login = request.Login.Trim().ToLowerInvariant();
+        var login = SenhaTemporaria.NormalizeLoginCpf(request.Login);
 
         var usuario = await db.Usuarios
             .Include(x => x.Servidor)
+                .ThenInclude(x => x.Setor)
             .Include(x => x.UsuarioPerfis)
                 .ThenInclude(x => x.Perfil)
                     .ThenInclude(x => x.PerfilPermissoes)
@@ -59,18 +61,62 @@ public class AuthService(
             .OrderBy(x => x)
             .ToList();
 
+        var setoresGerenciados = await db.SetorChefias
+            .AsNoTracking()
+            .Where(x => x.ServidorId == usuario.ServidorId)
+            .Select(x => x.SetorId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
         var authUser = new UsuarioAuthDto(
             usuario.Id,
             usuario.Login,
             usuario.Servidor.Nome,
             usuario.Servidor.Email,
             perfis,
-            permissoes);
+            permissoes,
+            usuario.ServidorId,
+            usuario.Servidor.SetorId,
+            usuario.Servidor.Setor?.Nome,
+            setoresGerenciados,
+            usuario.DeveAlterarSenha);
 
         var (token, expires) = jwtTokenService.CreateToken(authUser);
         usuario.RegistrarLogin();
         await db.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(token, expires, authUser));
+    }
+
+    public async Task<Result> AlterarSenhaAsync(
+        string actorLogin,
+        AlterarSenhaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var login = SenhaTemporaria.NormalizeLoginCpf(actorLogin);
+        var usuario = await db.Usuarios.FirstOrDefaultAsync(x => x.Login == login, cancellationToken);
+        if (usuario is null)
+        {
+            return Result.Failure("Usuário não encontrado.");
+        }
+
+        if (!passwordHasher.Verify(usuario.SenhaHash, request.SenhaAtual))
+        {
+            return Result.Failure("Senha atual inválida.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NovaSenha) || request.NovaSenha.Length < 8)
+        {
+            return Result.Failure("A nova senha deve ter ao menos 8 caracteres.");
+        }
+
+        if (string.Equals(request.SenhaAtual, request.NovaSenha, StringComparison.Ordinal))
+        {
+            return Result.Failure("A nova senha deve ser diferente da senha atual.");
+        }
+
+        usuario.ConfirmarSenhaAlterada(passwordHasher.Hash(request.NovaSenha), actorLogin);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

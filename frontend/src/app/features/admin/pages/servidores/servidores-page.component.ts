@@ -1,23 +1,32 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import {
   PciAlertComponent,
   PciColumn,
+  PciFeedbackModalService,
   PciFilterField,
   PciFilterValues,
   PciListPageComponent,
   PciRowAction,
+  PciSortChange,
+  PciToastService,
   filterRowsByPanelValues,
   filterTableRowsByQuickSearch,
+  sortTableRows,
 } from '@davillawitte/pci-design-system';
+import { filter } from 'rxjs/operators';
 
+import { AuthService } from '../../../../core/auth/auth.service';
+import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_OPTIONS,
   PageSizeOption,
+  ServidorExclusaoImpacto,
 } from '../../models/admin.models';
 
 type ServidorRow = {
@@ -32,12 +41,17 @@ type ServidorRow = {
 
 @Component({
   selector: 'app-servidores-page',
-  imports: [CommonModule, PciAlertComponent, PciListPageComponent],
+  imports: [CommonModule, MatDialogModule, PciAlertComponent, PciListPageComponent],
   templateUrl: './servidores-page.component.html',
+  styleUrl: './servidores-page.component.scss',
 })
 export class ServidoresPageComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+  private readonly feedback = inject(PciFeedbackModalService);
+  private readonly toast = inject(PciToastService);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
   readonly page = signal(1);
@@ -49,6 +63,8 @@ export class ServidoresPageComponent implements OnInit {
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
+  readonly sort = signal<PciSortChange<ServidorRow> | null>(null);
+  readonly canDelete = this.auth.hasPermission('servidores.excluir');
 
   readonly filterFields = computed<PciFilterField[]>(() => [
     {
@@ -94,9 +110,21 @@ export class ServidoresPageComponent implements OnInit {
     { key: 'status', label: 'Status' },
   ];
 
-  readonly rowActions: PciRowAction<ServidorRow>[] = [
-    { id: 'edit', label: 'Editar', icon: 'edit', placement: 'inline' },
-  ];
+  readonly rowActions = computed<PciRowAction<ServidorRow>[]>(() => {
+    const actions: PciRowAction<ServidorRow>[] = [
+      { id: 'edit', label: 'Editar', icon: 'edit', placement: 'inline' },
+    ];
+    if (this.canDelete) {
+      actions.push({
+        id: 'delete',
+        label: 'Excluir',
+        icon: 'trash',
+        placement: 'inline',
+        variant: 'danger',
+      });
+    }
+    return actions;
+  });
 
   readonly filteredRows = computed(() => {
     const byPanel = filterRowsByPanelValues(
@@ -104,7 +132,9 @@ export class ServidoresPageComponent implements OnInit {
       this.filterValues(),
       this.filterFields(),
     );
-    return filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
+    const searched = filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
+    const sort = this.sort();
+    return sort ? sortTableRows(searched, sort, this.columns) : searched;
   });
 
   readonly pagedRows = computed(() => {
@@ -127,6 +157,10 @@ export class ServidoresPageComponent implements OnInit {
   onRowAction(event: { action: string; row: ServidorRow }): void {
     if (event.action === 'edit') {
       void this.router.navigateByUrl(`/servidores/editar/${event.row.id}`);
+      return;
+    }
+    if (event.action === 'delete') {
+      this.excluir(event.row);
     }
   }
 
@@ -145,10 +179,97 @@ export class ServidoresPageComponent implements OnInit {
     this.page.set(1);
   }
 
+  onSortChange(sort: PciSortChange<ServidorRow> | null): void {
+    this.sort.set(sort);
+  }
+
   onPageSizeChange(size: number): void {
     const parsed = size as PageSizeOption;
     this.pageSize.set(PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE);
     this.page.set(1);
+  }
+
+  private excluir(row: ServidorRow): void {
+    if (!this.canDelete) {
+      return;
+    }
+
+    this.loading.set(true);
+    this.error.set(null);
+    this.api.getServidorExclusaoImpacto(row.id).subscribe({
+      next: (impacto) => {
+        this.loading.set(false);
+        if (!impacto.podeExcluir) {
+          openConfirmDialog(this.dialog, {
+            title: 'Não é possível excluir',
+            message: this.buildBloqueioMessage(row, impacto),
+            confirmLabel: 'Entendi',
+            cancelLabel: 'Fechar',
+          }).subscribe();
+          return;
+        }
+
+        const nucleoHint =
+          impacto.nucleosComoChefe > 0
+            ? `\n\nObs.: este servidor é chefe de ${impacto.nucleosComoChefe} núcleo(s); o vínculo será removido automaticamente.`
+            : '';
+
+        openConfirmDialog(this.dialog, {
+          title: 'Excluir servidor',
+          message: `Excluir o servidor "${row.nome}" (${row.matricula})? Esta ação não pode ser desfeita.${nucleoHint}`,
+          confirmLabel: 'Excluir',
+          danger: true,
+        })
+          .pipe(filter(Boolean))
+          .subscribe(() => {
+            this.loading.set(true);
+            this.api.deleteServidor(row.id).subscribe({
+              next: () => {
+                this.loading.set(false);
+                this.feedback.showSuccess('Servidor excluído com sucesso.');
+                this.reload();
+              },
+              error: (err: { error?: { message?: string } }) => {
+                const msg = err.error?.message ?? 'Não foi possível excluir o servidor.';
+                this.error.set(msg);
+                this.toast.showError(msg);
+                this.loading.set(false);
+              },
+            });
+          });
+      },
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível verificar os vínculos do servidor.';
+        this.error.set(msg);
+        this.toast.showError(msg);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private buildBloqueioMessage(row: ServidorRow, impacto: ServidorExclusaoImpacto): string {
+    const linhas: string[] = [
+      `O servidor "${row.nome}" possui vínculos que impedem a exclusão. Remova-os manualmente antes de tentar novamente.`,
+      '',
+    ];
+    if (impacto.escalas > 0) {
+      linhas.push(`• Escalas: ${impacto.escalas}`);
+    }
+    if (impacto.afastamentos > 0) {
+      linhas.push(`• Afastamentos: ${impacto.afastamentos}`);
+    }
+    if (impacto.chefias > 0) {
+      linhas.push(`• Chefias de setor: ${impacto.chefias}`);
+    }
+    if (impacto.usuarios > 0) {
+      linhas.push(`• Usuário do sistema: ${impacto.usuarios}`);
+    }
+    if (impacto.nucleosComoChefe > 0) {
+      linhas.push(
+        `• Núcleos como chefe: ${impacto.nucleosComoChefe} (informativo — não bloqueia)`,
+      );
+    }
+    return linhas.join('\n');
   }
 
   private reload(): void {

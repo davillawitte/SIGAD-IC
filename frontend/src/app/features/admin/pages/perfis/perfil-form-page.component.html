@@ -18,35 +18,33 @@
   <form [formGroup]="form">
     <app-form-section title="Dados do perfil">
       <pci-input label="Nome" formControlName="nome" [required]="true" />
-      <pci-input
-        label="Código"
-        formControlName="codigo"
-        hint="Ex.: ANALISTA"
-        [required]="true"
-      />
       <pci-input [appFormCol]="12" label="Descrição" formControlName="descricao" />
     </app-form-section>
 
-    <app-form-section title="Permissões">
-      @if (isSuperAdmin()) {
+    @if (isSuperAdmin()) {
+      <app-form-section title="Permissões">
         <pci-alert
           [appFormCol]="12"
           variant="info"
           title="Acesso total"
           message="Este perfil recebe automaticamente todas as permissões do catálogo. A associação não pode ser editada nem removida."
         />
+      </app-form-section>
+    } @else {
+      @for (group of permissoesPorArea(); track group.area) {
+        <app-form-section [title]="group.area">
+          <pci-selection-list
+            [appFormCol]="12"
+            [title]="'Permissões — ' + group.area"
+            [ariaLabel]="'Permissões de ' + group.area"
+            variant="divided"
+            [items]="group.items"
+            [selectedIds]="selectedIdsForArea(itemIds(group.items))"
+            (selectedIdsChange)="onPermissoesChange($event, itemIds(group.items))"
+          />
+        </app-form-section>
       }
-
-      <pci-selection-list
-        [appFormCol]="12"
-        title="Permissões do perfil"
-        ariaLabel="Permissões do perfil"
-        variant="divided"
-        [items]="permissaoItems()"
-        [selectedIds]="selectedPermissaoIds()"
-        (selectedIdsChange)="onPermissoesChange($event)"
-      />
-    </app-form-section>
+    }
 
     @if (showDesativarPanel()) {
       <app-form-section title="Desativar perfil">
@@ -64,27 +62,44 @@
             [message]="desativarMensagem()"
           />
 
-          @if (requerSubstituto()) {
-            <label [appFormCol]="12" class="pci-field">
-              <span class="pci-field__label"
-                >Perfil substituto <span class="pci-field__required">*</span></span
+          @if (temUsuariosVinculados()) {
+            <pci-stack [appFormCol]="12" gap="2" direction="horizontal">
+              <pci-button
+                [variant]="modoDesativacao() === 'substituir' ? 'primary' : 'secondary'"
+                (clicked)="modoDesativacao.set('substituir')"
               >
-              <div class="pci-field__control pci-field__control--select">
-                <mat-select
-                  class="pci-field__mat-select"
-                  placeholder="Selecione o perfil que receberá as contas"
-                  [value]="perfilSubstitutoId()"
-                  (valueChange)="perfilSubstitutoId.set($event)"
-                  panelClass="pci-select-panel"
-                  disableRipple
-                  hideSingleSelectionIndicator
+                Substituir por outro perfil
+              </pci-button>
+              <pci-button
+                [variant]="modoDesativacao() === 'remover' ? 'primary' : 'secondary'"
+                (clicked)="modoDesativacao.set('remover')"
+              >
+                Remover vínculos (sem perfil)
+              </pci-button>
+            </pci-stack>
+
+            @if (modoDesativacao() === 'substituir') {
+              <label [appFormCol]="12" class="pci-field">
+                <span class="pci-field__label"
+                  >Perfil substituto <span class="pci-field__required">*</span></span
                 >
-                  @for (option of substitutoOptions(); track option.value) {
-                    <mat-option [value]="option.value">{{ option.label }}</mat-option>
-                  }
-                </mat-select>
-              </div>
-            </label>
+                <div class="pci-field__control pci-field__control--select">
+                  <mat-select
+                    class="pci-field__mat-select"
+                    placeholder="Selecione o perfil que receberá as contas"
+                    [value]="perfilSubstitutoId()"
+                    (valueChange)="perfilSubstitutoId.set($event)"
+                    panelClass="pci-select-panel"
+                    disableRipple
+                    hideSingleSelectionIndicator
+                  >
+                    @for (option of substitutoOptions(); track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-select>
+                </div>
+              </label>
+            }
           }
 
           <pci-stack [appFormCol]="12" gap="3" direction="horizontal">

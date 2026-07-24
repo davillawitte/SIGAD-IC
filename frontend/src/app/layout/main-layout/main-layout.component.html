@@ -1,7 +1,7 @@
 <pci-app-layout
   brandTitle="SIGAD-IC"
-  brandSubtitle="Instituto de Criminalística — RN"
-  brandLogoSrc="/assets/images/ic-icon.png"
+  brandSubtitle="Sistema de Gestão do Instituto de Criminalística"
+  brandLogoSrc="/assets/images/logo-IC.png"
   [navGroups]="navGroups()"
   [activeItemId]="activeItemId()"
   [userName]="userName()"
@@ -16,3 +16,6 @@
 >
   <router-outlet />
 </pci-app-layout>
+
+<pci-toast-container />
+<pci-feedback-modal [managedByService]="true" />

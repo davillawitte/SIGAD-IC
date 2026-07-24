@@ -1,5 +1,12 @@
 namespace TemplateSistema.Application.Common;
 
+public static class PermissionAreas
+{
+    public const string GestaoInstitucional = "Gestão Institucional";
+    public const string GestaoDoSetor = "Gestão do Setor";
+    public const string AdministracaoDoSistema = "Administração do Sistema";
+}
+
 public static class PermissionCodes
 {
     public const string UsuariosListar = "usuarios.listar";
@@ -30,31 +37,61 @@ public static class PermissionCodes
     public const string ServidoresListar = "servidores.listar";
     public const string ServidoresCriar = "servidores.criar";
     public const string ServidoresEditar = "servidores.editar";
+    public const string ServidoresExcluir = "servidores.excluir";
 
-    public static readonly IReadOnlyList<(string Codigo, string Nome, string Modulo, string Descricao)> Catalog =
+    public const string EscalasListar = "escalas.listar";
+    public const string EscalasCriar = "escalas.criar";
+    public const string EscalasEditar = "escalas.editar";
+    public const string EscalasPublicar = "escalas.publicar";
+    public const string EscalasExportar = "escalas.exportar";
+    public const string EscalasFinalizar = "escalas.finalizar";
+    public const string EscalasExcluir = "escalas.excluir";
+    public const string EscalasSolicitarDevolucao = "escalas.solicitar_devolucao";
+    public const string EscalasDevolver = "escalas.devolver";
+
+    public const string AfastamentosListar = "afastamentos.listar";
+    public const string AfastamentosCriar = "afastamentos.criar";
+    public const string AfastamentosEditar = "afastamentos.editar";
+    public const string AfastamentosExcluir = "afastamentos.excluir";
+
+    public static readonly IReadOnlyList<(string Codigo, string Nome, string Modulo, string Area, string Descricao)> Catalog =
     [
-        (UsuariosListar, "Listar usuários", "usuarios", "Visualizar usuários do sistema"),
-        (UsuariosCriar, "Criar usuários", "usuarios", "Cadastrar novos usuários"),
-        (UsuariosEditar, "Editar usuários", "usuarios", "Alterar dados e perfis de usuários"),
-        (UsuariosBloquear, "Bloquear usuários", "usuarios", "Bloquear ou desbloquear acesso"),
-        (PerfisListar, "Listar perfis", "perfis", "Visualizar perfis de acesso"),
-        (PerfisCriar, "Criar perfis", "perfis", "Cadastrar novos perfis"),
-        (PerfisEditar, "Editar perfis", "perfis", "Alterar dados de perfis"),
-        (PerfisExcluir, "Excluir perfis", "perfis", "Desativar ou remover perfis"),
-        (PerfisGerenciarPermissoes, "Gerenciar permissões do perfil", "perfis", "Associar ou remover permissões de um perfil"),
-        (PermissoesListar, "Listar permissões", "permissoes", "Visualizar catálogo de permissões do sistema"),
-        (NucleosListar, "Listar núcleos", "nucleos", "Visualizar núcleos da estrutura organizacional"),
-        (NucleosCriar, "Criar núcleos", "nucleos", "Cadastrar núcleos"),
-        (NucleosEditar, "Editar núcleos", "nucleos", "Alterar núcleos"),
-        (NucleosExcluir, "Excluir núcleos", "nucleos", "Remover núcleos sem setores vinculados"),
-        (SetoresListar, "Listar setores", "setores", "Visualizar setores"),
-        (SetoresCriar, "Criar setores", "setores", "Cadastrar setores"),
-        (SetoresEditar, "Editar setores", "setores", "Alterar setores"),
-        (SetoresExcluir, "Excluir setores", "setores", "Remover setores sem servidores lotados"),
-        (CargosListar, "Listar cargos", "cargos", "Visualizar cargos oficiais"),
-        (ServidoresListar, "Listar servidores", "servidores", "Visualizar servidores"),
-        (ServidoresCriar, "Criar servidores", "servidores", "Cadastrar servidores"),
-        (ServidoresEditar, "Editar servidores", "servidores", "Alterar servidores"),
+        (UsuariosListar, "Listar usuários", "usuarios", PermissionAreas.AdministracaoDoSistema, "Visualizar usuários do sistema"),
+        (UsuariosCriar, "Criar usuários", "usuarios", PermissionAreas.AdministracaoDoSistema, "Cadastrar novos usuários"),
+        (UsuariosEditar, "Editar usuários", "usuarios", PermissionAreas.AdministracaoDoSistema, "Alterar dados e perfis de usuários"),
+        (UsuariosBloquear, "Bloquear usuários", "usuarios", PermissionAreas.AdministracaoDoSistema, "Bloquear ou desbloquear acesso"),
+        (PerfisListar, "Listar perfis", "perfis", PermissionAreas.AdministracaoDoSistema, "Visualizar perfis de acesso"),
+        (PerfisCriar, "Criar perfis", "perfis", PermissionAreas.AdministracaoDoSistema, "Cadastrar novos perfis"),
+        (PerfisEditar, "Editar perfis", "perfis", PermissionAreas.AdministracaoDoSistema, "Alterar dados de perfis"),
+        (PerfisExcluir, "Excluir perfis", "perfis", PermissionAreas.AdministracaoDoSistema, "Desativar ou remover perfis"),
+        (PerfisGerenciarPermissoes, "Gerenciar permissões do perfil", "perfis", PermissionAreas.AdministracaoDoSistema, "Associar ou remover permissões de um perfil"),
+        (PermissoesListar, "Listar permissões", "permissoes", PermissionAreas.AdministracaoDoSistema, "Visualizar catálogo de permissões do sistema"),
+        (NucleosListar, "Listar núcleos", "nucleos", PermissionAreas.GestaoInstitucional, "Visualizar núcleos da estrutura organizacional"),
+        (NucleosCriar, "Criar núcleos", "nucleos", PermissionAreas.GestaoInstitucional, "Cadastrar núcleos"),
+        (NucleosEditar, "Editar núcleos", "nucleos", PermissionAreas.GestaoInstitucional, "Alterar núcleos"),
+        (NucleosExcluir, "Excluir núcleos", "nucleos", PermissionAreas.GestaoInstitucional, "Remover núcleos sem setores vinculados"),
+        (SetoresListar, "Listar setores", "setores", PermissionAreas.GestaoInstitucional, "Visualizar setores"),
+        (SetoresCriar, "Criar setores", "setores", PermissionAreas.GestaoInstitucional, "Cadastrar setores"),
+        (SetoresEditar, "Editar setores", "setores", PermissionAreas.GestaoInstitucional, "Alterar setores"),
+        (SetoresExcluir, "Excluir setores", "setores", PermissionAreas.GestaoInstitucional, "Remover setores sem servidores lotados"),
+        (CargosListar, "Listar cargos", "cargos", PermissionAreas.GestaoInstitucional, "Visualizar cargos oficiais"),
+        (ServidoresListar, "Listar servidores", "servidores", PermissionAreas.GestaoInstitucional, "Visualizar servidores"),
+        (ServidoresCriar, "Criar servidores", "servidores", PermissionAreas.GestaoInstitucional, "Cadastrar servidores"),
+        (ServidoresEditar, "Editar servidores", "servidores", PermissionAreas.GestaoInstitucional, "Alterar servidores"),
+        (ServidoresExcluir, "Excluir servidores", "servidores", PermissionAreas.GestaoInstitucional, "Excluir servidores sem vínculos bloqueantes"),
+        (EscalasListar, "Listar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Visualizar escalas dos setores autorizados"),
+        (EscalasCriar, "Criar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Cadastrar e copiar escalas"),
+        (EscalasEditar, "Editar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Alterar rascunhos e escalas finalizadas"),
+        (EscalasFinalizar, "Finalizar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Finalizar montagem da escala"),
+        (EscalasPublicar, "Publicar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Publicar escalas finalizadas"),
+        (EscalasExcluir, "Excluir escalas", "escalas", PermissionAreas.GestaoDoSetor, "Excluir escalas em rascunho ou finalizadas"),
+        (EscalasSolicitarDevolucao, "Solicitar devolução de escala", "escalas", PermissionAreas.GestaoDoSetor, "Solicitar devolução de escala publicada"),
+        (EscalasDevolver, "Aprovar devolução de escala", "escalas", PermissionAreas.GestaoInstitucional, "Aprovar ou recusar devolução de escalas"),
+        (EscalasExportar, "Exportar escalas", "escalas", PermissionAreas.GestaoDoSetor, "Exportar escalas em PDF"),
+        (AfastamentosListar, "Listar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Visualizar afastamentos dos servidores"),
+        (AfastamentosCriar, "Criar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Cadastrar afastamentos"),
+        (AfastamentosEditar, "Editar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Alterar afastamentos"),
+        (AfastamentosExcluir, "Excluir afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Remover afastamentos"),
     ];
 }
 
@@ -95,13 +132,13 @@ public static class SetorSiglas
 
 public static class CargoCodes
 {
-    public const string PeritoCriminal = "PERITO_CRIMINAL";
-    public const string AgenteTecnicoForense = "AGENTE_TECNICO_FORENSE";
-    public const string AgenteNecropsia = "AGENTE_NECROPSIA";
-    public const string AssistenteTecnicoForense = "ASSISTENTE_TECNICO_FORENSE";
-    public const string Estagiario = "ESTAGIARIO";
-    public const string Terceirizado = "TERCEIRIZADO";
-    public const string ServidorExterno = "SERVIDOR_EXTERNO";
+    public const string PeritoCriminal = "PC";
+    public const string AgenteTecnicoForense = "ATF";
+    public const string AgenteNecropsia = "AN";
+    public const string AssistenteTecnicoForense = "ASTF";
+    public const string Estagiario = "EST";
+    public const string Terceirizado = "TER";
+    public const string ServidorExterno = "EXT";
 
     public static readonly IReadOnlyList<(string Codigo, string Nome)> Catalog =
     [
@@ -113,6 +150,19 @@ public static class CargoCodes
         (Terceirizado, "Terceirizado"),
         (ServidorExterno, "Servidor Externo"),
     ];
+
+    /// <summary>Códigos longos legados da seed antiga → sigla atual.</summary>
+    public static readonly IReadOnlyDictionary<string, string> ObsoleteToSigla =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PERITO_CRIMINAL"] = PeritoCriminal,
+            ["AGENTE_TECNICO_FORENSE"] = AgenteTecnicoForense,
+            ["AGENTE_NECROPSIA"] = AgenteNecropsia,
+            ["ASSISTENTE_TECNICO_FORENSE"] = AssistenteTecnicoForense,
+            ["ESTAGIARIO"] = Estagiario,
+            ["TERCEIRIZADO"] = Terceirizado,
+            ["SERVIDOR_EXTERNO"] = ServidorExterno,
+        };
 }
 
 public static class PerfilCodes

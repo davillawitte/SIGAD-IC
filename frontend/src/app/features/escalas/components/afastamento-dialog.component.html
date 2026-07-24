@@ -1,0 +1,60 @@
+<div class="pci-app-dialog">
+  <h2 class="pci-app-dialog__title">Adicionar afastamento</h2>
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <pci-form-card>
+    <form [formGroup]="form">
+      <app-form-section title="Dados">
+        <pci-select
+          [appFormCol]="12"
+          label="Servidor"
+          [required]="true"
+          formControlName="servidorId"
+          [options]="data.servidorOptions"
+          placeholder="Selecione o servidor"
+        />
+
+        <pci-input
+          [appFormCol]="6"
+          label="Data início"
+          type="date"
+          formControlName="dataInicio"
+          [required]="true"
+        />
+        <pci-input
+          [appFormCol]="6"
+          label="Data fim"
+          type="date"
+          formControlName="dataFim"
+          [required]="true"
+        />
+
+        <pci-select
+          [appFormCol]="12"
+          label="Tipo"
+          [required]="true"
+          formControlName="tipoOcorrenciaCodigo"
+          [options]="tipoOptions"
+          placeholder="Selecione o tipo"
+        />
+
+        <pci-input
+          [appFormCol]="12"
+          label="SEI"
+          formControlName="sei"
+          placeholder="Número do processo SEI (opcional)"
+        />
+
+        <pci-input [appFormCol]="12" label="Observação" formControlName="observacao" />
+      </app-form-section>
+    </form>
+  </pci-form-card>
+
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+    <pci-button variant="primary" [loading]="saving()" (clicked)="save()">Salvar</pci-button>
+  </pci-form-actions>
+</div>

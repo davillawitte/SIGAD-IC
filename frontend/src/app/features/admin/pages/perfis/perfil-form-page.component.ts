@@ -19,6 +19,11 @@ import type { PerfilListItem, PermissaoItem } from '../../models/admin.models';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
 
 const SUPER_ADMIN_CODIGO = 'SUPERADMINISTRADOR';
+const AREA_ORDER = [
+  'Gestão Institucional',
+  'Gestão do Setor',
+  'Administração do Sistema',
+] as const;
 
 @Component({
   selector: 'app-perfil-form-page',
@@ -56,22 +61,50 @@ export class PerfilFormPageComponent implements OnInit {
 
   readonly desativarConfirmado = signal(false);
   readonly quantidadeUsuarios = signal(0);
-  readonly requerSubstituto = signal(false);
+  readonly temUsuariosVinculados = signal(false);
+  readonly modoDesativacao = signal<'substituir' | 'remover' | null>(null);
   readonly perfilSubstitutoId = signal<string | null>(null);
   readonly perfisAtivos = signal<PerfilListItem[]>([]);
 
   readonly form = this.fb.nonNullable.group({
     nome: ['', Validators.required],
-    codigo: ['', Validators.required],
     descricao: [''],
   });
 
-  readonly permissaoItems = computed<PciSelectionListItem[]>(() =>
-    this.permissoes().map((permissao) => ({
-      id: permissao.id,
-      label: `${permissao.codigo} — ${permissao.nome}`,
-    })),
-  );
+  readonly permissoesPorArea = computed(() => {
+    const groups = new Map<string, PermissaoItem[]>();
+    for (const permissao of this.permissoes()) {
+      const area = permissao.area || 'Outros';
+      const list = groups.get(area) ?? [];
+      list.push(permissao);
+      groups.set(area, list);
+    }
+
+    const ordered: { area: string; items: PciSelectionListItem[] }[] = AREA_ORDER.filter(
+      (area) => groups.has(area),
+    ).map((area) => ({
+      area,
+      items: (groups.get(area) ?? []).map(
+        (permissao): PciSelectionListItem => ({
+          id: permissao.id,
+          label: `${permissao.nome} (${permissao.codigo})`,
+        }),
+      ),
+    }));
+
+    for (const [area, items] of groups.entries()) {
+      if ((AREA_ORDER as readonly string[]).includes(area)) continue;
+      ordered.push({
+        area,
+        items: items.map((permissao) => ({
+          id: permissao.id,
+          label: `${permissao.nome} (${permissao.codigo})`,
+        })),
+      });
+    }
+
+    return ordered;
+  });
 
   readonly showDesativarPanel = computed(
     () => this.isEdit() && !this.isSistema() && !this.isSuperAdmin(),
@@ -84,7 +117,7 @@ export class PerfilFormPageComponent implements OnInit {
     }
 
     const conta = qtd === 1 ? '1 conta está vinculada' : `${qtd} contas estão vinculadas`;
-    return `${conta} a este perfil. Escolha um perfil substituto; as contas serão reatribuídas automaticamente e em seguida o perfil será desativado.`;
+    return `${conta} a este perfil. Você pode substituir por outro perfil ou remover o vínculo (usuários ficam sem perfil e só acessam o Início).`;
   });
 
   readonly substitutoOptions = computed<PciSelectOption[]>(() =>
@@ -92,7 +125,7 @@ export class PerfilFormPageComponent implements OnInit {
       .filter((perfil) => perfil.id !== this.editId)
       .map((perfil) => ({
         value: perfil.id,
-        label: `${perfil.nome} (${perfil.codigo})`,
+        label: perfil.nome,
       })),
   );
 
@@ -103,17 +136,15 @@ export class PerfilFormPageComponent implements OnInit {
     this.isEdit.set(!!this.editId);
     this.currentPath.set(this.editId ? '/perfis/editar/:id' : '/perfis/novo');
 
-    this.api.listPermissoes({ page: 1, pageSize: 100 }).subscribe({
+    this.api.listPermissoes({ page: 1, pageSize: 200 }).subscribe({
       next: (result) => this.permissoes.set(result.items.filter((p) => p.ativo)),
     });
 
     if (this.editId) {
-      this.form.controls.codigo.disable();
       this.api.getPerfil(this.editId).subscribe({
         next: (perfil) => {
           this.form.patchValue({
             nome: perfil.nome,
-            codigo: perfil.codigo,
             descricao: perfil.descricao ?? '',
           });
           this.isSistema.set(perfil.sistema);
@@ -125,12 +156,22 @@ export class PerfilFormPageComponent implements OnInit {
     }
   }
 
-  onPermissoesChange(ids: string[]): void {
+  onPermissoesChange(ids: string[], areaItemIds: string[]): void {
     if (this.isSuperAdmin()) {
       return;
     }
 
-    this.selectedPermissaoIds.set(ids);
+    const kept = this.selectedPermissaoIds().filter((id) => !areaItemIds.includes(id));
+    this.selectedPermissaoIds.set([...kept, ...ids]);
+  }
+
+  selectedIdsForArea(itemIds: string[]): string[] {
+    const selected = new Set(this.selectedPermissaoIds());
+    return itemIds.filter((id) => selected.has(id));
+  }
+
+  itemIds(items: PciSelectionListItem[]): string[] {
+    return items.map((item) => item.id);
   }
 
   save(): void {
@@ -148,7 +189,6 @@ export class PerfilFormPageComponent implements OnInit {
       this.api
         .createPerfil({
           nome: value.nome.trim(),
-          codigo: value.codigo.trim(),
           descricao: value.descricao.trim() || null,
           permissaoIds: this.selectedPermissaoIds(),
         })
@@ -191,12 +231,13 @@ export class PerfilFormPageComponent implements OnInit {
     this.api.getPerfilExclusaoImpacto(this.editId).subscribe({
       next: (impacto) => {
         this.quantidadeUsuarios.set(impacto.quantidadeUsuarios);
-        this.requerSubstituto.set(impacto.requerSubstituto);
+        this.temUsuariosVinculados.set(impacto.temUsuariosVinculados);
         this.perfilSubstitutoId.set(null);
+        this.modoDesativacao.set(impacto.temUsuariosVinculados ? null : 'remover');
         this.desativarConfirmado.set(true);
         this.saving.set(false);
 
-        if (impacto.requerSubstituto) {
+        if (impacto.temUsuariosVinculados) {
           this.api.listPerfis({ page: 1, pageSize: 100 }).subscribe({
             next: (result) =>
               this.perfisAtivos.set(result.items.filter((perfil) => perfil.ativo)),
@@ -209,7 +250,8 @@ export class PerfilFormPageComponent implements OnInit {
 
   cancelarDesativacao(): void {
     this.desativarConfirmado.set(false);
-    this.requerSubstituto.set(false);
+    this.temUsuariosVinculados.set(false);
+    this.modoDesativacao.set(null);
     this.perfilSubstitutoId.set(null);
     this.error.set(null);
   }
@@ -219,16 +261,25 @@ export class PerfilFormPageComponent implements OnInit {
       return;
     }
 
-    if (this.requerSubstituto() && !this.perfilSubstitutoId()) {
-      this.error.set('Selecione o perfil substituto para as contas vinculadas.');
-      return;
+    if (this.temUsuariosVinculados()) {
+      if (this.modoDesativacao() === 'substituir' && !this.perfilSubstitutoId()) {
+        this.error.set('Selecione o perfil substituto para as contas vinculadas.');
+        return;
+      }
+
+      if (!this.modoDesativacao()) {
+        this.error.set('Escolha substituir o perfil ou remover os vínculos.');
+        return;
+      }
     }
 
     this.saving.set(true);
     this.error.set(null);
     this.api
       .desativarPerfil(this.editId, {
-        perfilSubstitutoId: this.perfilSubstitutoId(),
+        perfilSubstitutoId:
+          this.modoDesativacao() === 'substituir' ? this.perfilSubstitutoId() : null,
+        removerVinculosSemSubstituto: this.modoDesativacao() === 'remover',
       })
       .subscribe({
         next: () => void this.router.navigateByUrl('/perfis'),

@@ -1,0 +1,9 @@
+:host ::ng-deep .pci-filter-panel__grid {
+  grid-template-columns: 2fr 1fr 1.1fr 0.9fr; /* nome | matrícula | cargo | status */
+}
+
+@media (max-width: 960px) {
+  :host ::ng-deep .pci-filter-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}

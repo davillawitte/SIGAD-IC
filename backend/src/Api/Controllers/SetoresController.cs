@@ -18,6 +18,11 @@ public class SetoresController(ISetorService setorService) : ControllerBase
     public async Task<IActionResult> List(CancellationToken cancellationToken) =>
         Ok(await setorService.ListAsync(cancellationToken));
 
+    [HttpGet("meus")]
+    [RequiresAnyPermission(PermissionCodes.SetoresListar, PermissionCodes.EscalasCriar, PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> ListMeus(CancellationToken cancellationToken) =>
+        Ok(await setorService.ListMeusAsync(User.GetLogin(), cancellationToken));
+
     [HttpGet("estrutura")]
     [RequiresPermission(PermissionCodes.SetoresListar)]
     public async Task<IActionResult> Estrutura(CancellationToken cancellationToken)
@@ -33,6 +38,13 @@ public class SetoresController(ISetorService setorService) : ControllerBase
         var result = await setorService.GetByIdAsync(id, cancellationToken);
         return result.Succeeded ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
+
+    [HttpPost("chefias-conflitos")]
+    [RequiresAnyPermission(PermissionCodes.SetoresCriar, PermissionCodes.SetoresEditar)]
+    public async Task<IActionResult> PreviewChefiasConflitos(
+        [FromBody] PreviewChefiasConflitosRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await setorService.PreviewChefiasConflitosAsync(request, cancellationToken));
 
     [HttpPost]
     [RequiresPermission(PermissionCodes.SetoresCriar)]

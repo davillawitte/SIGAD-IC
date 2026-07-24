@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
 
-import { superAdminGuard } from '../../core/auth/auth.guard';
+import { anyPermissionGuard } from '../../core/auth/auth.guard';
 
 export const ADMIN_ROUTES: Routes = [
   {
     path: 'usuarios',
-    canActivate: [superAdminGuard],
+    canActivate: [anyPermissionGuard('usuarios.listar')],
     data: { navId: 'usuarios' },
     children: [
       {
@@ -15,6 +15,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'novo',
+        canActivate: [anyPermissionGuard('usuarios.criar')],
         loadComponent: () =>
           import('./pages/usuarios/usuario-form-page.component').then(
             (m) => m.UsuarioFormPageComponent,
@@ -22,6 +23,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'editar/:id',
+        canActivate: [anyPermissionGuard('usuarios.editar')],
         loadComponent: () =>
           import('./pages/usuarios/usuario-form-page.component').then(
             (m) => m.UsuarioFormPageComponent,
@@ -31,7 +33,7 @@ export const ADMIN_ROUTES: Routes = [
   },
   {
     path: 'perfis',
-    canActivate: [superAdminGuard],
+    canActivate: [anyPermissionGuard('perfis.listar')],
     data: { navId: 'perfis' },
     children: [
       {
@@ -41,11 +43,13 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'novo',
+        canActivate: [anyPermissionGuard('perfis.criar')],
         loadComponent: () =>
           import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
       },
       {
         path: 'editar/:id',
+        canActivate: [anyPermissionGuard('perfis.editar')],
         loadComponent: () =>
           import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
       },
@@ -53,7 +57,7 @@ export const ADMIN_ROUTES: Routes = [
   },
   {
     path: 'servidores',
-    canActivate: [superAdminGuard],
+    canActivate: [anyPermissionGuard('servidores.listar')],
     data: { navId: 'servidores' },
     children: [
       {
@@ -65,6 +69,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'novo',
+        canActivate: [anyPermissionGuard('servidores.criar')],
         loadComponent: () =>
           import('./pages/servidores/servidor-form-page.component').then(
             (m) => m.ServidorFormPageComponent,
@@ -72,6 +77,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'editar/:id',
+        canActivate: [anyPermissionGuard('servidores.editar')],
         loadComponent: () =>
           import('./pages/servidores/servidor-form-page.component').then(
             (m) => m.ServidorFormPageComponent,
@@ -81,7 +87,7 @@ export const ADMIN_ROUTES: Routes = [
   },
   {
     path: 'estrutura-organizacional',
-    canActivate: [superAdminGuard],
+    canActivate: [anyPermissionGuard('nucleos.listar', 'setores.listar')],
     data: { navId: 'estrutura-organizacional' },
     children: [
       {
@@ -93,6 +99,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'nucleos/novo',
+        canActivate: [anyPermissionGuard('nucleos.criar')],
         loadComponent: () =>
           import('./pages/estrutura/nucleo-form-page.component').then(
             (m) => m.NucleoFormPageComponent,
@@ -100,6 +107,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'nucleos/editar/:id',
+        canActivate: [anyPermissionGuard('nucleos.editar')],
         loadComponent: () =>
           import('./pages/estrutura/nucleo-form-page.component').then(
             (m) => m.NucleoFormPageComponent,
@@ -107,6 +115,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'setores/novo',
+        canActivate: [anyPermissionGuard('setores.criar')],
         loadComponent: () =>
           import('./pages/estrutura/setor-form-page.component').then(
             (m) => m.SetorFormPageComponent,
@@ -114,6 +123,7 @@ export const ADMIN_ROUTES: Routes = [
       },
       {
         path: 'setores/editar/:id',
+        canActivate: [anyPermissionGuard('setores.editar')],
         loadComponent: () =>
           import('./pages/estrutura/setor-form-page.component').then(
             (m) => m.SetorFormPageComponent,

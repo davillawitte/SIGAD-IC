@@ -3,6 +3,7 @@ export interface UsuarioListItem {
   login: string;
   nomeServidor: string;
   matricula: string;
+  cpf: string;
   ativo: boolean;
   ultimoLogin?: string | null;
   perfis: string[];
@@ -21,11 +22,20 @@ export interface UsuarioDetail {
   perfis: string[];
 }
 
+export interface UsuarioComSenha extends UsuarioDetail {
+  senhaTemporaria: string;
+}
+
 export interface CreateUsuarioPayload {
   servidorId: string;
-  login: string;
-  senha: string;
   perfilIds: string[];
+}
+
+export interface ResetSenhaResult {
+  id: string;
+  login: string;
+  nomeServidor: string;
+  senhaTemporaria: string;
 }
 
 export interface UpdateUsuarioPayload {
@@ -50,7 +60,7 @@ export interface PerfilDetail extends PerfilListItem {
 
 export interface CreatePerfilPayload {
   nome: string;
-  codigo: string;
+  codigo?: string | null;
   descricao?: string | null;
   permissaoIds?: string[];
 }
@@ -63,11 +73,21 @@ export interface UpdatePerfilPayload {
 
 export interface PerfilExclusaoImpacto {
   quantidadeUsuarios: number;
-  requerSubstituto: boolean;
+  temUsuariosVinculados: boolean;
+}
+
+export interface ServidorExclusaoImpacto {
+  escalas: number;
+  afastamentos: number;
+  chefias: number;
+  usuarios: number;
+  nucleosComoChefe: number;
+  podeExcluir: boolean;
 }
 
 export interface DesativarPerfilPayload {
   perfilSubstitutoId?: string | null;
+  removerVinculosSemSubstituto?: boolean;
 }
 
 export interface PermissaoItem {
@@ -76,6 +96,7 @@ export interface PermissaoItem {
   nome: string;
   descricao?: string | null;
   modulo: string;
+  area: string;
   sistema: boolean;
   ativo: boolean;
 }
@@ -89,6 +110,7 @@ export interface ServidorListItem {
   cpf: string;
   cargoId: string;
   cargo: string;
+  cargoCodigo: string;
   email: string;
   telefone?: string | null;
   dataNascimento: string;
@@ -150,12 +172,21 @@ export interface SetorListItem {
   chefias: SetorChefia[];
 }
 
+export interface ChefiaConflito {
+  servidorId: string;
+  servidorNome: string;
+  tipoChefia: TipoChefia;
+  setorId: string;
+  setorNome: string;
+}
+
 export interface CreateSetorPayload {
   nome: string;
   sigla: string;
   resumo?: string | null;
   nucleoId?: string | null;
   chefias: SetorChefiaInput[];
+  confirmarRemocaoChefiasEmOutrosSetores?: boolean;
 }
 
 export interface UpdateSetorPayload {
@@ -164,6 +195,7 @@ export interface UpdateSetorPayload {
   resumo?: string | null;
   nucleoId?: string | null;
   chefias: SetorChefiaInput[];
+  confirmarRemocaoChefiasEmOutrosSetores?: boolean;
 }
 
 export interface NucleoListItem {

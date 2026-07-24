@@ -1,13 +1,23 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
-import { PciAppLayoutComponent, PciNavGroup } from '@davillawitte/pci-design-system';
+import {
+  PciAppLayoutComponent,
+  PciFeedbackModalComponent,
+  PciNavGroup,
+  PciToastContainerComponent,
+} from '@davillawitte/pci-design-system';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { NavActiveService } from '../../core/navigation/nav-active.service';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterOutlet, PciAppLayoutComponent],
+  imports: [
+    RouterOutlet,
+    PciAppLayoutComponent,
+    PciToastContainerComponent,
+    PciFeedbackModalComponent,
+  ],
   host: {
     '(click)': 'onBreadcrumbLinkClick($event)',
   },
@@ -27,6 +37,9 @@ export class MainLayoutComponent {
     perfis: '/perfis',
     servidores: '/servidores',
     'estrutura-organizacional': '/estrutura-organizacional',
+    escalas: '/escalas',
+    afastamentos: '/afastamentos',
+    'solicitacoes-trocas': '/solicitacoes-trocas',
   };
 
   readonly activeItemId = computed(() => this.navActive.navId());
@@ -39,23 +52,46 @@ export class MainLayoutComponent {
       },
     ];
 
-    if (this.auth.isSuperAdmin()) {
-      groups.push(
-        {
-          title: 'Gestão Institucional',
-          items: [
-            { id: 'servidores', label: 'Servidores', icon: 'users' },
-            { id: 'estrutura-organizacional', label: 'Estrutura Organizacional', icon: 'building' },
-          ],
-        },
-        {
-          title: 'Administração do Sistema',
-          items: [
-            { id: 'usuarios', label: 'Usuários', icon: 'users' },
-            { id: 'perfis', label: 'Perfis', icon: 'shield' },
-          ],
-        },
-      );
+    if (
+      this.auth.hasAnyPermission([
+        'nucleos.listar',
+        'setores.listar',
+        'servidores.listar',
+        'cargos.listar',
+      ])
+    ) {
+      groups.push({
+        title: 'Gestão Institucional',
+        items: [
+          { id: 'servidores', label: 'Servidores', icon: 'users' },
+          { id: 'estrutura-organizacional', label: 'Estrutura Organizacional', icon: 'building' },
+        ],
+      });
+    }
+
+    if (this.auth.hasAnyPermission(['escalas.listar', 'afastamentos.listar'])) {
+      groups.push({
+        title: 'Gestão do Setor',
+        items: [
+          ...(this.auth.hasPermission('escalas.listar')
+            ? [{ id: 'escalas', label: 'Escalas', icon: 'schedule' as const }]
+            : []),
+          ...(this.auth.hasPermission('afastamentos.listar')
+            ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'calendar' as const }]
+            : []),
+          { id: 'solicitacoes-trocas', label: 'Solicitações de trocas', icon: 'refresh' as const },
+        ],
+      });
+    }
+
+    if (this.auth.hasAnyPermission(['usuarios.listar', 'perfis.listar'])) {
+      groups.push({
+        title: 'Administração do Sistema',
+        items: [
+          { id: 'usuarios', label: 'Usuários', icon: 'users' },
+          { id: 'perfis', label: 'Perfis', icon: 'shield' },
+        ],
+      });
     }
 
     return groups;
@@ -71,7 +107,7 @@ export class MainLayoutComponent {
       return 'SIGAD-IC';
     }
 
-    return user.perfis[0] ?? user.meta ?? 'SIGAD-IC';
+    return user.setorLotacaoNome?.trim() || user.meta || 'SIGAD-IC';
   });
 
   readonly userAvatarName = computed(

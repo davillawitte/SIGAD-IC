@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard, mustChangePasswordGuard, passwordOkGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -10,8 +10,16 @@ export const routes: Routes = [
       import('./features/auth/pages/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    path: 'trocar-senha',
+    canActivate: [mustChangePasswordGuard],
+    loadComponent: () =>
+      import('./features/auth/pages/trocar-senha/trocar-senha-page.component').then(
+        (m) => m.TrocarSenhaPageComponent,
+      ),
+  },
+  {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [authGuard, passwordOkGuard],
     loadComponent: () =>
       import('./layout/main-layout/main-layout.component').then((m) => m.MainLayoutComponent),
     children: [
@@ -22,6 +30,16 @@ export const routes: Routes = [
       {
         path: '',
         loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+      },
+      {
+        path: '',
+        loadChildren: () =>
+          import('./features/escalas/escalas.routes').then((m) => m.ESCALAS_ROUTES),
+      },
+      {
+        path: '',
+        loadChildren: () =>
+          import('./features/gestao-setor/gestao-setor.routes').then((m) => m.GESTAO_SETOR_ROUTES),
       },
     ],
   },
