@@ -22,10 +22,38 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             .Include(x => x.Servidor).ThenInclude(x => x.Setor)
             .AsQueryable();
 
-        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Afastamentos);
-        if (setoresVisiveis is not null)
+        var escopo = (query.Escopo ?? string.Empty).Trim().ToLowerInvariant();
+        if (escopo is "setor" or "meus")
         {
-            q = q.Where(x => setoresVisiveis.Contains(x.Servidor.SetorId));
+            var meus = actor.SetoresGerenciadosIds;
+            if (meus.Count == 0)
+            {
+                return [];
+            }
+
+            q = q.Where(x => meus.Contains(x.Servidor.SetorId));
+        }
+        else if (escopo is "institucional" or "outros")
+        {
+            if (!actor.TemVisaoGlobal(PermissionModules.Afastamentos))
+            {
+                return [];
+            }
+
+            // Institucional: todos os setores, exceto a Direção do IC.
+            var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
+            if (direcaoIds.Count > 0)
+            {
+                q = q.Where(x => !direcaoIds.Contains(x.Servidor.SetorId));
+            }
+        }
+        else
+        {
+            var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Afastamentos);
+            if (setoresVisiveis is not null)
+            {
+                q = q.Where(x => setoresVisiveis.Contains(x.Servidor.SetorId));
+            }
         }
 
         if (query.SetorId is Guid setorId)
@@ -232,6 +260,18 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
 
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);
+
+    private async Task<HashSet<Guid>> LoadDirecaoIcSetorIdsAsync(CancellationToken cancellationToken)
+    {
+        var setores = await db.Setores
+            .AsNoTracking()
+            .Select(x => new { x.Id, x.Sigla })
+            .ToListAsync(cancellationToken);
+        return setores
+            .Where(x => SetorSiglas.IsDirecaoIc(x.Sigla))
+            .Select(x => x.Id)
+            .ToHashSet();
+    }
 
     private static bool CanView(ActorContext actor, Guid setorId) =>
         actor.PodeVer(PermissionCodes.AfastamentosListar, setorId);

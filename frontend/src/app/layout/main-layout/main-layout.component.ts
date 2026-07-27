@@ -38,7 +38,9 @@ export class MainLayoutComponent {
     servidores: '/servidores',
     'estrutura-organizacional': '/estrutura-organizacional',
     escalas: '/escalas',
+    'escalas-institucionais': '/escalas-institucionais',
     afastamentos: '/afastamentos',
+    'afastamentos-institucionais': '/afastamentos-institucionais',
   };
 
   readonly activeItemId = computed(() => this.navActive.navId());
@@ -52,6 +54,20 @@ export class MainLayoutComponent {
     ];
 
     const gestaoInstitucional = [
+      ...(this.auth.hasGestaoInstitucional()
+        ? [
+            {
+              id: 'escalas-institucionais',
+              label: 'Escalas',
+              icon: 'schedule' as const,
+            },
+            {
+              id: 'afastamentos-institucionais',
+              label: 'Afastamentos',
+              icon: 'calendar' as const,
+            },
+          ]
+        : []),
       ...(this.auth.hasPermission('servidores.listar')
         ? [{ id: 'servidores', label: 'Servidores', icon: 'users' as const }]
         : []),
@@ -69,14 +85,20 @@ export class MainLayoutComponent {
       groups.push({ title: 'Gestão Institucional', items: gestaoInstitucional });
     }
 
-    const gestaoSetor = [
-      ...(this.auth.hasPermission('escalas.listar')
-        ? [{ id: 'escalas', label: 'Escalas', icon: 'schedule' as const }]
-        : []),
-      ...(this.auth.hasPermission('afastamentos.listar')
-        ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'calendar' as const }]
-        : []),
-    ];
+    // Gestão do Setor: aparece quando o usuário é chefia de algum setor
+    // e tem a área operacional (escalas/afastamentos).
+    const isChefe = (this.auth.currentUser()?.setoresGerenciadosIds?.length ?? 0) > 0;
+    const gestaoSetor =
+      isChefe
+        ? [
+            ...(this.auth.hasPermission('escalas.listar')
+              ? [{ id: 'escalas', label: 'Escalas', icon: 'schedule' as const }]
+              : []),
+            ...(this.auth.hasPermission('afastamentos.listar')
+              ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'calendar' as const }]
+              : []),
+          ]
+        : [];
     if (gestaoSetor.length) {
       groups.push({ title: 'Gestão do Setor', items: gestaoSetor });
     }

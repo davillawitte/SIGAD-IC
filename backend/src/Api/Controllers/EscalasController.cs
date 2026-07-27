@@ -14,9 +14,10 @@ namespace TemplateSistema.Api.Controllers;
 [Route("api/escalas")]
 public class EscalasController(IEscalaService escalaService, IEscalaPdfService escalaPdfService) : ControllerBase
 {
-    [HttpGet]
+    /// <summary>Gestão do Setor: só escalas dos setores em que o usuário é chefia.</summary>
+    [HttpGet("setor")]
     [RequiresPermission(PermissionCodes.EscalasListar)]
-    public async Task<IActionResult> List(
+    public Task<IActionResult> ListSetor(
         [FromQuery] Guid? setorId,
         [FromQuery] int? mes,
         [FromQuery] int? ano,
@@ -24,7 +25,47 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ListInternal("setor", setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+
+    /// <summary>Gestão Institucional: escalas de todos os setores, exceto a Direção do IC.</summary>
+    [HttpGet("institucionais")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public Task<IActionResult> ListInstitucionais(
+        [FromQuery] Guid? setorId,
+        [FromQuery] int? mes,
+        [FromQuery] int? ano,
+        [FromQuery] StatusEscala? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default) =>
+        ListInternal("institucional", setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+
+    [HttpGet]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public Task<IActionResult> List(
+        [FromQuery] Guid? setorId,
+        [FromQuery] int? mes,
+        [FromQuery] int? ano,
+        [FromQuery] StatusEscala? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null,
+        [FromQuery] string? escopo = null,
+        CancellationToken cancellationToken = default) =>
+        ListInternal(escopo, setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+
+    private async Task<IActionResult> ListInternal(
+        string? escopo,
+        Guid? setorId,
+        int? mes,
+        int? ano,
+        StatusEscala? status,
+        int page,
+        int pageSize,
+        string? search,
+        CancellationToken cancellationToken)
     {
         var result = await escalaService.ListAsync(
             new EscalaListQuery
@@ -36,6 +77,7 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
                 Page = page,
                 PageSize = pageSize,
                 Search = search,
+                Escopo = escopo,
             },
             User.GetLogin(),
             cancellationToken);

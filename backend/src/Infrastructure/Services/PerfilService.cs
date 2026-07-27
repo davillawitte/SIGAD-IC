@@ -64,25 +64,19 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
 
         var perfil = Perfil.Create(request.Nome, codigo, request.Descricao, sistema: false, createdBy: actorLogin);
 
-        if (request.PermissaoIds is { Count: > 0 })
+        var grants = await ResolveGrantsAsync(request.Areas, request.PermissaoIds, request.AbrangenciaPorPermissao, cancellationToken);
+        if (!grants.Succeeded)
         {
-            var permissoes = await ResolvePermissoesAsync(request.PermissaoIds, cancellationToken);
-            if (permissoes is null)
-            {
-                return Result<PerfilDetailDto>.Failure("Uma ou mais permissões são inválidas.");
-            }
+            return Result<PerfilDetailDto>.Failure(grants.Error!);
+        }
 
-            if (ContemAdministracaoDoSistema(permissoes))
-            {
-                return Result<PerfilDetailDto>.Failure(PermissaoAdminNaoDelegavel);
-            }
+        foreach (var (permissao, abr) in grants.Value!)
+        {
+            perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissao.Id, abr));
+        }
 
-            foreach (var permissao in permissoes)
-            {
-                var abr = ResolveAbrangencia(permissao, request.AbrangenciaPorPermissao);
-                perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissao.Id, abr));
-            }
-
+        if (grants.Value!.Count > 0)
+        {
             perfil.MarkUpdated(actorLogin);
         }
 
@@ -238,24 +232,18 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         if (perfil.Codigo == PerfilCodes.SuperAdministrador)
         {
             return Result<PerfilDetailDto>.Failure(
-                "As permissões do Super Administrador não podem ser alteradas. Este perfil possui acesso total.");
+                "As permissões do Super Administrador não podem ser alteradas. Este perfil cobre apenas Administração do Sistema.");
         }
 
-        var permissoes = await ResolvePermissoesAsync(request.PermissaoIds, cancellationToken);
-        if (permissoes is null)
+        var grants = await ResolveGrantsAsync(request.Areas, request.PermissaoIds, request.AbrangenciaPorPermissao, cancellationToken);
+        if (!grants.Succeeded)
         {
-            return Result<PerfilDetailDto>.Failure("Uma ou mais permissões são inválidas.");
-        }
-
-        if (ContemAdministracaoDoSistema(permissoes))
-        {
-            return Result<PerfilDetailDto>.Failure(PermissaoAdminNaoDelegavel);
+            return Result<PerfilDetailDto>.Failure(grants.Error!);
         }
 
         db.PerfilPermissoes.RemoveRange(perfil.PerfilPermissoes);
-        foreach (var permissao in permissoes)
+        foreach (var (permissao, abr) in grants.Value!)
         {
-            var abr = ResolveAbrangencia(permissao, request.AbrangenciaPorPermissao);
             perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissao.Id, abr));
         }
 
@@ -264,6 +252,57 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
 
         var updated = await LoadAsync(id, cancellationToken);
         return Result<PerfilDetailDto>.Success(MapDetail(updated!));
+    }
+
+    private async Task<Result<List<(Permissao Permissao, Abrangencia Abrangencia)>>> ResolveGrantsAsync(
+        IReadOnlyList<string>? areas,
+        IReadOnlyList<Guid>? permissaoIds,
+        IReadOnlyDictionary<string, Abrangencia>? abrangenciaPorCodigo,
+        CancellationToken cancellationToken)
+    {
+        if (areas is { Count: > 0 })
+        {
+            if (areas.Any(a => string.Equals(a, PermissionAreas.AdministracaoDoSistema, StringComparison.Ordinal)))
+            {
+                return Result<List<(Permissao, Abrangencia)>>.Failure(PermissaoAdminNaoDelegavel);
+            }
+
+            var expanded = PermissionAreaGrants.Expand(areas);
+            if (expanded.Count == 0)
+            {
+                return Result<List<(Permissao, Abrangencia)>>.Success([]);
+            }
+
+            var codigos = expanded.Keys.ToList();
+            var permissoes = await db.Permissoes
+                .AsNoTracking()
+                .Where(x => x.Ativo && codigos.Contains(x.Codigo))
+                .ToListAsync(cancellationToken);
+
+            var list = permissoes
+                .Select(p => (p, expanded[p.Codigo]))
+                .ToList();
+            return Result<List<(Permissao, Abrangencia)>>.Success(list);
+        }
+
+        if (permissaoIds is not { Count: > 0 })
+        {
+            return Result<List<(Permissao, Abrangencia)>>.Success([]);
+        }
+
+        var resolved = await ResolvePermissoesAsync(permissaoIds, cancellationToken);
+        if (resolved is null)
+        {
+            return Result<List<(Permissao, Abrangencia)>>.Failure("Uma ou mais permissões são inválidas.");
+        }
+
+        if (ContemAdministracaoDoSistema(resolved))
+        {
+            return Result<List<(Permissao, Abrangencia)>>.Failure(PermissaoAdminNaoDelegavel);
+        }
+
+        return Result<List<(Permissao, Abrangencia)>>.Success(
+            resolved.Select(p => (p, ResolveAbrangencia(p, abrangenciaPorCodigo))).ToList());
     }
 
     private async Task<string> GenerateUniqueCodigoAsync(
@@ -347,8 +386,14 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
                 .ThenInclude(x => x.Permissao)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-    private static PerfilDetailDto MapDetail(Perfil perfil) =>
-        new(
+    private static PerfilDetailDto MapDetail(Perfil perfil)
+    {
+        var permissoes = perfil.PerfilPermissoes.Select(x => x.Permissao.Codigo).OrderBy(x => x).ToList();
+        var abrangencia = perfil.PerfilPermissoes
+            .Where(x => x.Abrangencia != Abrangencia.MeusSetores)
+            .ToDictionary(x => x.Permissao.Codigo, x => x.Abrangencia, StringComparer.OrdinalIgnoreCase);
+
+        return new(
             perfil.Id,
             perfil.Nome,
             perfil.Codigo,
@@ -356,8 +401,8 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
             perfil.Sistema,
             perfil.Ativo,
             perfil.PerfilPermissoes.Select(x => x.PermissaoId).ToList(),
-            perfil.PerfilPermissoes.Select(x => x.Permissao.Codigo).OrderBy(x => x).ToList(),
-            perfil.PerfilPermissoes
-                .Where(x => x.Abrangencia != Abrangencia.MeusSetores)
-                .ToDictionary(x => x.Permissao.Codigo, x => x.Abrangencia, StringComparer.OrdinalIgnoreCase));
+            permissoes,
+            abrangencia,
+            PermissionAreaGrants.DetectAreas(permissoes, abrangencia));
+    }
 }

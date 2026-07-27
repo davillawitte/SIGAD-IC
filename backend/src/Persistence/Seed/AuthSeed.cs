@@ -269,6 +269,18 @@ public static class AuthSeed
         {
             await SeedDirecaoIcPermissoesIniciaisAsync(context, cancellationToken);
         }
+        else
+        {
+            // Idempotente: garante baseline (incl. servidores criar/editar/excluir) em bancos já existentes.
+            var direcaoId = await context.Perfis
+                .Where(x => x.Id == PerfilDirecaoIcId || x.Codigo == PerfilCodes.DirecaoIc)
+                .Select(x => x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (direcaoId != Guid.Empty)
+            {
+                await SeedDirecaoIcPermissoesIniciaisAsync(context, direcaoId, cancellationToken);
+            }
+        }
 
         await context.SaveChangesAsync(cancellationToken);
         return criados;
@@ -278,25 +290,8 @@ public static class AuthSeed
         ApplicationDbContext context,
         CancellationToken cancellationToken)
     {
-        var codes = new[]
-        {
-            PermissionCodes.EscalasListar,
-            PermissionCodes.EscalasCriar,
-            PermissionCodes.EscalasEditar,
-            PermissionCodes.EscalasFinalizar,
-            PermissionCodes.EscalasPublicar,
-            PermissionCodes.EscalasExcluir,
-            PermissionCodes.EscalasSolicitarDevolucao,
-            PermissionCodes.EscalasExportar,
-            PermissionCodes.AfastamentosListar,
-            PermissionCodes.AfastamentosCriar,
-            PermissionCodes.AfastamentosEditar,
-            PermissionCodes.AfastamentosExcluir,
-            PermissionCodes.ServidoresListar,
-        };
-
-        await EnsurePerfilPermissoesAsync(
-            context, PerfilChefeSetorId, codes, Abrangencia.MeusSetores, cancellationToken);
+        var grants = PermissionAreaGrants.Expand([PermissionAreas.GestaoDoSetor]);
+        await EnsurePerfilPermissoesFromGrantsAsync(context, PerfilChefeSetorId, grants, cancellationToken);
     }
 
     private static async Task SeedServidorPermissoesIniciaisAsync(
@@ -314,54 +309,40 @@ public static class AuthSeed
             context, PerfilServidorId, codes, Abrangencia.MeusSetores, cancellationToken);
     }
 
+    private static Task SeedDirecaoIcPermissoesIniciaisAsync(
+        ApplicationDbContext context,
+        CancellationToken cancellationToken) =>
+        SeedDirecaoIcPermissoesIniciaisAsync(context, PerfilDirecaoIcId, cancellationToken);
+
     private static async Task SeedDirecaoIcPermissoesIniciaisAsync(
         ApplicationDbContext context,
+        Guid perfilId,
         CancellationToken cancellationToken)
     {
-        // Ver / institucional em todos os setores.
-        var leituraGlobal = new[]
-        {
-            PermissionCodes.EscalasListar,
-            PermissionCodes.EscalasDevolver,
-            PermissionCodes.EscalasExportar,
-            PermissionCodes.AfastamentosListar,
-            PermissionCodes.ServidoresListar,
-            PermissionCodes.NucleosListar,
-            PermissionCodes.SetoresListar,
-            PermissionCodes.CargosListar,
-        };
+        // Institucional (visão de todos) + Setor (CRUD no próprio setor / chefia).
+        var grants = PermissionAreaGrants.Expand(
+        [
+            PermissionAreas.GestaoInstitucional,
+            PermissionAreas.GestaoDoSetor,
+        ]);
+        await EnsurePerfilPermissoesFromGrantsAsync(context, perfilId, grants, cancellationToken);
+    }
 
-        // Mutação operacional só nos setores gerenciados (Direção IC).
-        var mutacaoLocal = new[]
+    private static async Task EnsurePerfilPermissoesFromGrantsAsync(
+        ApplicationDbContext context,
+        Guid perfilId,
+        IReadOnlyDictionary<string, Abrangencia> grants,
+        CancellationToken cancellationToken)
+    {
+        foreach (var group in grants.GroupBy(x => x.Value))
         {
-            PermissionCodes.EscalasCriar,
-            PermissionCodes.EscalasEditar,
-            PermissionCodes.EscalasFinalizar,
-            PermissionCodes.EscalasPublicar,
-            PermissionCodes.EscalasExcluir,
-            PermissionCodes.EscalasSolicitarDevolucao,
-            PermissionCodes.AfastamentosCriar,
-            PermissionCodes.AfastamentosEditar,
-            PermissionCodes.AfastamentosExcluir,
-        };
-
-        // Estrutura organizacional: gestão institucional global.
-        var estruturaGlobal = new[]
-        {
-            PermissionCodes.NucleosCriar,
-            PermissionCodes.NucleosEditar,
-            PermissionCodes.NucleosExcluir,
-            PermissionCodes.SetoresCriar,
-            PermissionCodes.SetoresEditar,
-            PermissionCodes.SetoresExcluir,
-        };
-
-        await EnsurePerfilPermissoesAsync(
-            context, PerfilDirecaoIcId, leituraGlobal, Abrangencia.TodosOsSetores, cancellationToken);
-        await EnsurePerfilPermissoesAsync(
-            context, PerfilDirecaoIcId, mutacaoLocal, Abrangencia.MeusSetores, cancellationToken);
-        await EnsurePerfilPermissoesAsync(
-            context, PerfilDirecaoIcId, estruturaGlobal, Abrangencia.TodosOsSetores, cancellationToken);
+            await EnsurePerfilPermissoesAsync(
+                context,
+                perfilId,
+                group.Select(x => x.Key).ToList(),
+                group.Key,
+                cancellationToken);
+        }
     }
 
     /// <summary>

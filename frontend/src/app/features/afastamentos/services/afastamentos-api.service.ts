@@ -44,6 +44,7 @@ export class AfastamentosApiService {
     mes?: number;
     tipoOcorrenciaCodigo?: string;
     servidorIds?: string[];
+    escopo?: 'setor' | 'institucional';
   } = {}): Observable<AfastamentoItem[]> {
     let httpParams = new HttpParams();
     if (params.setorId) httpParams = httpParams.set('setorId', params.setorId);
@@ -56,7 +57,13 @@ export class AfastamentosApiService {
     for (const id of params.servidorIds ?? []) {
       httpParams = httpParams.append('servidorIds', id);
     }
-    return this.http.get<AfastamentoItem[]>(`${this.base}/api/afastamentos`, { params: httpParams });
+    const path =
+      params.escopo === 'institucional'
+        ? 'api/afastamentos/institucionais'
+        : params.escopo === 'setor'
+          ? 'api/afastamentos/setor'
+          : 'api/afastamentos';
+    return this.http.get<AfastamentoItem[]>(`${this.base}/${path}`, { params: httpParams });
   }
 
   get(id: string): Observable<AfastamentoItem> {

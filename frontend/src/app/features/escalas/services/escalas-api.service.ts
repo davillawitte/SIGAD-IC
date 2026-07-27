@@ -37,14 +37,24 @@ export class EscalasApiService {
     page?: number;
     pageSize?: number;
     search?: string;
+    escopo?: 'setor' | 'institucional';
   }): Observable<PagedEscalas> {
     let httpParams = new HttpParams();
     Object.entries(params).forEach(([key, value]) => {
+      if (key === 'escopo') {
+        return;
+      }
       if (value !== undefined && value !== null && value !== '') {
         httpParams = httpParams.set(key, String(value));
       }
     });
-    return this.http.get<PagedEscalas>(`${this.base}/api/escalas`, { params: httpParams });
+    const path =
+      params.escopo === 'institucional'
+        ? 'api/escalas/institucionais'
+        : params.escopo === 'setor'
+          ? 'api/escalas/setor'
+          : 'api/escalas';
+    return this.http.get<PagedEscalas>(`${this.base}/${path}`, { params: httpParams });
   }
 
   get(id: string): Observable<EscalaDetail> {

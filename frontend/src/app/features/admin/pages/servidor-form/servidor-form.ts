@@ -22,6 +22,7 @@ import {
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 import { Subscription, forkJoin } from 'rxjs';
 
+import { AuthService } from '../../../../core/auth/auth.service';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import type { CargoListItem, ServidorListItem, SetorListItem, StatusServidor } from '../../models/admin.models';
@@ -89,6 +90,7 @@ function toDateOnlyString(value: string | null | undefined): string | null {
 })
 export class ServidorForm implements OnInit, OnDestroy {
   private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -127,9 +129,12 @@ export class ServidorForm implements OnInit, OnDestroy {
     this.cargos().map((c) => ({ label: c.nome, value: c.id })),
   );
 
-  readonly setorOptions = computed<PciSelectOption[]>(() =>
-    this.setores().map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id })),
-  );
+  readonly setorOptions = computed<PciSelectOption[]>(() => {
+    const permission = this.isEdit() ? 'servidores.editar' : 'servidores.criar';
+    return this.setores()
+      .filter((s) => this.auth.canAccess(permission, s.id))
+      .map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id }));
+  });
 
   private editId: string | null = null;
 

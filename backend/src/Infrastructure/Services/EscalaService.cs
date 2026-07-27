@@ -26,10 +26,38 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var q = db.Escalas.AsNoTracking().Include(x => x.Setor).AsQueryable();
 
-        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
-        if (setoresVisiveis is not null)
+        var escopo = (query.Escopo ?? string.Empty).Trim().ToLowerInvariant();
+        if (escopo is "setor" or "meus")
         {
-            q = q.Where(x => setoresVisiveis.Contains(x.SetorId));
+            var meus = actor.SetoresGerenciadosIds;
+            if (meus.Count == 0)
+            {
+                return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
+            }
+
+            q = q.Where(x => meus.Contains(x.SetorId));
+        }
+        else if (escopo is "institucional" or "outros")
+        {
+            if (!actor.TemVisaoGlobal(PermissionModules.Escalas))
+            {
+                return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
+            }
+
+            // Institucional: todos os setores, exceto a Direção do IC (gerida em Gestão do Setor).
+            var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
+            if (direcaoIds.Count > 0)
+            {
+                q = q.Where(x => !direcaoIds.Contains(x.SetorId));
+            }
+        }
+        else
+        {
+            var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
+            if (setoresVisiveis is not null)
+            {
+                q = q.Where(x => setoresVisiveis.Contains(x.SetorId));
+            }
         }
 
         if (query.SetorId is Guid setorId)
@@ -855,6 +883,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .Where(x => x.Status == StatusSolicitacaoDevolucao.Pendente)
             .OrderBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
+
+        // Devoluções institucionais: setores operacionais (não a própria Direção IC).
+        var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
+        if (direcaoIds.Count > 0)
+        {
+            items = items.Where(x => !direcaoIds.Contains(x.Escala.SetorId)).ToList();
+        }
 
         return items.Select(x => new SolicitacaoDevolucaoEscalaDto(
             x.Id,
@@ -1894,6 +1929,18 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);
+
+    private async Task<HashSet<Guid>> LoadDirecaoIcSetorIdsAsync(CancellationToken cancellationToken)
+    {
+        var setores = await db.Setores
+            .AsNoTracking()
+            .Select(x => new { x.Id, x.Sigla })
+            .ToListAsync(cancellationToken);
+        return setores
+            .Where(x => SetorSiglas.IsDirecaoIc(x.Sigla))
+            .Select(x => x.Id)
+            .ToHashSet();
+    }
 
     private static bool CanMutate(ActorContext actor, Guid setorId) =>
         actor.PodeAcessar(PermissionCodes.EscalasEditar, setorId);

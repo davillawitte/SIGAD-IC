@@ -7,12 +7,13 @@ export const ESCALAS_ROUTES: Routes = [
   {
     path: 'escalas',
     canActivate: [permissionGuard('escalas.listar')],
-    data: { navId: 'escalas' },
+    data: { navId: 'escalas', escopo: 'setor' },
     children: [
       {
         path: '',
         loadComponent: () =>
           import('./pages/escala-list/escala-list').then((m) => m.EscalaList),
+        data: { escopo: 'setor' },
       },
       {
         path: 'nova',
@@ -39,6 +40,19 @@ export const ESCALAS_ROUTES: Routes = [
           import('./pages/escala-calendario/escala-calendario').then(
             (m) => m.EscalaCalendario,
           ),
+      },
+    ],
+  },
+  {
+    path: 'escalas-institucionais',
+    canActivate: [permissionGuard('escalas.listar')],
+    data: { navId: 'escalas-institucionais', escopo: 'institucional' },
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/escala-list/escala-list').then((m) => m.EscalaList),
+        data: { escopo: 'institucional' },
       },
     ],
   },

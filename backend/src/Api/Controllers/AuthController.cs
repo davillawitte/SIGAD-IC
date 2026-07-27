@@ -33,6 +33,19 @@ public class AuthController(
         return Ok(result.Value);
     }
 
+    [HttpPost("refresh")]
+    [Authorize]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var result = await authService.RefreshSessionAsync(User.GetLogin(), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return Unauthorized(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
+
     [HttpPost("alterar-senha")]
     [Authorize]
     public async Task<IActionResult> AlterarSenha(

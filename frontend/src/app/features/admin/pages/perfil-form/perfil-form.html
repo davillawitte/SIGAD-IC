@@ -2,8 +2,8 @@
   [title]="isEdit() ? 'Editar perfil' : 'Novo perfil'"
   [description]="
     isSuperAdminProfile()
-      ? 'O Super Administrador possui todas as permissões do sistema e não pode ser alterado.'
-      : 'Defina o perfil e associe permissões. Para cada módulo, configure Abrang. Ver (listar) e Abrang. Mutar (criar/editar/excluir) separadamente.'
+      ? 'O Super Administrador cobre apenas Administração do Sistema (usuários e perfis).'
+      : 'Liberar uma área concede todas as funções daquela área. Gestão do Setor opera nos setores em que o usuário é chefia; Gestão Institucional enxerga todos os setores.'
   "
   [currentPath]="currentPath()"
   [routePages]="routePages"
@@ -22,152 +22,87 @@
     </app-form-section>
 
     @if (isSuperAdminProfile()) {
-      <app-form-section title="Permissões">
+      <app-form-section title="Áreas de acesso">
         <pci-alert
           [appFormCol]="12"
           variant="info"
-          title="Acesso total"
-          message="Este perfil recebe automaticamente todas as permissões do catálogo. A associação não pode ser editada nem removida."
+          title="Administração do Sistema"
+          message="Exclusivo deste perfil: usuários, perfis e permissões. O restante vem dos outros perfis do usuário (ex.: Direção IC)."
         />
       </app-form-section>
     } @else {
-      <app-form-section title="Matriz de permissões">
-        <div [appFormCol]="12" class="perm-matrix-wrap" [formGroup]="abrangenciaForm">
-          <table class="perm-matrix" aria-label="Matriz de permissões por módulo">
-            <thead>
-              <tr>
-                <th scope="col">Módulo</th>
-                @for (col of crudColumns; track col.action) {
-                  <th scope="col">{{ col.label }}</th>
-                }
-                <th scope="col">Ações extras</th>
-                <th scope="col">Abrang. Ver</th>
-                <th scope="col">Abrang. Mutar</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of visibleRows(); track row.key) {
-                <tr>
-                  <th scope="row">{{ row.label }}</th>
-                  @for (col of crudColumns; track col.action) {
-                    <td>
-                      @if (hasCrud(row, col.action)) {
-                        <pci-checkbox
-                          [attr.aria-label]="col.label + ' — ' + row.label"
-                          [checked]="isCrudChecked(row, col.action)"
-                          (changed)="toggleCrud(row, col.action, $event)"
-                        />
-                      } @else {
-                        <span class="perm-matrix__na">—</span>
-                      }
-                    </td>
-                  }
-                  <td>
-                    @if (row.extras.length) {
-                      <div class="perm-matrix__extras">
-                        @for (extra of row.extras; track extra.codigo) {
-                          <pci-checkbox
-                            [label]="extra.label"
-                            [checked]="isExtraChecked(extra.codigo)"
-                            (changed)="toggleExtra(extra.codigo, $event)"
-                          />
-                        }
-                      </div>
-                    } @else {
-                      <span class="perm-matrix__na">—</span>
-                    }
-                  </td>
-                  <td>
-                    @if (row.hasAbrangencia) {
-                      <pci-select
-                        class="perm-matrix__abrangencia"
-                        [attr.aria-label]="'Abrangência Ver — ' + row.label"
-                        [formControlName]="row.key + '_ver'"
-                        [options]="abrangenciaOptions"
-                        placeholder="Ver"
-                      />
-                    } @else {
-                      <span class="perm-matrix__na">Global</span>
-                    }
-                  </td>
-                  <td>
-                    @if (row.hasAbrangencia) {
-                      <pci-select
-                        class="perm-matrix__abrangencia"
-                        [attr.aria-label]="'Abrangência Mutar — ' + row.label"
-                        [formControlName]="row.key + '_mutar'"
-                        [options]="abrangenciaOptions"
-                        placeholder="Mutar"
-                      />
-                    } @else {
-                      <span class="perm-matrix__na">Global</span>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+      <app-form-section title="Áreas de acesso">
+        <div [appFormCol]="12">
+          <pci-stack gap="3">
+            <pci-checkbox
+              label="Gestão do Setor"
+              [checked]="areaSetor()"
+              (changed)="toggleAreaSetor($event)"
+            />
+            <p class="area-hint">
+              Escalas e afastamentos do(s) setor(es) em que a pessoa é chefia — com criar, editar,
+              excluir e demais ações (na Direção IC: só o próprio setor).
+            </p>
+            <pci-checkbox
+              label="Gestão Institucional"
+              [checked]="areaInstitucional()"
+              (changed)="toggleAreaInstitucional($event)"
+            />
+            <p class="area-hint">
+              Escalas e afastamentos de todos os setores (exceto a Direção do IC): ver e devolver
+              escalas. Em servidores e estrutura organizacional: CRUD completo.
+            </p>
+          </pci-stack>
         </div>
       </app-form-section>
     }
+  </form>
 
-    @if (showDesativarPanel()) {
-      <app-form-section title="Desativar perfil">
-        @if (!desativarConfirmado()) {
-          <pci-stack [appFormCol]="12" gap="3">
-            <pci-button variant="danger" icon="trash" [loading]="saving()" (clicked)="iniciarDesativacao()">
-              Desativar
-            </pci-button>
-          </pci-stack>
-        } @else {
-          <pci-alert
-            [appFormCol]="12"
-            variant="warning"
-            title="Confirmar desativação"
-            [message]="desativarMensagem()"
-          />
-
-          @if (temUsuariosVinculados()) {
-            <pci-stack [appFormCol]="12" gap="2" direction="horizontal">
-              <pci-button
-                [variant]="modoDesativacao() === 'substituir' ? 'primary' : 'secondary'"
-                (clicked)="modoDesativacao.set('substituir')"
-              >
-                Substituir por outro perfil
-              </pci-button>
-              <pci-button
-                [variant]="modoDesativacao() === 'remover' ? 'primary' : 'secondary'"
-                (clicked)="modoDesativacao.set('remover')"
-              >
-                Remover vínculos (sem perfil)
-              </pci-button>
-            </pci-stack>
-
-            @if (modoDesativacao() === 'substituir') {
-              <pci-select
-                [appFormCol]="12"
-                label="Perfil substituto"
-                [required]="true"
-                [formControl]="perfilSubstitutoControl"
-                [options]="substitutoOptions()"
-                placeholder="Selecione o perfil que receberá as contas"
-              />
-            }
-          }
-
-          <pci-stack [appFormCol]="12" gap="3" direction="horizontal">
-            <pci-button variant="secondary" (clicked)="cancelarDesativacao()">Cancelar</pci-button>
+  @if (canDesativar()) {
+    <pci-stack gap="3">
+      @if (!desativarConfirmado()) {
+        <pci-button variant="danger" (clicked)="iniciarDesativacao()">Desativar perfil</pci-button>
+      } @else {
+        <pci-alert
+          variant="warning"
+          title="Desativar perfil"
+          [message]="
+            temUsuariosVinculados()
+              ? 'Há ' + quantidadeUsuarios() + ' usuário(s) com este perfil. Escolha como proceder.'
+              : 'Confirme a desativação deste perfil.'
+          "
+        />
+        @if (temUsuariosVinculados()) {
+          <pci-stack gap="2">
             <pci-button
-              variant="danger"
-              icon="trash"
-              [loading]="saving()"
-              (clicked)="confirmarDesativacao()"
+              [variant]="modoDesativacao() === 'substituir' ? 'primary' : 'ghost'"
+              (clicked)="modoDesativacao.set('substituir')"
             >
-              Confirmar desativação
+              Substituir por outro perfil
             </pci-button>
+            <pci-button
+              [variant]="modoDesativacao() === 'remover' ? 'primary' : 'ghost'"
+              (clicked)="modoDesativacao.set('remover')"
+            >
+              Remover vínculos
+            </pci-button>
+            @if (modoDesativacao() === 'substituir') {
+              <select [formControl]="perfilSubstitutoControl">
+                <option [ngValue]="null">Selecione…</option>
+                @for (p of perfisAtivos(); track p.id) {
+                  @if (p.id !== perfilId) {
+                    <option [ngValue]="p.id">{{ p.nome }}</option>
+                  }
+                }
+              </select>
+            }
           </pci-stack>
         }
-      </app-form-section>
-    }
-  </form>
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button variant="danger" (clicked)="confirmarDesativacao()">Confirmar</pci-button>
+          <pci-button variant="ghost" (clicked)="cancelarDesativacao()">Cancelar</pci-button>
+        </pci-stack>
+      }
+    </pci-stack>
+  }
 </pci-form-page>

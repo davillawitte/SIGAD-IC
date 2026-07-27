@@ -3,9 +3,9 @@
 }
 
 <pci-list-page
-  title="Afastamentos"
-  description="Cadastre férias, licenças médicas e demais afastamentos dos servidores."
-  currentPath="/afastamentos"
+  [title]="pageTitle()"
+  [description]="pageDescription()"
+  [currentPath]="listPath()"
   [routePages]="routePages"
   [filterFields]="filterFields"
   [filterValues]="filterValues()"
@@ -16,7 +16,7 @@
   [page]="page()"
   [pageSize]="pageSize()"
   [loading]="loading()"
-  [showCreateButton]="canCreate"
+  [showCreateButton]="canCreate()"
   createLabel="Novo afastamento"
   [rowActions]="rowActions()"
   sortMode="server"

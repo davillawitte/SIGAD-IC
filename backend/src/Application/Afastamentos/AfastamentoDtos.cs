@@ -39,4 +39,9 @@ public record AfastamentoListQuery
     public int? Mes { get; init; }
     public string? TipoOcorrenciaCodigo { get; init; }
     public IReadOnlyList<Guid>? ServidorIds { get; init; }
+
+    /// <summary>
+    /// <c>setor</c>: só setores gerenciados. <c>institucional</c>: demais setores (visão global).
+    /// </summary>
+    public string? Escopo { get; init; }
 }

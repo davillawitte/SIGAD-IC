@@ -35,6 +35,7 @@ type ServidorRow = {
   matricula: string;
   cargo: string;
   setor: string;
+  setorId: string;
   email: string;
   status: string;
 };
@@ -115,7 +116,13 @@ export class ServidorList implements OnInit {
   readonly rowActions = computed<PciRowAction<ServidorRow>[]>(() => {
     const actions: PciRowAction<ServidorRow>[] = [];
     if (this.canEdit) {
-      actions.push({ id: 'edit', label: 'Editar', icon: 'edit', placement: 'inline' });
+      actions.push({
+        id: 'edit',
+        label: 'Editar',
+        icon: 'edit',
+        placement: 'inline',
+        disabled: (row) => !this.auth.canAccess('servidores.editar', row.setorId),
+      });
     }
     if (this.canDelete) {
       actions.push({
@@ -124,6 +131,7 @@ export class ServidorList implements OnInit {
         icon: 'trash',
         placement: 'inline',
         variant: 'danger',
+        disabled: (row) => !this.auth.canAccess('servidores.excluir', row.setorId),
       });
     }
     return actions;
@@ -159,10 +167,16 @@ export class ServidorList implements OnInit {
 
   onRowAction(event: { action: string; row: ServidorRow }): void {
     if (event.action === 'edit') {
+      if (!this.auth.canAccess('servidores.editar', event.row.setorId)) {
+        return;
+      }
       void this.router.navigateByUrl(`/servidores/editar/${event.row.id}`);
       return;
     }
     if (event.action === 'delete') {
+      if (!this.auth.canAccess('servidores.excluir', event.row.setorId)) {
+        return;
+      }
       this.excluir(event.row);
     }
   }
@@ -286,6 +300,7 @@ export class ServidorList implements OnInit {
             matricula: s.matricula,
             cargo: s.cargo,
             setor: s.setorNome,
+            setorId: s.setorId,
             email: s.email ?? '',
             status: s.status,
           })),

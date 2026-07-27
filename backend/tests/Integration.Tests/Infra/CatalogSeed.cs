@@ -65,24 +65,11 @@ public static class CatalogSeed
 
     private static async Task SeedChefePermissoesAsync(ApplicationDbContext db, CancellationToken cancellationToken)
     {
-        var codes = new[]
-        {
-            PermissionCodes.EscalasListar,
-            PermissionCodes.EscalasCriar,
-            PermissionCodes.EscalasEditar,
-            PermissionCodes.EscalasFinalizar,
-            PermissionCodes.EscalasPublicar,
-            PermissionCodes.EscalasExcluir,
-            PermissionCodes.EscalasSolicitarDevolucao,
-            PermissionCodes.EscalasExportar,
-            PermissionCodes.AfastamentosListar,
-            PermissionCodes.AfastamentosCriar,
-            PermissionCodes.AfastamentosEditar,
-            PermissionCodes.AfastamentosExcluir,
-            PermissionCodes.ServidoresListar,
-        };
-
-        await LinkPermissoesAsync(db, PerfilChefeSetorId, codes, Abrangencia.MeusSetores, cancellationToken);
+        await LinkGrantsAsync(
+            db,
+            PerfilChefeSetorId,
+            PermissionAreaGrants.Expand([PermissionAreas.GestaoDoSetor]),
+            cancellationToken);
     }
 
     private static async Task SeedServidorPermissoesAsync(ApplicationDbContext db, CancellationToken cancellationToken)
@@ -99,44 +86,32 @@ public static class CatalogSeed
 
     private static async Task SeedDirecaoIcPermissoesAsync(ApplicationDbContext db, CancellationToken cancellationToken)
     {
-        var leituraGlobal = new[]
-        {
-            PermissionCodes.EscalasListar,
-            PermissionCodes.EscalasDevolver,
-            PermissionCodes.EscalasExportar,
-            PermissionCodes.AfastamentosListar,
-            PermissionCodes.ServidoresListar,
-            PermissionCodes.NucleosListar,
-            PermissionCodes.SetoresListar,
-            PermissionCodes.CargosListar,
-        };
+        await LinkGrantsAsync(
+            db,
+            PerfilDirecaoIcId,
+            PermissionAreaGrants.Expand(
+            [
+                PermissionAreas.GestaoInstitucional,
+                PermissionAreas.GestaoDoSetor,
+            ]),
+            cancellationToken);
+    }
 
-        var mutacaoLocal = new[]
+    private static async Task LinkGrantsAsync(
+        ApplicationDbContext db,
+        Guid perfilId,
+        IReadOnlyDictionary<string, Abrangencia> grants,
+        CancellationToken cancellationToken)
+    {
+        foreach (var group in grants.GroupBy(x => x.Value))
         {
-            PermissionCodes.EscalasCriar,
-            PermissionCodes.EscalasEditar,
-            PermissionCodes.EscalasFinalizar,
-            PermissionCodes.EscalasPublicar,
-            PermissionCodes.EscalasExcluir,
-            PermissionCodes.EscalasSolicitarDevolucao,
-            PermissionCodes.AfastamentosCriar,
-            PermissionCodes.AfastamentosEditar,
-            PermissionCodes.AfastamentosExcluir,
-        };
-
-        var estruturaGlobal = new[]
-        {
-            PermissionCodes.NucleosCriar,
-            PermissionCodes.NucleosEditar,
-            PermissionCodes.NucleosExcluir,
-            PermissionCodes.SetoresCriar,
-            PermissionCodes.SetoresEditar,
-            PermissionCodes.SetoresExcluir,
-        };
-
-        await LinkPermissoesAsync(db, PerfilDirecaoIcId, leituraGlobal, Abrangencia.TodosOsSetores, cancellationToken);
-        await LinkPermissoesAsync(db, PerfilDirecaoIcId, mutacaoLocal, Abrangencia.MeusSetores, cancellationToken);
-        await LinkPermissoesAsync(db, PerfilDirecaoIcId, estruturaGlobal, Abrangencia.TodosOsSetores, cancellationToken);
+            await LinkPermissoesAsync(
+                db,
+                perfilId,
+                group.Select(x => x.Key).ToArray(),
+                group.Key,
+                cancellationToken);
+        }
     }
 
     private static async Task SeedSuperAdminPermissoesAsync(

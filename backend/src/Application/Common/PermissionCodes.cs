@@ -5,7 +5,133 @@ public static class PermissionAreas
     public const string GestaoInstitucional = "Gestão Institucional";
     public const string GestaoDoSetor = "Gestão do Setor";
     public const string AdministracaoDoSistema = "Administração do Sistema";
+
+    public static readonly IReadOnlyList<string> Operacionais =
+    [
+        GestaoDoSetor,
+        GestaoInstitucional,
+    ];
 }
+
+/// <summary>
+/// Expande áreas de acesso em permissões concretas. Regra do produto:
+/// quem tem a área, tem tudo nela. Escopo de listagem:
+/// Gestão do Setor → setores da chefia (ex.: só Direção IC);
+/// Gestão Institucional → todos os setores exceto a Direção IC (ver + devolver escalas);
+/// em servidores/estrutura institucional o CRUD é completo (TodosOsSetores).
+/// </summary>
+public static class PermissionAreaGrants
+{
+    /// <summary>
+    /// Escalas/afastamentos liberados pela Gestão Institucional em visão global
+    /// (listar/exportar/devolver — sem mutação operacional de outros setores).
+    /// </summary>
+    private static readonly string[] VisaoInstitucionalExtras =
+    [
+        PermissionCodes.EscalasListar,
+        PermissionCodes.EscalasExportar,
+        PermissionCodes.EscalasDevolver,
+        PermissionCodes.AfastamentosListar,
+    ];
+
+    public static IReadOnlyDictionary<string, Domain.Enums.Abrangencia> Expand(IEnumerable<string> areas)
+    {
+        var selected = areas
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .Select(a => a.Trim())
+            .ToHashSet(StringComparer.Ordinal);
+
+        var map = new Dictionary<string, Domain.Enums.Abrangencia>(StringComparer.OrdinalIgnoreCase);
+
+        if (selected.Contains(PermissionAreas.GestaoDoSetor))
+        {
+            foreach (var (codigo, _, _, area, _) in PermissionCodes.Catalog)
+            {
+                if (string.Equals(area, PermissionAreas.GestaoDoSetor, StringComparison.Ordinal))
+                {
+                    map[codigo] = Domain.Enums.Abrangencia.MeusSetores;
+                }
+            }
+        }
+
+        if (selected.Contains(PermissionAreas.GestaoInstitucional))
+        {
+            foreach (var (codigo, _, _, area, _) in PermissionCodes.Catalog)
+            {
+                if (string.Equals(area, PermissionAreas.GestaoInstitucional, StringComparison.Ordinal))
+                {
+                    map[codigo] = Domain.Enums.Abrangencia.TodosOsSetores;
+                }
+            }
+
+            foreach (var codigo in VisaoInstitucionalExtras)
+            {
+                map[codigo] = Domain.Enums.Abrangencia.TodosOsSetores;
+            }
+        }
+
+        if (selected.Contains(PermissionAreas.AdministracaoDoSistema))
+        {
+            foreach (var (codigo, _, _, area, _) in PermissionCodes.Catalog)
+            {
+                if (string.Equals(area, PermissionAreas.AdministracaoDoSistema, StringComparison.Ordinal))
+                {
+                    map[codigo] = Domain.Enums.Abrangencia.MeusSetores;
+                }
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Detecta quais áreas um conjunto de permissões cobre (≥70% dos códigos da área,
+    /// ou visão institucional completa para Gestão Institucional).
+    /// </summary>
+    public static IReadOnlyList<string> DetectAreas(
+        IEnumerable<string> permissionCodes,
+        IReadOnlyDictionary<string, Domain.Enums.Abrangencia>? abrangenciaPorCodigo = null)
+    {
+        var codes = permissionCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var areas = new List<string>();
+
+        var setorCodes = PermissionCodes.Catalog
+            .Where(x => x.Area == PermissionAreas.GestaoDoSetor)
+            .Select(x => x.Codigo)
+            .ToList();
+        if (setorCodes.Count > 0 && setorCodes.Count(c => codes.Contains(c)) >= Math.Ceiling(setorCodes.Count * 0.7))
+        {
+            areas.Add(PermissionAreas.GestaoDoSetor);
+        }
+
+        var instCodes = PermissionCodes.Catalog
+            .Where(x => x.Area == PermissionAreas.GestaoInstitucional)
+            .Select(x => x.Codigo)
+            .ToList();
+        var hasInstCore = instCodes.Count > 0
+            && instCodes.Count(c => codes.Contains(c)) >= Math.Ceiling(instCodes.Count * 0.7);
+        var hasVisaoGlobalEscalas = codes.Contains(PermissionCodes.EscalasListar)
+            && abrangenciaPorCodigo is not null
+            && abrangenciaPorCodigo.TryGetValue(PermissionCodes.EscalasListar, out var abr)
+            && abr == Domain.Enums.Abrangencia.TodosOsSetores;
+        if (hasInstCore || hasVisaoGlobalEscalas)
+        {
+            areas.Add(PermissionAreas.GestaoInstitucional);
+        }
+
+        var adminCodes = PermissionCodes.Catalog
+            .Where(x => x.Area == PermissionAreas.AdministracaoDoSistema)
+            .Select(x => x.Codigo)
+            .ToList();
+        if (adminCodes.Count > 0 && adminCodes.All(c => codes.Contains(c)))
+        {
+            areas.Add(PermissionAreas.AdministracaoDoSistema);
+        }
+
+        return areas;
+    }
+}
+
 
 /// <summary>
 /// Módulos do catálogo de permissões. A abrangência de um perfil é definida por módulo.

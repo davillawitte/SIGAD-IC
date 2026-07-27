@@ -91,10 +91,41 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
         return (await new EscalaService(db).FinalizarAsync(escalaId, login)).Succeeded;
     }
 
-    private async Task<int> EscalasVisiveisAsync(string login)
+    private async Task<int> EscalasVisiveisAsync(string login, string? escopo = null)
     {
         await using var db = NewContext();
-        return (await new EscalaService(db).ListAsync(new EscalaListQuery(), login)).TotalItems;
+        return (await new EscalaService(db).ListAsync(new EscalaListQuery { Escopo = escopo }, login))
+            .TotalItems;
+    }
+
+    private async Task<int> AfastamentosVisiveisAsync(string login, string? escopo = null)
+    {
+        await using var db = NewContext();
+        return (await new AfastamentoService(db).ListAsync(new AfastamentoListQuery { Escopo = escopo }, login))
+            .Count;
+    }
+
+    [Fact]
+    public async Task Listagem_setor_so_chefia_e_institucional_exclui_direcao_ic()
+    {
+        var ctx = await PrepararAsync();
+
+        // Gestão do Setor: Diretor só vê a escala da própria Direção IC (onde é chefia).
+        (await EscalasVisiveisAsync(Diretor, "setor")).ShouldBe(1);
+        (await EscalasVisiveisAsync(ChefeNb, "setor")).ShouldBe(1);
+
+        // Gestão Institucional: demais setores, sem a Direção IC.
+        (await EscalasVisiveisAsync(Diretor, "institucional")).ShouldBe(2);
+        (await EscalasVisiveisAsync(ChefeNb, "institucional")).ShouldBe(0);
+
+        (await AfastamentosVisiveisAsync(Diretor, "setor")).ShouldBe(0);
+        (await AfastamentosVisiveisAsync(ChefeNb, "setor")).ShouldBe(1);
+        (await AfastamentosVisiveisAsync(Diretor, "institucional")).ShouldBe(1);
+        (await AfastamentosVisiveisAsync(ChefeNb, "institucional")).ShouldBe(0);
+
+        // Detalhe: a escala NB continua acessível ao Diretor (visão), só não entra na listagem de setor.
+        (await PodeVerEscalaAsync(ctx.EscalaNbId, Diretor)).ShouldBeTrue();
+        (await PodeVerEscalaAsync(ctx.EscalaDirecaoId, Diretor)).ShouldBeTrue();
     }
 
     [Fact]
@@ -280,12 +311,6 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
     {
         await using var db = NewContext();
         return (await new AfastamentoService(db).GetByIdAsync(afastamentoId, login)).Succeeded;
-    }
-
-    private async Task<int> AfastamentosVisiveisAsync(string login)
-    {
-        await using var db = NewContext();
-        return (await new AfastamentoService(db).ListAsync(new AfastamentoListQuery(), login)).Count;
     }
 
     [Fact]

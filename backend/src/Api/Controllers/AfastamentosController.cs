@@ -13,15 +13,61 @@ namespace TemplateSistema.Api.Controllers;
 [Route("api/afastamentos")]
 public class AfastamentosController(IAfastamentoService afastamentoService) : ControllerBase
 {
-    [HttpGet]
+    /// <summary>Gestão do Setor: só afastamentos dos setores em que o usuário é chefia.</summary>
+    [HttpGet("setor")]
     [RequiresPermission(PermissionCodes.AfastamentosListar)]
-    public async Task<IActionResult> List(
+    public Task<IActionResult> ListSetor(
         [FromQuery] Guid? setorId,
         [FromQuery] Guid? servidorId,
         [FromQuery] int? ano,
         [FromQuery] int? mes,
         [FromQuery] string? tipoOcorrenciaCodigo,
         [FromQuery] List<Guid>? servidorIds,
+        CancellationToken cancellationToken) =>
+        ListInternal("setor", setorId, servidorId, ano, mes, tipoOcorrenciaCodigo, servidorIds, cancellationToken);
+
+    /// <summary>Gestão Institucional: afastamentos de todos os setores, exceto a Direção do IC.</summary>
+    [HttpGet("institucionais")]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public Task<IActionResult> ListInstitucionais(
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? servidorId,
+        [FromQuery] int? ano,
+        [FromQuery] int? mes,
+        [FromQuery] string? tipoOcorrenciaCodigo,
+        [FromQuery] List<Guid>? servidorIds,
+        CancellationToken cancellationToken) =>
+        ListInternal(
+            "institucional",
+            setorId,
+            servidorId,
+            ano,
+            mes,
+            tipoOcorrenciaCodigo,
+            servidorIds,
+            cancellationToken);
+
+    [HttpGet]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public Task<IActionResult> List(
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? servidorId,
+        [FromQuery] int? ano,
+        [FromQuery] int? mes,
+        [FromQuery] string? tipoOcorrenciaCodigo,
+        [FromQuery] List<Guid>? servidorIds,
+        [FromQuery] string? escopo = null,
+        CancellationToken cancellationToken = default) =>
+        ListInternal(escopo, setorId, servidorId, ano, mes, tipoOcorrenciaCodigo, servidorIds, cancellationToken);
+
+    private async Task<IActionResult> ListInternal(
+        string? escopo,
+        Guid? setorId,
+        Guid? servidorId,
+        int? ano,
+        int? mes,
+        string? tipoOcorrenciaCodigo,
+        List<Guid>? servidorIds,
         CancellationToken cancellationToken)
     {
         var result = await afastamentoService.ListAsync(
@@ -33,6 +79,7 @@ public class AfastamentosController(IAfastamentoService afastamentoService) : Co
                 Mes = mes,
                 TipoOcorrenciaCodigo = tipoOcorrenciaCodigo,
                 ServidorIds = servidorIds,
+                Escopo = escopo,
             },
             User.GetLogin(),
             cancellationToken);

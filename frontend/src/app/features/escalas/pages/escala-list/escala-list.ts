@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
   PciBadgeComponent,
@@ -32,6 +32,8 @@ import { ESCALAS_ROUTE_PAGES } from '../../escalas-route-pages';
 import { EscalasApiService } from '../../services/escalas-api.service';
 import type { EscalaListItem, SolicitacaoDevolucaoEscala, StatusEscala } from '../../models/escalas.models';
 import { statusEscalaLabel } from '../../models/escalas.models';
+
+type EscalaEscopo = 'setor' | 'institucional';
 
 type EscalaRow = {
   id: string;
@@ -76,12 +78,27 @@ export class EscalaList implements OnInit, OnDestroy {
   private readonly api = inject(EscalasApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(PciToastService);
   private readonly feedback = inject(PciFeedbackModalService);
   private readonly dialog = inject(MatDialog);
   private readonly breadcrumb = inject(PciBreadcrumbService);
   private readonly layoutBreadcrumb = inject(PciLayoutBreadcrumbService);
   readonly statusLabel = statusEscalaLabel;
+
+  readonly escopo = signal<EscalaEscopo>('setor');
+  readonly isInstitucional = computed(() => this.escopo() === 'institucional');
+  readonly pageTitle = computed(() =>
+    this.isInstitucional() ? 'Escalas institucionais' : 'Escalas',
+  );
+  readonly pageDescription = computed(() =>
+    this.isInstitucional()
+      ? 'Consulta das escalas de todos os setores (exceto a Direção do IC). Somente visualização e devolução.'
+      : 'Gerencie as escalas mensais do seu setor.',
+  );
+  readonly listBasePath = computed(() =>
+    this.isInstitucional() ? '/escalas-institucionais' : '/escalas',
+  );
 
   readonly routePages = ESCALAS_ROUTE_PAGES;
   readonly page = signal(1);
@@ -93,8 +110,12 @@ export class EscalaList implements OnInit, OnDestroy {
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
-  readonly canCreate = this.auth.hasPermission('escalas.criar');
-  readonly canDevolver = this.auth.hasPermission('escalas.devolver');
+  readonly canCreate = computed(
+    () => !this.isInstitucional() && this.auth.hasPermission('escalas.criar'),
+  );
+  readonly canDevolver = computed(
+    () => this.isInstitucional() && this.auth.hasPermission('escalas.devolver'),
+  );
   readonly devolucoes = signal<SolicitacaoDevolucaoEscala[]>([]);
   readonly devolucaoWorking = signal(false);
   readonly openMenuRowId = signal<string | null>(null);
@@ -148,9 +169,15 @@ export class EscalaList implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.layoutBreadcrumb.setItems(this.breadcrumb.buildFromRoutes(this.routePages, '/escalas'));
+    const modo = (this.route.snapshot.data['escopo'] as EscalaEscopo | undefined) ?? 'setor';
+    this.escopo.set(modo === 'institucional' ? 'institucional' : 'setor');
+    this.layoutBreadcrumb.setItems(
+      this.breadcrumb.buildFromRoutes(this.routePages, this.listBasePath()),
+    );
     this.reload();
-    this.reloadDevolucoes();
+    if (this.canDevolver()) {
+      this.reloadDevolucoes();
+    }
   }
 
   ngOnDestroy(): void {
@@ -167,6 +194,9 @@ export class EscalaList implements OnInit, OnDestroy {
     const actions: InlineAction[] = [
       { id: 'view', label: 'Visualizar', icon: 'eye' },
     ];
+    if (this.isInstitucional()) {
+      return actions;
+    }
     if (
       this.auth.canAccess('escalas.editar', row.setorId) &&
       (row.status === 'Rascunho' || row.status === 'Finalizada')
@@ -188,6 +218,7 @@ export class EscalaList implements OnInit, OnDestroy {
       );
     }
     if (
+      !this.isInstitucional() &&
       this.auth.canAccess('escalas.excluir', row.setorId) &&
       (row.status === 'Rascunho' || row.status === 'Finalizada')
     ) {
@@ -405,6 +436,7 @@ export class EscalaList implements OnInit, OnDestroy {
         status: (filters['status'] as string) || undefined,
         ano: Number.isFinite(ano) && ano > 0 ? ano : undefined,
         mes: Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined,
+        escopo: this.escopo(),
       })
       .subscribe({
         next: (result) => {

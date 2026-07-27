@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
   PciAlertComponent,
@@ -21,6 +21,8 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 import { AFASTAMENTOS_ROUTE_PAGES } from '../../afastamentos.routes.meta';
 import { AfastamentosApiService } from '../../services/afastamentos-api.service';
+
+type AfastamentoEscopo = 'setor' | 'institucional';
 
 type AfastamentoRow = {
   id: string;
@@ -44,10 +46,25 @@ export class AfastamentoList implements OnInit {
   private readonly api = inject(AfastamentosApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(MatDialog);
   private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = AFASTAMENTOS_ROUTE_PAGES;
+  readonly escopo = signal<AfastamentoEscopo>('setor');
+  readonly isInstitucional = computed(() => this.escopo() === 'institucional');
+  readonly pageTitle = computed(() =>
+    this.isInstitucional() ? 'Afastamentos institucionais' : 'Afastamentos',
+  );
+  readonly pageDescription = computed(() =>
+    this.isInstitucional()
+      ? 'Consulta dos afastamentos de todos os setores (exceto a Direção do IC). Somente visualização.'
+      : 'Cadastre férias, licenças e afastamentos dos servidores do seu setor.',
+  );
+  readonly listPath = computed(() =>
+    this.isInstitucional() ? '/afastamentos-institucionais' : '/afastamentos',
+  );
+
   readonly page = signal(1);
   readonly pageSize = signal(50);
   readonly loading = signal(false);
@@ -57,7 +74,9 @@ export class AfastamentoList implements OnInit {
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
   readonly sort = signal<PciSortChange<AfastamentoRow> | null>(null);
-  readonly canCreate = this.auth.hasPermission('afastamentos.criar');
+  readonly canCreate = computed(
+    () => !this.isInstitucional() && this.auth.hasPermission('afastamentos.criar'),
+  );
 
   readonly filterFields: PciFilterField[] = [
     { key: 'servidor', label: 'Servidor', type: 'text', columnKey: 'servidor' },
@@ -87,6 +106,9 @@ export class AfastamentoList implements OnInit {
   ];
 
   readonly rowActions = computed<PciRowAction<AfastamentoRow>[]>(() => {
+    if (this.isInstitucional()) {
+      return [];
+    }
     const actions: PciRowAction<AfastamentoRow>[] = [];
     if (this.auth.hasPermission('afastamentos.editar')) {
       actions.push({
@@ -126,6 +148,8 @@ export class AfastamentoList implements OnInit {
   });
 
   ngOnInit(): void {
+    const modo = (this.route.snapshot.data['escopo'] as AfastamentoEscopo | undefined) ?? 'setor';
+    this.escopo.set(modo === 'institucional' ? 'institucional' : 'setor');
     this.reload();
   }
 
@@ -134,6 +158,9 @@ export class AfastamentoList implements OnInit {
   }
 
   onRowAction(event: { action: string; row: AfastamentoRow }): void {
+    if (this.isInstitucional()) {
+      return;
+    }
     if (
       (event.action === 'edit' && !this.auth.canAccess('afastamentos.editar', event.row.setorId)) ||
       (event.action === 'delete' && !this.auth.canAccess('afastamentos.excluir', event.row.setorId))
@@ -188,7 +215,7 @@ export class AfastamentoList implements OnInit {
   private reload(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.api.list().subscribe({
+    this.api.list({ escopo: this.escopo() }).subscribe({
       next: (items) => {
         this.allRows.set(
           items.map((a) => ({

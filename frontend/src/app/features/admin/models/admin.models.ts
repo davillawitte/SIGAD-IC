@@ -60,6 +60,8 @@ export interface PerfilDetail extends PerfilListItem {
   permissoes: string[];
   /** Abrangência por código de permissão. */
   abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
+  /** Áreas liberadas (Gestão do Setor / Gestão Institucional / Administração). */
+  areas?: string[];
 }
 
 export interface CreatePerfilPayload {
@@ -68,11 +70,13 @@ export interface CreatePerfilPayload {
   descricao?: string | null;
   permissaoIds?: string[];
   abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
+  areas?: string[];
 }
 
 export interface SetPerfilPermissoesPayload {
-  permissaoIds: string[];
+  permissaoIds?: string[];
   abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
+  areas?: string[];
 }
 
 export interface UpdatePerfilPayload {

@@ -1,4 +1,4 @@
-@if (canDevolver && devolucoes().length > 0) {
+@if (canDevolver() && devolucoes().length > 0) {
   <section class="escalas-devolucoes">
     <h2 class="escalas-devolucoes__title">Solicitações de devolução pendentes</h2>
     @for (item of devolucoes(); track item.id) {
@@ -30,9 +30,9 @@
 }
 
 <div class="escalas-page">
-  <pci-page-header title="Escalas" description="Gerencie as escalas mensais dos setores.">
+  <pci-page-header [title]="pageTitle()" [description]="pageDescription()">
     <pci-stack slot="actions" gap="2" direction="horizontal">
-      @if (canCreate) {
+      @if (canCreate()) {
         <pci-button variant="primary" icon="plus" (clicked)="onCreate()">Nova escala</pci-button>
       }
     </pci-stack>

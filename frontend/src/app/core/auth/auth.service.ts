@@ -47,6 +47,15 @@ export class AuthService {
       );
   }
 
+  /** Reemite JWT e claims após alteração de perfis/permissões. */
+  refreshSession(): Observable<boolean> {
+    return this.http.post<LoginResponse>(`${environment.apiUrl}/api/auth/refresh`, {}).pipe(
+      tap((response) => this.persistFromResponse(response)),
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
   alterarSenha(
     senhaAtual: string,
     novaSenha: string,
@@ -128,6 +137,38 @@ export class AuthService {
 
   isSuperAdmin(): boolean {
     return this.currentUserSignal()?.perfis.includes('SUPERADMINISTRADOR') ?? false;
+  }
+
+  /** Visão global do módulo (ex.: escalas.listar com TodosOsSetores). */
+  hasVisaoGlobal(modulo: string): boolean {
+    const user = this.currentUserSignal();
+    if (!user) {
+      return false;
+    }
+
+    const listar = `${modulo}.listar`;
+    const detalhes = user.perfisDetalhe ?? [];
+    if (detalhes.length === 0) {
+      return false;
+    }
+
+    return detalhes.some(
+      (perfil) =>
+        perfil.permissoes.includes(listar) &&
+        this.resolveAbrangenciaPermissao(perfil, listar) === 'TodosOsSetores',
+    );
+  }
+
+  /** Área Gestão Institucional (visão de todos + estrutura/servidores/devoluções). */
+  hasGestaoInstitucional(): boolean {
+    return (
+      this.hasVisaoGlobal('escalas') ||
+      this.hasVisaoGlobal('afastamentos') ||
+      this.hasVisaoGlobal('servidores') ||
+      this.hasVisaoGlobal('setores') ||
+      this.hasVisaoGlobal('nucleos') ||
+      this.hasPermission('escalas.devolver')
+    );
   }
 
   private abrangerPermissao(

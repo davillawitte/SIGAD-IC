@@ -268,4 +268,10 @@ public record EscalaListQuery : PaginationQuery
     public int? Mes { get; init; }
     public int? Ano { get; init; }
     public StatusEscala? Status { get; init; }
+
+    /// <summary>
+    /// <c>setor</c>: só setores gerenciados (Gestão do Setor).
+    /// <c>institucional</c>: demais setores, quando há visão global (Gestão Institucional).
+    /// </summary>
+    public string? Escopo { get; init; }
 }
