@@ -335,7 +335,7 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
     }
 
     [HttpGet("{id:guid}/pdf")]
-    [RequiresPermission(PermissionCodes.EscalasExportar)]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
     public async Task<IActionResult> Pdf(Guid id, [FromQuery] string layout = "horizontal", CancellationToken cancellationToken = default)
     {
         var result = await escalaPdfService.GenerateAsync(id, layout, User.GetLogin(), cancellationToken);

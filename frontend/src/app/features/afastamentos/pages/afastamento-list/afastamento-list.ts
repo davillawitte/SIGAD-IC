@@ -54,7 +54,7 @@ export class AfastamentoList implements OnInit {
   readonly escopo = signal<AfastamentoEscopo>('setor');
   readonly isInstitucional = computed(() => this.escopo() === 'institucional');
   readonly pageTitle = computed(() =>
-    this.isInstitucional() ? 'Afastamentos institucionais' : 'Afastamentos',
+    this.isInstitucional() ? 'Afastamentos Institucionais' : 'Afastamentos',
   );
   readonly pageDescription = computed(() =>
     this.isInstitucional()

@@ -4,26 +4,18 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
-  PciBadgeComponent,
   PciBreadcrumbService,
   PciButtonComponent,
-  PciDropdownMenuComponent,
-  PciDropdownPanelDirective,
-  PciDropdownTriggerDirective,
+  PciColumn,
   PciFeedbackModalService,
   PciFilterField,
-  PciFilterPanelComponent,
   PciFilterValues,
-  PciIconButtonComponent,
-  PciIconComponent,
   PciLayoutBreadcrumbService,
-  PciPageHeaderComponent,
+  PciListPageComponent,
+  PciRowAction,
   PciStackComponent,
   PciToastService,
-  PciTooltipChildDirective,
-  PciTooltipComponent,
 } from '@davillawitte/pci-design-system';
-import type { PciBadgeVariant, PciIconName } from '@davillawitte/pci-design-system';
 import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
@@ -40,16 +32,11 @@ type EscalaRow = {
   setorId: string;
   periodoReferencia: string;
   setor: string;
-  status: StatusEscala;
+  status: string;
+  statusRaw: StatusEscala;
   publicadaEm: string;
   criadoEm: string;
   criadoPor: string;
-};
-
-type InlineAction = {
-  id: string;
-  label: string;
-  icon: PciIconName;
 };
 
 @Component({
@@ -58,18 +45,9 @@ type InlineAction = {
     CommonModule,
     MatDialogModule,
     PciAlertComponent,
-    PciBadgeComponent,
     PciButtonComponent,
-    PciDropdownMenuComponent,
-    PciDropdownPanelDirective,
-    PciDropdownTriggerDirective,
-    PciFilterPanelComponent,
-    PciIconButtonComponent,
-    PciIconComponent,
-    PciPageHeaderComponent,
+    PciListPageComponent,
     PciStackComponent,
-    PciTooltipComponent,
-    PciTooltipChildDirective,
   ],
   templateUrl: './escala-list.html',
   styleUrl: './escala-list.scss',
@@ -84,12 +62,11 @@ export class EscalaList implements OnInit, OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly breadcrumb = inject(PciBreadcrumbService);
   private readonly layoutBreadcrumb = inject(PciLayoutBreadcrumbService);
-  readonly statusLabel = statusEscalaLabel;
 
   readonly escopo = signal<EscalaEscopo>('setor');
   readonly isInstitucional = computed(() => this.escopo() === 'institucional');
   readonly pageTitle = computed(() =>
-    this.isInstitucional() ? 'Escalas institucionais' : 'Escalas',
+    this.isInstitucional() ? 'Escalas Institucionais' : 'Escalas',
   );
   readonly pageDescription = computed(() =>
     this.isInstitucional()
@@ -116,9 +93,13 @@ export class EscalaList implements OnInit, OnDestroy {
   readonly canDevolver = computed(
     () => this.isInstitucional() && this.auth.hasPermission('escalas.devolver'),
   );
+  readonly canExport = computed(
+    () =>
+      this.auth.hasPermission('escalas.exportar') ||
+      (this.isInstitucional() && this.auth.hasPermission('escalas.listar')),
+  );
   readonly devolucoes = signal<SolicitacaoDevolucaoEscala[]>([]);
   readonly devolucaoWorking = signal(false);
-  readonly openMenuRowId = signal<string | null>(null);
 
   readonly filterFields: PciFilterField[] = [
     {
@@ -154,18 +135,63 @@ export class EscalaList implements OnInit, OnDestroy {
     },
   ];
 
-  readonly totalPages = computed(() => {
-    const size = this.pageSize();
-    const total = this.totalItems();
-    return total <= 0 ? 0 : Math.ceil(total / size);
-  });
+  readonly columns: PciColumn<EscalaRow>[] = [
+    { key: 'periodoReferencia', label: 'Período de Referência', sortable: false },
+    { key: 'setor', label: 'Setor', sortable: false },
+    { key: 'status', label: 'Status', sortable: false },
+    { key: 'publicadaEm', label: 'Publicada em', sortable: false },
+    { key: 'criadoEm', label: 'Criada em', sortable: false },
+    { key: 'criadoPor', label: 'Responsável', sortable: false },
+  ];
 
-  readonly rangeLabel = computed(() => {
-    const total = this.totalItems();
-    if (total <= 0) return '0 resultados';
-    const start = (this.page() - 1) * this.pageSize() + 1;
-    const end = Math.min(this.page() * this.pageSize(), total);
-    return `${start}–${end} de ${total}`;
+  readonly rowActions = computed<PciRowAction<EscalaRow>[]>(() => {
+    const actions: PciRowAction<EscalaRow>[] = [
+      { id: 'view', label: 'Visualizar', icon: 'eye', placement: 'inline' },
+    ];
+
+    if (!this.isInstitucional()) {
+      actions.push(
+        {
+          id: 'edit',
+          label: 'Editar',
+          icon: 'edit',
+          placement: 'inline',
+          hidden: (row) =>
+            !this.auth.canAccess('escalas.editar', row.setorId) ||
+            (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada'),
+        },
+        {
+          id: 'publish',
+          label: 'Publicar',
+          icon: 'check',
+          placement: 'inline',
+          hidden: (row) =>
+            !this.auth.canAccess('escalas.publicar', row.setorId) || row.statusRaw !== 'Finalizada',
+        },
+      );
+    }
+
+    if (this.canExport()) {
+      actions.push(
+        { id: 'pdf-h', label: 'PDF horizontal', icon: 'download', placement: 'menu' },
+        { id: 'pdf-v', label: 'PDF vertical', icon: 'download', placement: 'menu' },
+      );
+    }
+
+    if (!this.isInstitucional()) {
+      actions.push({
+        id: 'delete',
+        label: 'Excluir',
+        icon: 'trash',
+        placement: 'menu',
+        variant: 'danger',
+        hidden: (row) =>
+          !this.auth.canAccess('escalas.excluir', row.setorId) ||
+          (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada'),
+      });
+    }
+
+    return actions;
   });
 
   ngOnInit(): void {
@@ -184,63 +210,17 @@ export class EscalaList implements OnInit, OnDestroy {
     this.layoutBreadcrumb.clear();
   }
 
-  statusVariant(status: StatusEscala): PciBadgeVariant {
-    if (status === 'Publicada') return 'success';
-    if (status === 'Finalizada') return 'secondary';
-    return 'warning';
-  }
-
-  inlineActions(row: EscalaRow): InlineAction[] {
-    const actions: InlineAction[] = [
-      { id: 'view', label: 'Visualizar', icon: 'eye' },
-    ];
-    if (this.isInstitucional()) {
-      return actions;
-    }
-    if (
-      this.auth.canAccess('escalas.editar', row.setorId) &&
-      (row.status === 'Rascunho' || row.status === 'Finalizada')
-    ) {
-      actions.push({ id: 'edit', label: 'Editar', icon: 'edit' });
-    }
-    if (this.auth.canAccess('escalas.publicar', row.setorId) && row.status === 'Finalizada') {
-      actions.push({ id: 'publish', label: 'Publicar', icon: 'check' });
-    }
-    return actions;
-  }
-
-  menuActions(row: EscalaRow): InlineAction[] {
-    const actions: InlineAction[] = [];
-    if (this.auth.hasPermission('escalas.exportar')) {
-      actions.push(
-        { id: 'pdf-h', label: 'PDF horizontal', icon: 'download' },
-        { id: 'pdf-v', label: 'PDF vertical', icon: 'download' },
-      );
-    }
-    if (
-      !this.isInstitucional() &&
-      this.auth.canAccess('escalas.excluir', row.setorId) &&
-      (row.status === 'Rascunho' || row.status === 'Finalizada')
-    ) {
-      actions.push({ id: 'delete', label: 'Excluir', icon: 'trash' });
-    }
-    return actions;
-  }
-
   onCreate(): void {
     void this.router.navigateByUrl('/escalas/nova');
   }
 
   onPageChange(page: number): void {
-    if (page < 1 || (this.totalPages() > 0 && page > this.totalPages())) return;
     this.page.set(page);
     this.reload();
   }
 
-  onPageSizeChange(event: Event): void {
-    const value = Number((event.target as HTMLSelectElement).value);
-    if (!Number.isFinite(value) || value <= 0) return;
-    this.pageSize.set(value);
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
     this.page.set(1);
     this.reload();
   }
@@ -257,19 +237,18 @@ export class EscalaList implements OnInit, OnDestroy {
     this.reload();
   }
 
-  onSearchInput(event: Event): void {
-    const term = (event.target as HTMLInputElement).value ?? '';
+  onSearchChange(term: string): void {
     this.searchTerm.set(term);
     this.page.set(1);
     this.reload();
   }
 
-  onRowAction(action: string, row: EscalaRow): void {
-    this.openMenuRowId.set(null);
+  onRowAction(event: { action: string; row: EscalaRow }): void {
+    const { action, row } = event;
     const id = row.id;
     switch (action) {
       case 'view':
-        void this.router.navigateByUrl(`/escalas/${id}`);
+        void this.router.navigateByUrl(`${this.listBasePath()}/${id}`);
         break;
       case 'edit':
         void this.router.navigateByUrl(`/escalas/${id}/editar`);
@@ -287,39 +266,6 @@ export class EscalaList implements OnInit, OnDestroy {
         this.excluir(row);
         break;
     }
-  }
-
-  private excluir(row: EscalaRow): void {
-    if (row.status !== 'Rascunho' && row.status !== 'Finalizada') {
-      const msg = 'Somente escalas em rascunho ou finalizadas podem ser excluídas.';
-      this.error.set(msg);
-      this.toast.showError(msg);
-      return;
-    }
-    openConfirmDialog(this.dialog, {
-      title: 'Excluir escala',
-      message: `Excluir a escala ${row.periodoReferencia} (${row.setor})? Esta ação não pode ser desfeita.`,
-      confirmLabel: 'Excluir',
-      danger: true,
-    })
-      .pipe(filter(Boolean))
-      .subscribe(() => {
-        this.loading.set(true);
-        this.error.set(null);
-        this.api.delete(row.id).subscribe({
-          next: () => {
-            this.loading.set(false);
-            this.feedback.showSuccess('Escala excluída com sucesso.');
-            this.reload();
-          },
-          error: (err: { error?: { message?: string } }) => {
-            const msg = err.error?.message ?? 'Não foi possível excluir a escala.';
-            this.error.set(msg);
-            this.toast.showError(msg);
-            this.loading.set(false);
-          },
-        });
-      });
   }
 
   aprovarDevolucao(item: SolicitacaoDevolucaoEscala): void {
@@ -358,8 +304,41 @@ export class EscalaList implements OnInit, OnDestroy {
     });
   }
 
+  private excluir(row: EscalaRow): void {
+    if (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada') {
+      const msg = 'Somente escalas em rascunho ou finalizadas podem ser excluídas.';
+      this.error.set(msg);
+      this.toast.showError(msg);
+      return;
+    }
+    openConfirmDialog(this.dialog, {
+      title: 'Excluir escala',
+      message: `Excluir a escala ${row.periodoReferencia} (${row.setor})? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
+      .pipe(filter(Boolean))
+      .subscribe(() => {
+        this.loading.set(true);
+        this.error.set(null);
+        this.api.delete(row.id).subscribe({
+          next: () => {
+            this.loading.set(false);
+            this.feedback.showSuccess('Escala excluída com sucesso.');
+            this.reload();
+          },
+          error: (err: { error?: { message?: string } }) => {
+            const msg = err.error?.message ?? 'Não foi possível excluir a escala.';
+            this.error.set(msg);
+            this.toast.showError(msg);
+            this.loading.set(false);
+          },
+        });
+      });
+  }
+
   private publicar(row: EscalaRow): void {
-    if (row.status !== 'Finalizada') {
+    if (row.statusRaw !== 'Finalizada') {
       const msg = 'Somente escalas finalizadas podem ser publicadas.';
       this.error.set(msg);
       this.toast.showError(msg);
@@ -402,8 +381,8 @@ export class EscalaList implements OnInit, OnDestroy {
         URL.revokeObjectURL(url);
         this.feedback.showSuccess('PDF gerado com sucesso.');
       },
-      error: () => {
-        const msg = 'Não foi possível exportar o PDF.';
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível exportar o PDF.';
         this.error.set(msg);
         this.toast.showError(msg);
       },
@@ -411,7 +390,7 @@ export class EscalaList implements OnInit, OnDestroy {
   }
 
   private reloadDevolucoes(): void {
-    if (!this.canDevolver) {
+    if (!this.canDevolver()) {
       this.devolucoes.set([]);
       return;
     }
@@ -474,7 +453,8 @@ export class EscalaList implements OnInit, OnDestroy {
       setorId: item.setorId,
       periodoReferencia: `${mesNome}/${item.ano}`,
       setor: `${item.setorSigla} — ${item.setorNome}`,
-      status: item.status,
+      status: statusEscalaLabel(item.status),
+      statusRaw: item.status,
       publicadaEm:
         (item.status === 'Publicada' || item.status === 'DevolucaoSolicitada') && item.publicadaEm
           ? this.fmtDateTime(item.publicadaEm)

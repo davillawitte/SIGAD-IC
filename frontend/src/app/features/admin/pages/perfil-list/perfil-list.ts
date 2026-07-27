@@ -79,7 +79,6 @@ export class PerfilList implements OnInit {
   readonly columns: PciColumn<PerfilRow>[] = [
     { key: 'nome', label: 'Nome', sortable: true },
     { key: 'descricao', label: 'Descrição', width: '18rem' },
-    { key: 'permissoes', label: 'Qtd. permissões' },
     { key: 'status', label: 'Status' },
   ];
 

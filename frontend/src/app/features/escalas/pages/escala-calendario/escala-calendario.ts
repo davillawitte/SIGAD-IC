@@ -36,6 +36,7 @@ export class EscalaCalendario implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly escala = signal<EscalaDetail | null>(null);
+  private listBasePath = '/escalas';
 
   readonly days = computed(() => {
     const e = this.escala();
@@ -50,6 +51,9 @@ export class EscalaCalendario implements OnInit {
   });
 
   ngOnInit(): void {
+    const escopo = (this.route.snapshot.data['escopo'] as string | undefined) ?? 'setor';
+    this.listBasePath = escopo === 'institucional' ? '/escalas-institucionais' : '/escalas';
+
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.error.set('Escala inválida.');
@@ -120,8 +124,8 @@ export class EscalaCalendario implements OnInit {
 
   voltar(): void {
     const id = this.escala()?.id;
-    if (id) void this.router.navigateByUrl(`/escalas/${id}`);
-    else void this.router.navigateByUrl('/escalas');
+    if (id) void this.router.navigateByUrl(`${this.listBasePath}/${id}`);
+    else void this.router.navigateByUrl(this.listBasePath);
   }
 
   editar(): void {

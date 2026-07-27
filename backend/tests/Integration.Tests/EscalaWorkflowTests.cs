@@ -85,15 +85,15 @@ public class EscalaWorkflowTests(PostgresFixture fixture) : IntegrationTestBase(
     }
 
     [Fact]
-    public async Task Finalizar_escala_ja_finalizada_falha()
+    public async Task Finalizar_escala_ja_finalizada_confirma_edicao()
     {
         var ctx = await PrepararAsync();
         (await ExecutarAsync(s => s.FinalizarAsync(ctx.EscalaId, LoginSuper))).Succeeded.ShouldBeTrue();
 
         var resultado = await ExecutarAsync(s => s.FinalizarAsync(ctx.EscalaId, LoginSuper));
 
-        resultado.Succeeded.ShouldBeFalse();
-        resultado.Error.ShouldBe("Somente escalas em rascunho podem ser finalizadas.");
+        resultado.Succeeded.ShouldBeTrue(resultado.Error);
+        (await StatusAsync(ctx.EscalaId)).ShouldBe(StatusEscala.Finalizada);
     }
 
     [Fact]

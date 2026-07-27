@@ -6,5 +6,15 @@ export const ESCALAS_ROUTE_PAGES: PciRoutePageMeta[] = [
   { path: '/escalas/:id', label: 'Detalhe', parentPath: '/escalas' },
   { path: '/escalas/:id/editar', label: 'Editar', parentPath: '/escalas' },
   { path: '/escalas/:id/calendario', label: 'Calendário', parentPath: '/escalas' },
-  { path: '/escalas-institucionais', label: 'Escalas institucionais' },
+  { path: '/escalas-institucionais', label: 'Escalas Institucionais' },
+  {
+    path: '/escalas-institucionais/:id',
+    label: 'Detalhe',
+    parentPath: '/escalas-institucionais',
+  },
+  {
+    path: '/escalas-institucionais/:id/calendario',
+    label: 'Calendário',
+    parentPath: '/escalas-institucionais',
+  },
 ];

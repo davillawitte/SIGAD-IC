@@ -71,6 +71,7 @@ export class EscalaDetail implements OnInit {
   readonly working = signal(false);
   readonly pdfMenuOpen = signal(false);
   readonly statusLabel = statusEscalaLabel;
+  readonly listBasePath = signal('/escalas');
 
   private readonly viewTabOrder: ViewTab[] = ['matriz', 'vertical'];
   readonly viewTab = signal<ViewTab>('matriz');
@@ -89,6 +90,8 @@ export class EscalaDetail implements OnInit {
   });
 
   ngOnInit(): void {
+    const escopo = (this.route.snapshot.data['escopo'] as string | undefined) ?? 'setor';
+    this.listBasePath.set(escopo === 'institucional' ? '/escalas-institucionais' : '/escalas');
     this.reload();
   }
 
@@ -128,7 +131,10 @@ export class EscalaDetail implements OnInit {
   }
 
   canExport(): boolean {
-    return this.auth.hasPermission('escalas.exportar');
+    return (
+      this.auth.hasPermission('escalas.exportar') ||
+      this.auth.hasPermission('escalas.listar')
+    );
   }
 
   isEditableStatus(status: StatusEscala): boolean {
@@ -147,7 +153,7 @@ export class EscalaDetail implements OnInit {
   }
 
   voltar(): void {
-    void this.router.navigateByUrl('/escalas');
+    void this.router.navigateByUrl(this.listBasePath());
   }
 
   finalizar(): void {
@@ -274,7 +280,7 @@ export class EscalaDetail implements OnInit {
       .subscribe({
         next: () => {
           this.feedback.showSuccess('Escala excluída com sucesso.');
-          void this.router.navigateByUrl('/escalas');
+          void this.router.navigateByUrl(this.listBasePath());
         },
         error: (err: { error?: { message?: string } }) => {
           this.error.set(err.error?.message ?? 'Não foi possível excluir a escala.');

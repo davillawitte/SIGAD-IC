@@ -37,19 +37,22 @@ public class EscalaPdfService(
             return Result<(byte[], string)>.Failure(detail.Error!);
         }
 
-        // Só muta afastamentos em escala editável; Publicada/DevolucaoSolicitada usam o snapshot já salvo.
+        // Só tenta sincronizar afastamentos em escala editável; se o ator não puder
+        // mutar (ex.: visão institucional), gera o PDF com o snapshot atual.
         if (detail.Value!.Status is not (StatusEscala.Publicada or StatusEscala.DevolucaoSolicitada))
         {
             var applied = await escalaService.AplicarAfastamentosAsync(id, actorLogin, cancellationToken);
-            if (!applied.Succeeded)
+            if (applied.Succeeded)
+            {
+                detail = await escalaService.GetByIdAsync(id, actorLogin, cancellationToken);
+                if (!detail.Succeeded)
+                {
+                    return Result<(byte[], string)>.Failure(detail.Error!);
+                }
+            }
+            else if (!IsMutationDenied(applied.Error))
             {
                 return Result<(byte[], string)>.Failure(applied.Error!);
-            }
-
-            detail = await escalaService.GetByIdAsync(id, actorLogin, cancellationToken);
-            if (!detail.Succeeded)
-            {
-                return Result<(byte[], string)>.Failure(detail.Error!);
             }
         }
 
@@ -70,6 +73,11 @@ public class EscalaPdfService(
 
         return Result<(byte[], string)>.Success((bytes, fileName));
     }
+
+    private static bool IsMutationDenied(string? error) =>
+        !string.IsNullOrWhiteSpace(error)
+        && (error.Contains("Sem permissão", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("só pode ser alterada", StringComparison.OrdinalIgnoreCase));
 
     private byte[]? LoadImageBytes(string fileName)
     {
@@ -252,7 +260,7 @@ public class EscalaPdfService(
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.A4.Landscape());
+                page.Size(PageSizes.A4); // portrait (orientação vertical)
                 page.Margin(18);
                 page.DefaultTextStyle(x => x.FontSize(8));
 

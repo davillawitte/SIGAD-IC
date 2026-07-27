@@ -4,5 +4,5 @@ export const AFASTAMENTOS_ROUTE_PAGES: PciRoutePageMeta[] = [
   { path: '/afastamentos', label: 'Afastamentos' },
   { path: '/afastamentos/novo', label: 'Novo', parentPath: '/afastamentos' },
   { path: '/afastamentos/editar/:id', label: 'Editar', parentPath: '/afastamentos' },
-  { path: '/afastamentos-institucionais', label: 'Afastamentos institucionais' },
+  { path: '/afastamentos-institucionais', label: 'Afastamentos Institucionais' },
 ];

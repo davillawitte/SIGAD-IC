@@ -130,9 +130,9 @@ export class EscalaForm implements OnInit {
   /** Capturado na criação — `getCurrentNavigation()` só funciona durante a construção. */
   private readonly initialOpenStep: WizardStep =
     (this.router.getCurrentNavigation()?.extras.state as { openStep?: number } | undefined)
-      ?.openStep === 3
-      ? 3
-      : 2;
+      ?.openStep === 2
+      ? 2
+      : 3;
 
   readonly routePages = ESCALAS_ROUTE_PAGES;
 
@@ -487,7 +487,6 @@ export class EscalaForm implements OnInit {
     this.checkPeriodoDuplicado$((exists) => {
       this.working.set(false);
       if (exists) {
-        this.error.set('Já existe escala para este setor neste mês/ano.');
         return;
       }
       this.error.set(null);
@@ -498,7 +497,6 @@ export class EscalaForm implements OnInit {
 
   private copiarOrigem(origemId: string): void {
     if (this.periodoDuplicado()) {
-      this.error.set('Já existe escala para este setor neste mês/ano.');
       return;
     }
     const v = this.step1Form.getRawValue();
@@ -583,11 +581,6 @@ export class EscalaForm implements OnInit {
   private checkPeriodoDuplicado(): void {
     this.checkPeriodoDuplicado$((exists) => {
       this.periodoDuplicado.set(exists);
-      if (exists) {
-        this.error.set('Já existe escala para este setor neste mês/ano.');
-      } else if (this.error() === 'Já existe escala para este setor neste mês/ano.') {
-        this.error.set(null);
-      }
     });
   }
 
@@ -619,7 +612,7 @@ export class EscalaForm implements OnInit {
     });
   }
 
-  private loadExisting(id: string, openStep: WizardStep = 2): void {
+  private loadExisting(id: string, openStep: WizardStep = 3): void {
     this.working.set(true);
     this.api.get(id).subscribe({
       next: (escala) => {

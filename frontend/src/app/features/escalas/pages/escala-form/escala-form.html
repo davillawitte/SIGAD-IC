@@ -22,7 +22,7 @@
   >
     <pci-step label="Período" [completed]="step() > 1"></pci-step>
     <pci-step label="Regimes e servidores" [completed]="step() > 2"></pci-step>
-    <pci-step label="Afastamentos e ocorrências" [completed]="step() > 3"></pci-step>
+    <pci-step label="Escala e Afastamentos" [completed]="step() > 3"></pci-step>
     <pci-step label="Revisão" [completed]="false"></pci-step>
   </pci-stepper>
 
@@ -73,7 +73,7 @@
                 [appFormCol]="12"
                 variant="info"
                 title="Continuidade"
-                message="Plantões 12h/24h preservam o ciclo (trabalho/folga). Expediente administrativo (seg–sex) é recalculado para o mês destino. Ao copiar, você vai direto para a matriz de afastamentos e ocorrências."
+                message="Plantões 12h/24h preservam o ciclo (trabalho/folga). Expediente administrativo (seg–sex) é recalculado para o mês destino."
               />
             }
           </app-form-section>

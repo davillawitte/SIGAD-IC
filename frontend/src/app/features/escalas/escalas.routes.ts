@@ -26,6 +26,7 @@ export const ESCALAS_ROUTES: Routes = [
         path: ':id',
         loadComponent: () =>
           import('./pages/escala-detail/escala-detail').then((m) => m.EscalaDetail),
+        data: { escopo: 'setor' },
       },
       {
         path: ':id/editar',
@@ -40,6 +41,7 @@ export const ESCALAS_ROUTES: Routes = [
           import('./pages/escala-calendario/escala-calendario').then(
             (m) => m.EscalaCalendario,
           ),
+        data: { escopo: 'setor' },
       },
     ],
   },
@@ -52,6 +54,20 @@ export const ESCALAS_ROUTES: Routes = [
         path: '',
         loadComponent: () =>
           import('./pages/escala-list/escala-list').then((m) => m.EscalaList),
+        data: { escopo: 'institucional' },
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('./pages/escala-detail/escala-detail').then((m) => m.EscalaDetail),
+        data: { escopo: 'institucional' },
+      },
+      {
+        path: ':id/calendario',
+        loadComponent: () =>
+          import('./pages/escala-calendario/escala-calendario').then(
+            (m) => m.EscalaCalendario,
+          ),
         data: { escopo: 'institucional' },
       },
     ],

@@ -69,6 +69,13 @@ public class Escala : BaseEntity
 
     public void Finalizar(string? updatedBy = null)
     {
+        // Escala finalizada continua editável; "Finalizar" de novo só confirma a edição.
+        if (Status == StatusEscala.Finalizada)
+        {
+            MarkUpdated(updatedBy);
+            return;
+        }
+
         if (Status != StatusEscala.Rascunho)
         {
             throw new InvalidOperationException("Somente escalas em rascunho podem ser finalizadas.");
