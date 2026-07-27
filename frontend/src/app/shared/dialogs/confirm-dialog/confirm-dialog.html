@@ -1,0 +1,12 @@
+<div class="pci-app-dialog">
+  <h2 class="pci-app-dialog__title">{{ data.title }}</h2>
+  <pci-form-card>
+    <p class="pci-app-dialog__message">{{ data.message }}</p>
+  </pci-form-card>
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">{{ data.cancelLabel || 'Cancelar' }}</pci-button>
+    <pci-button [variant]="data.danger ? 'danger' : 'primary'" (clicked)="confirm()">
+      {{ data.confirmLabel || 'Confirmar' }}
+    </pci-button>
+  </pci-form-actions>
+</div>

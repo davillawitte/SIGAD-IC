@@ -18,6 +18,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddPersistence(configuration);
+        services.AddHttpContextAccessor();
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
@@ -48,6 +49,7 @@ public static class DependencyInjection
 
         services.AddAuthorization();
 
+        services.AddScoped<IActorContextAccessor, ActorContextAccessor>();
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();

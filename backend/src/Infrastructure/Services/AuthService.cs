@@ -3,6 +3,7 @@ using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Domain.Common;
+using TemplateSistema.Domain.Enums;
 using TemplateSistema.Persistence;
 
 namespace TemplateSistema.Infrastructure.Services;
@@ -40,25 +41,51 @@ public class AuthService(
             return Result<LoginResponse>.Failure("Servidor vinculado inativo.");
         }
 
-        var perfis = usuario.UsuarioPerfis
+        var perfisAtivos = usuario.UsuarioPerfis
             .Where(x => x.Perfil.Ativo)
-            .Select(x => x.Perfil.Codigo)
-            .Distinct()
-            .OrderBy(x => x)
+            .Select(x => x.Perfil)
             .ToList();
 
-        if (perfis.Count == 0)
+        if (perfisAtivos.Count == 0)
         {
             return Result<LoginResponse>.Failure("Usuário sem perfil ativo.");
         }
 
-        var permissoes = usuario.UsuarioPerfis
-            .Where(x => x.Perfil.Ativo)
-            .SelectMany(x => x.Perfil.PerfilPermissoes)
+        var perfis = perfisAtivos
+            .Select(x => x.Codigo)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        var permissoes = perfisAtivos
+            .SelectMany(x => x.PerfilPermissoes)
             .Where(x => x.Permissao.Ativo)
             .Select(x => x.Permissao.Codigo)
             .Distinct()
             .OrderBy(x => x)
+            .ToList();
+
+        var perfisDetalhe = perfisAtivos
+            .Select(perfil =>
+            {
+                var ativos = perfil.PerfilPermissoes
+                    .Where(x => x.Permissao.Ativo)
+                    .ToList();
+
+                var perfilPermissoes = ativos
+                    .Select(x => x.Permissao.Codigo)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+
+                IReadOnlyDictionary<string, Abrangencia> abrangencia = ativos
+                    .Where(x => x.Abrangencia != Abrangencia.MeusSetores)
+                    .GroupBy(x => x.Permissao.Codigo, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().Abrangencia, StringComparer.OrdinalIgnoreCase);
+
+                return new PerfilAuthDto(perfil.Codigo, perfilPermissoes, abrangencia);
+            })
+            .OrderBy(x => x.Codigo)
             .ToList();
 
         var setoresGerenciados = await db.SetorChefias
@@ -79,7 +106,8 @@ public class AuthService(
             usuario.Servidor.SetorId,
             usuario.Servidor.Setor?.Nome,
             setoresGerenciados,
-            usuario.DeveAlterarSenha);
+            usuario.DeveAlterarSenha,
+            perfisDetalhe);
 
         var (token, expires) = jwtTokenService.CreateToken(authUser);
         usuario.RegistrarLogin();

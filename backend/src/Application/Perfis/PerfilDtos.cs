@@ -1,3 +1,5 @@
+using TemplateSistema.Domain.Enums;
+
 namespace TemplateSistema.Application.Perfis;
 
 public record PerfilListItemDto(
@@ -17,20 +19,29 @@ public record PerfilDetailDto(
     bool Sistema,
     bool Ativo,
     IReadOnlyList<Guid> PermissaoIds,
-    IReadOnlyList<string> Permissoes);
+    IReadOnlyList<string> Permissoes,
+    /// <summary>Abrangência por código de permissão (ex.: escalas.listar → TodosOsSetores).</summary>
+    IReadOnlyDictionary<string, Abrangencia> AbrangenciaPorPermissao);
 
 public record CreatePerfilRequest(
     string Nome,
     string? Codigo,
     string? Descricao,
-    IReadOnlyList<Guid>? PermissaoIds);
+    IReadOnlyList<Guid>? PermissaoIds,
+    IReadOnlyDictionary<string, Abrangencia>? AbrangenciaPorPermissao = null);
 
 public record UpdatePerfilRequest(
     string Nome,
     string? Descricao,
     bool? Ativo);
 
-public record SetPerfilPermissoesRequest(IReadOnlyList<Guid> PermissaoIds);
+/// <summary>
+/// Permissões ausentes em <paramref name="AbrangenciaPorPermissao"/> usam
+/// <see cref="Abrangencia.MeusSetores"/>. Chaves = código da permissão.
+/// </summary>
+public record SetPerfilPermissoesRequest(
+    IReadOnlyList<Guid> PermissaoIds,
+    IReadOnlyDictionary<string, Abrangencia>? AbrangenciaPorPermissao = null);
 
 public record PerfilExclusaoImpactoDto(
     int QuantidadeUsuarios,

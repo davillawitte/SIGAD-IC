@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Afastamentos;
+using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Domain.Entities;
-using TemplateSistema.Domain.Enums;
+using TemplateSistema.Infrastructure.Security;
 using TemplateSistema.Persistence;
 
 namespace TemplateSistema.Infrastructure.Services;
@@ -21,11 +22,10 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             .Include(x => x.Servidor).ThenInclude(x => x.Setor)
             .AsQueryable();
 
-        // SuperAdmin e chefe da Direção IC: visão global.
-        // Demais chefes: somente setores em que são chefia.
-        if (!actor.IsSuperAdmin && !actor.IsDirecaoIcChefe)
+        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Afastamentos);
+        if (setoresVisiveis is not null)
         {
-            q = q.Where(x => actor.SetoresGerenciadosIds.Contains(x.Servidor.SetorId));
+            q = q.Where(x => setoresVisiveis.Contains(x.Servidor.SetorId));
         }
 
         if (query.SetorId is Guid setorId)
@@ -123,7 +123,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Servidor não encontrado.");
         }
 
-        if (!CanMutate(actor, servidor.SetorId))
+        if (!actor.PodeAcessar(PermissionCodes.AfastamentosCriar, servidor.SetorId))
         {
             return Result<AfastamentoDto>.Failure(
                 "Só é possível cadastrar afastamento para servidores do setor em que você é chefe.");
@@ -167,7 +167,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Afastamento não encontrado.");
         }
 
-        if (!CanMutate(actor, entity.Servidor.SetorId))
+        if (!actor.PodeAcessar(PermissionCodes.AfastamentosEditar, entity.Servidor.SetorId))
         {
             return Result<AfastamentoDto>.Failure("Sem permissão para alterar afastamento neste setor.");
         }
@@ -203,7 +203,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result.Failure("Afastamento não encontrado.");
         }
 
-        if (!CanMutate(actor, entity.Servidor.SetorId))
+        if (!actor.PodeAcessar(PermissionCodes.AfastamentosExcluir, entity.Servidor.SetorId))
         {
             return Result.Failure("Sem permissão para excluir afastamento neste setor.");
         }
@@ -230,45 +230,9 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             x.Sei,
             x.CreatedAt);
 
-    private async Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken)
-    {
-        var normalized = login.Trim().ToLowerInvariant();
-        var usuario = await db.Usuarios
-            .AsNoTracking()
-            .Include(x => x.UsuarioPerfis).ThenInclude(x => x.Perfil)
-            .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
-
-        if (usuario is null)
-        {
-            return new ActorContext(false, [], false);
-        }
-
-        var isSuper = usuario.UsuarioPerfis.Any(x =>
-            x.Perfil.Ativo && x.Perfil.Codigo == PerfilCodes.SuperAdministrador);
-
-        var managedSetores = await db.SetorChefias
-            .AsNoTracking()
-            .Where(x => x.ServidorId == usuario.ServidorId)
-            .Select(x => new { x.SetorId, x.Setor.Sigla, x.TipoChefia })
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        var setores = managedSetores.Select(x => x.SetorId).Distinct().ToList();
-        // Visão global somente para o Diretor da Direção IC (não Subcoordenador).
-        var isDirecaoIcChefe = managedSetores.Any(x =>
-            SetorSiglas.IsDirecaoIc(x.Sigla) && x.TipoChefia == TipoChefia.Diretor);
-
-        return new ActorContext(isSuper, setores, isDirecaoIcChefe);
-    }
-
-    private static bool CanMutate(ActorContext actor, Guid setorId) =>
-        actor.IsSuperAdmin || actor.SetoresGerenciadosIds.Contains(setorId);
+    private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
+        ActorContextLoader.LoadAsync(db, login, cancellationToken);
 
     private static bool CanView(ActorContext actor, Guid setorId) =>
-        CanMutate(actor, setorId) || actor.IsDirecaoIcChefe;
-
-    private sealed record ActorContext(
-        bool IsSuperAdmin,
-        IReadOnlyList<Guid> SetoresGerenciadosIds,
-        bool IsDirecaoIcChefe);
+        actor.PodeVer(PermissionCodes.AfastamentosListar, setorId);
 }

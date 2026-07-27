@@ -1,0 +1,41 @@
+@if (error()) {
+  <pci-alert variant="error" title="Erro" [message]="error()!" />
+}
+
+@if (successMessage()) {
+  <pci-alert variant="success" title="Senha resetada" [message]="successMessage()!" />
+}
+
+<pci-list-page
+  title="Usuários"
+  description="Gerencie contas de acesso vinculadas a servidores."
+  currentPath="/usuarios"
+  [routePages]="routePages"
+  [filterFields]="filterFields"
+  [filterValues]="filterValues()"
+  [filtersExpanded]="filtersExpanded()"
+  [columns]="columns"
+  [rows]="pagedRows()"
+  [exportDataSource]="filteredRows()"
+  [total]="filteredRows().length"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [loading]="loading()"
+  [showCreateButton]="canCreate"
+  [enableExportPdf]="true"
+  createLabel="Novo usuário"
+  [rowActions]="rowActions()"
+  sortMode="server"
+  quickSearchMode="server"
+  [sort]="sort()"
+  (createClicked)="goCreate()"
+  (filterApply)="onFilterApply($event)"
+  (filterClear)="onFilterClear()"
+  (filterValuesChange)="filterValues.set($event)"
+  (filtersExpandedChange)="filtersExpanded.set($event)"
+  (searchChange)="onSearchChange($event)"
+  (sortChange)="onSortChange($event)"
+  (pageChange)="page.set($event)"
+  (pageSizeChange)="onPageSizeChange($event)"
+  (rowAction)="onRowAction($event)"
+/>

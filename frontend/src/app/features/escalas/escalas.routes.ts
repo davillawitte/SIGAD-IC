@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { permissionGuard } from '../../core/auth/auth.guard';
-import { escalaWizardCanDeactivate } from './escalas-wizard.guard';
+import { escalaFormCanDeactivate } from './escala-form.guard';
 
 export const ESCALAS_ROUTES: Routes = [
   {
@@ -12,39 +12,33 @@ export const ESCALAS_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/escalas-page.component').then((m) => m.EscalasPageComponent),
+          import('./pages/escala-list/escala-list').then((m) => m.EscalaList),
       },
       {
         path: 'nova',
         canActivate: [permissionGuard('escalas.criar')],
-        canDeactivate: [escalaWizardCanDeactivate],
+        canDeactivate: [escalaFormCanDeactivate],
         loadComponent: () =>
-          import('./pages/escala-wizard-page.component').then((m) => m.EscalaWizardPageComponent),
+          import('./pages/escala-form/escala-form').then((m) => m.EscalaForm),
       },
       {
         path: ':id',
         loadComponent: () =>
-          import('./pages/escala-detail-page.component').then((m) => m.EscalaDetailPageComponent),
+          import('./pages/escala-detail/escala-detail').then((m) => m.EscalaDetail),
       },
       {
         path: ':id/editar',
         canActivate: [permissionGuard('escalas.editar')],
-        canDeactivate: [escalaWizardCanDeactivate],
+        canDeactivate: [escalaFormCanDeactivate],
         loadComponent: () =>
-          import('./pages/escala-wizard-page.component').then((m) => m.EscalaWizardPageComponent),
+          import('./pages/escala-form/escala-form').then((m) => m.EscalaForm),
       },
       {
         path: ':id/calendario',
         loadComponent: () =>
-          import('./pages/escala-calendario-page.component').then(
-            (m) => m.EscalaCalendarioPageComponent,
+          import('./pages/escala-calendario/escala-calendario').then(
+            (m) => m.EscalaCalendario,
           ),
-      },
-      {
-        path: ':id/copiar',
-        canActivate: [permissionGuard('escalas.criar')],
-        loadComponent: () =>
-          import('./pages/escala-copiar-page.component').then((m) => m.EscalaCopiarPageComponent),
       },
     ],
   },

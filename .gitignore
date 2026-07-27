@@ -64,10 +64,10 @@ secrets/
 credentials.json
 
 ## Backups de banco (pasta versionada vazia)
-/backups/*
-!/backups/.gitkeep
-*.dump
-*.sql.gz
+# /backups/*
+# !/backups/.gitkeep
+# *.dump
+# *.sql.gz
 
 ## Node (frontend)
 frontend/node_modules/

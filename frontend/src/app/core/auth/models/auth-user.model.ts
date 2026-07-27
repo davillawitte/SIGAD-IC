@@ -1,3 +1,14 @@
+export type Abrangencia = 'MeusSetores' | 'TodosOsSetores' | 1 | 2;
+
+export interface PerfilAuthDetalhe {
+  codigo: string;
+  permissoes: string[];
+  /** Abrangência por código de permissão (ex.: escalas.listar). */
+  abrangenciaPorPermissao: Record<string, Abrangencia>;
+  /** @deprecated prefer abrangenciaPorPermissao */
+  abrangenciaPorModulo?: Record<string, Abrangencia>;
+}
+
 export interface AuthUser {
   id: string;
   login: string;
@@ -5,6 +16,7 @@ export interface AuthUser {
   email?: string | null;
   perfis: string[];
   permissoes: string[];
+  perfisDetalhe?: PerfilAuthDetalhe[];
   servidorId: string;
   setorLotacaoId?: string | null;
   setorLotacaoNome?: string | null;
@@ -23,6 +35,7 @@ export interface LoginResponse {
     email?: string | null;
     perfis: string[];
     permissoes: string[];
+    perfisDetalhe?: PerfilAuthDetalhe[];
     servidorId: string;
     setorLotacaoId?: string | null;
     setorLotacaoNome?: string | null;

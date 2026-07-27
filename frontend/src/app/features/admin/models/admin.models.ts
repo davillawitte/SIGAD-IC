@@ -15,7 +15,7 @@ export interface UsuarioDetail {
   login: string;
   nomeServidor: string;
   matricula: string;
-  email: string;
+  email?: string | null;
   ativo: boolean;
   ultimoLogin?: string | null;
   perfilIds: string[];
@@ -53,9 +53,13 @@ export interface PerfilListItem {
   quantidadePermissoes: number;
 }
 
+export type AbrangenciaModulo = 'MeusSetores' | 'TodosOsSetores' | 1 | 2;
+
 export interface PerfilDetail extends PerfilListItem {
   permissaoIds: string[];
   permissoes: string[];
+  /** Abrangência por código de permissão. */
+  abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
 }
 
 export interface CreatePerfilPayload {
@@ -63,6 +67,12 @@ export interface CreatePerfilPayload {
   codigo?: string | null;
   descricao?: string | null;
   permissaoIds?: string[];
+  abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
+}
+
+export interface SetPerfilPermissoesPayload {
+  permissaoIds: string[];
+  abrangenciaPorPermissao?: Record<string, AbrangenciaModulo>;
 }
 
 export interface UpdatePerfilPayload {
@@ -111,7 +121,7 @@ export interface ServidorListItem {
   cargoId: string;
   cargo: string;
   cargoCodigo: string;
-  email: string;
+  email?: string | null;
   telefone?: string | null;
   dataNascimento: string;
   setorId: string;
@@ -125,7 +135,7 @@ export interface CreateServidorPayload {
   matricula: string;
   cpf: string;
   cargoId: string;
-  email: string;
+  email?: string | null;
   setorId: string;
   dataNascimento: string;
   telefone?: string | null;
@@ -137,7 +147,7 @@ export interface UpdateServidorPayload {
   matricula: string;
   cpf: string;
   cargoId: string;
-  email: string;
+  email?: string | null;
   setorId: string;
   dataNascimento: string;
   telefone?: string | null;

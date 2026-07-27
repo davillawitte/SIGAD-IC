@@ -1,0 +1,23 @@
+<div class="pci-app-dialog">
+  <h2 class="pci-app-dialog__title">{{ data.title }}</h2>
+  @if (error()) {
+    <pci-alert variant="error" title="Atenção" [message]="error()!" />
+  }
+  <pci-form-card>
+    <form [formGroup]="form">
+      <pci-textarea
+        [label]="data.label"
+        [placeholder]="data.placeholder || ''"
+        [required]="true"
+        [rows]="4"
+        formControlName="value"
+      />
+    </form>
+  </pci-form-card>
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">{{ data.cancelLabel || 'Cancelar' }}</pci-button>
+    <pci-button variant="primary" (clicked)="confirm()">
+      {{ data.confirmLabel || 'Confirmar' }}
+    </pci-button>
+  </pci-form-actions>
+</div>

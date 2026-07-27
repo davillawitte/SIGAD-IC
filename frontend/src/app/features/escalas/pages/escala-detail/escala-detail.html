@@ -1,0 +1,109 @@
+<div class="escala-detail">
+  @if (escala(); as e) {
+    <pci-page-header [title]="pageTitle()" [description]="e.setorNome">
+      <pci-stack slot="actions" gap="2" direction="horizontal" class="escala-detail__header-actions">
+        <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
+      </pci-stack>
+    </pci-page-header>
+
+    @if (error()) {
+      <pci-alert variant="error" title="Operação inválida" [message]="error()!" />
+    }
+
+    <p class="escala-detail__resumo">
+      <span>Período: {{ mesNome() }}/{{ e.ano }}</span>
+      <pci-badge [variant]="statusVariant(e.status)">{{ statusLabel(e.status) }}</pci-badge>
+      @if ((e.status === 'Publicada' || e.status === 'DevolucaoSolicitada') && e.publicadaEm) {
+        <span class="escala-detail__dot" aria-hidden="true">·</span>
+        <span>Publicada em: {{ fmtDateTime(e.publicadaEm) }}@if (e.publicadaPor) { por {{ e.publicadaPor }}}</span>
+      }
+    </p>
+
+    @if (e.observacao) {
+      <p class="escala-detail__obs">{{ e.observacao }}</p>
+    }
+
+    <pci-stack gap="2" direction="horizontal" class="escala-detail__actions">
+      @if (canFinalizar() && e.status === 'Rascunho') {
+        <pci-button variant="primary" [loading]="working()" (clicked)="finalizar()">Finalizar</pci-button>
+      }
+      @if (canPublish() && e.status === 'Finalizada') {
+        <pci-button variant="primary" [loading]="working()" (clicked)="publicar()">Publicar</pci-button>
+      }
+      @if (canEdit() && e.status === 'Finalizada') {
+        <pci-button variant="secondary" icon="edit" (clicked)="editar()">Editar</pci-button>
+        <pci-button variant="secondary" [loading]="working()" (clicked)="reabrir()">Reabrir como rascunho</pci-button>
+      }
+      @if (canEdit() && e.status === 'Rascunho') {
+        <pci-button variant="secondary" icon="edit" (clicked)="editar()">Editar</pci-button>
+      }
+      @if (canSolicitarDevolucao()) {
+        <pci-button variant="secondary" [loading]="working()" (clicked)="solicitarDevolucao()">
+          Solicitar devolução
+        </pci-button>
+      }
+      @if (canDevolverDireto()) {
+        <pci-button variant="secondary" [loading]="working()" (clicked)="devolverDireto()">
+          Devolver
+        </pci-button>
+      }
+      @if (canExport()) {
+        <pci-dropdown-menu
+          align="start"
+          [panelMinWidth]="180"
+          [open]="pdfMenuOpen()"
+          (openChange)="pdfMenuOpen.set($event)"
+        >
+          <pci-button pciDropdownTrigger variant="secondary" icon="download">Exportar PDF</pci-button>
+          <ul pciDropdownPanel class="pci-dropdown-menu__list">
+            <li role="none">
+              <button
+                type="button"
+                class="pci-dropdown-menu__item"
+                role="menuitem"
+                (click)="onExportPdf('horizontal')"
+              >
+                Matriz
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                class="pci-dropdown-menu__item"
+                role="menuitem"
+                (click)="onExportPdf('vertical')"
+              >
+                Vertical
+              </button>
+            </li>
+          </ul>
+        </pci-dropdown-menu>
+      }
+      @if (canExcluir() && isEditableStatus(e.status)) {
+        <pci-button variant="ghost" icon="trash" [loading]="working()" (clicked)="excluir()">Excluir</pci-button>
+      }
+    </pci-stack>
+
+    <fieldset class="escala-detail__preview-fieldset">
+      <legend>Pré-visualização</legend>
+
+      <pci-tabs [selectedIndex]="viewTabIndex()" (selectedIndexChange)="onViewTabIndexChange($event)">
+        <pci-tab label="Matriz"></pci-tab>
+        <pci-tab label="Vertical"></pci-tab>
+      </pci-tabs>
+
+      <div class="escala-detail__preview">
+        @if (viewTab() === 'matriz') {
+          <app-escala-matrix [escala]="e" layout="matriz" [compactHeader]="true" />
+        }
+        @if (viewTab() === 'vertical') {
+          <app-escala-matrix [escala]="e" layout="vertical" [compactHeader]="true" />
+        }
+      </div>
+    </fieldset>
+  } @else if (loading()) {
+    <p>Carregando…</p>
+  } @else if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+</div>

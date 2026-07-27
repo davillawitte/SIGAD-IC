@@ -603,6 +603,11 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<Guid>("PermissaoId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Abrangencia")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.HasKey("PerfilId", "PermissaoId");
 
                     b.HasIndex("PermissaoId");

@@ -10,21 +10,8 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: gestao_ic_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d gestao_ic_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    # Os projetos de teste sobem o proprio Postgres via Testcontainers, usando o
+    # Docker que ja existe no runner. Nao ha servico de banco compartilhado.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +44,10 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Test frontend
+        working-directory: frontend
+        run: npm test
+
       - name: Restore backend
         working-directory: backend
         run: dotnet restore TemplateSistema.sln
@@ -67,6 +58,4 @@ jobs:
 
       - name: Test backend
         working-directory: backend
-        env:
-          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=gestao_ic_test;Username=postgres;Password=postgres"
         run: dotnet test TemplateSistema.sln --no-build -c Release --verbosity normal

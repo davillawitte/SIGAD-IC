@@ -93,25 +93,11 @@
           "builder": "@angular/build:extract-i18n"
         },
         "test": {
-          "builder": "@angular/build:karma",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "polyfills": ["zone.js", "zone.js/testing"],
+            "runner": "vitest",
             "tsConfig": "tsconfig.spec.json",
-            "inlineStyleLanguage": "scss",
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "public"
-              }
-            ],
-            "styles": [
-              "node_modules/@davillawitte/pci-design-system/tokens/pci-tokens.css",
-              "node_modules/@davillawitte/pci-design-system/tokens/pci-form-layout.css",
-              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-select.css",
-              "node_modules/@davillawitte/pci-design-system/tokens/pci-mat-datepicker.css",
-              "src/styles.scss"
-            ],
-            "scripts": []
+            "buildTarget": "frontend:build:development"
           }
         },
         "lint": {

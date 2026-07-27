@@ -11,22 +11,22 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/usuarios/usuarios-page.component').then((m) => m.UsuariosPageComponent),
+          import('./pages/usuario-list/usuario-list').then((m) => m.UsuarioList),
       },
       {
         path: 'novo',
         canActivate: [anyPermissionGuard('usuarios.criar')],
         loadComponent: () =>
-          import('./pages/usuarios/usuario-form-page.component').then(
-            (m) => m.UsuarioFormPageComponent,
+          import('./pages/usuario-form/usuario-form').then(
+            (m) => m.UsuarioForm,
           ),
       },
       {
         path: 'editar/:id',
         canActivate: [anyPermissionGuard('usuarios.editar')],
         loadComponent: () =>
-          import('./pages/usuarios/usuario-form-page.component').then(
-            (m) => m.UsuarioFormPageComponent,
+          import('./pages/usuario-form/usuario-form').then(
+            (m) => m.UsuarioForm,
           ),
       },
     ],
@@ -39,19 +39,19 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/perfis/perfis-page.component').then((m) => m.PerfisPageComponent),
+          import('./pages/perfil-list/perfil-list').then((m) => m.PerfilList),
       },
       {
         path: 'novo',
         canActivate: [anyPermissionGuard('perfis.criar')],
         loadComponent: () =>
-          import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
+          import('./pages/perfil-form/perfil-form').then((m) => m.PerfilForm),
       },
       {
         path: 'editar/:id',
         canActivate: [anyPermissionGuard('perfis.editar')],
         loadComponent: () =>
-          import('./pages/perfis/perfil-form-page.component').then((m) => m.PerfilFormPageComponent),
+          import('./pages/perfil-form/perfil-form').then((m) => m.PerfilForm),
       },
     ],
   },
@@ -63,24 +63,24 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/servidores/servidores-page.component').then(
-            (m) => m.ServidoresPageComponent,
+          import('./pages/servidor-list/servidor-list').then(
+            (m) => m.ServidorList,
           ),
       },
       {
         path: 'novo',
         canActivate: [anyPermissionGuard('servidores.criar')],
         loadComponent: () =>
-          import('./pages/servidores/servidor-form-page.component').then(
-            (m) => m.ServidorFormPageComponent,
+          import('./pages/servidor-form/servidor-form').then(
+            (m) => m.ServidorForm,
           ),
       },
       {
         path: 'editar/:id',
         canActivate: [anyPermissionGuard('servidores.editar')],
         loadComponent: () =>
-          import('./pages/servidores/servidor-form-page.component').then(
-            (m) => m.ServidorFormPageComponent,
+          import('./pages/servidor-form/servidor-form').then(
+            (m) => m.ServidorForm,
           ),
       },
     ],
@@ -93,40 +93,40 @@ export const ADMIN_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/estrutura/estrutura-organizacional-page.component').then(
-            (m) => m.EstruturaOrganizacionalPageComponent,
+          import('./pages/estrutura-list/estrutura-list').then(
+            (m) => m.EstruturaList,
           ),
       },
       {
         path: 'nucleos/novo',
         canActivate: [anyPermissionGuard('nucleos.criar')],
         loadComponent: () =>
-          import('./pages/estrutura/nucleo-form-page.component').then(
-            (m) => m.NucleoFormPageComponent,
+          import('./pages/nucleo-form/nucleo-form').then(
+            (m) => m.NucleoForm,
           ),
       },
       {
         path: 'nucleos/editar/:id',
         canActivate: [anyPermissionGuard('nucleos.editar')],
         loadComponent: () =>
-          import('./pages/estrutura/nucleo-form-page.component').then(
-            (m) => m.NucleoFormPageComponent,
+          import('./pages/nucleo-form/nucleo-form').then(
+            (m) => m.NucleoForm,
           ),
       },
       {
         path: 'setores/novo',
         canActivate: [anyPermissionGuard('setores.criar')],
         loadComponent: () =>
-          import('./pages/estrutura/setor-form-page.component').then(
-            (m) => m.SetorFormPageComponent,
+          import('./pages/setor-form/setor-form').then(
+            (m) => m.SetorForm,
           ),
       },
       {
         path: 'setores/editar/:id',
         canActivate: [anyPermissionGuard('setores.editar')],
         loadComponent: () =>
-          import('./pages/estrutura/setor-form-page.component').then(
-            (m) => m.SetorFormPageComponent,
+          import('./pages/setor-form/setor-form').then(
+            (m) => m.SetorForm,
           ),
       },
     ],

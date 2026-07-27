@@ -1,28 +1,61 @@
 using System.Net;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Testcontainers.PostgreSql;
 
 namespace TemplateSistema.Api.Tests;
 
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+/// <summary>
+/// Sobe a API contra um Postgres real. Sem o container, o endpoint responde
+/// ServiceUnavailable e o teste não afirmaria nada de útil.
+/// </summary>
+public sealed class ApiFixture : IAsyncLifetime
 {
-    private readonly HttpClient _client;
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private TestApiFactory? _factory;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
+    public HttpClient Client { get; private set; } = null!;
+
+    public async Task InitializeAsync()
     {
-        _client = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("ConnectionStrings:DefaultConnection",
-                "Host=localhost;Port=5432;Database=gestao_ic_test;Username=postgres;Password=postgres");
-        }).CreateClient();
+        await _container.StartAsync();
+        _factory = new TestApiFactory(_container.GetConnectionString());
+        Client = _factory.CreateClient();
     }
 
-    [Fact]
-    public async Task GetHealth_ReturnsOkOrServiceUnavailable()
+    public async Task DisposeAsync()
     {
-        var response = await _client.GetAsync("/health");
+        Client?.Dispose();
+        if (_factory is not null)
+        {
+            await _factory.DisposeAsync();
+        }
 
-        Assert.True(
-            response.StatusCode is HttpStatusCode.OK or HttpStatusCode.ServiceUnavailable,
-            $"Unexpected status: {response.StatusCode}");
+        await _container.DisposeAsync();
+    }
+
+    /// <summary>
+    /// O ambiente "Testing" evita o DatabaseInitializer, que só roda em Development,
+    /// Docker ou Production. O health check só precisa de conectividade, e assim o
+    /// teste não passa a depender do AuthSeed.
+    /// </summary>
+    private sealed class TestApiFactory(string connectionString) : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
+        }
+    }
+}
+
+public class HealthEndpointTests(ApiFixture fixture) : IClassFixture<ApiFixture>
+{
+    [Fact]
+    public async Task GetHealth_ComBancoDisponivel_RetornaOk()
+    {
+        var response = await fixture.Client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

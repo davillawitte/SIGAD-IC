@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { environment } from '../../../../environments/environment';
 import {
@@ -16,6 +17,7 @@ import {
   CreateNucleoPayload,
   CreatePerfilPayload,
   CreateServidorPayload,
+  SetPerfilPermissoesPayload,
   ChefiaConflito,
   CreateSetorPayload,
   CreateUsuarioPayload,
@@ -36,6 +38,7 @@ import {
   UsuarioDetail,
   UsuarioListItem,
 } from '../models/admin.models';
+import { mapCargoListItem, mapServidorListItem, mapSetorListItem } from './admin-api.mappers';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -92,8 +95,14 @@ export class AdminApiService {
     return this.http.post<void>(`${this.base}/api/perfis/${id}/desativar`, payload);
   }
 
-  setPerfilPermissoes(id: string, permissaoIds: string[]): Observable<PerfilDetail> {
-    return this.http.put<PerfilDetail>(`${this.base}/api/perfis/${id}/permissoes`, { permissaoIds });
+  setPerfilPermissoes(
+    id: string,
+    payload: SetPerfilPermissoesPayload | string[],
+  ): Observable<PerfilDetail> {
+    const body: SetPerfilPermissoesPayload = Array.isArray(payload)
+      ? { permissaoIds: payload }
+      : payload;
+    return this.http.put<PerfilDetail>(`${this.base}/api/perfis/${id}/permissoes`, body);
   }
 
   listPermissoes(query: PaginationQuery = {}): Observable<PagedResult<PermissaoItem>> {
@@ -105,25 +114,35 @@ export class AdminApiService {
 
   listServidores(semUsuario = false): Observable<ServidorListItem[]> {
     const query = semUsuario ? '?semUsuario=true' : '';
-    return this.http.get<ServidorListItem[]>(`${this.base}/api/servidores${query}`);
+    return this.http
+      .get<unknown[]>(`${this.base}/api/servidores${query}`)
+      .pipe(map((items) => items.map(mapServidorListItem)));
   }
 
   /** Servidores dos setores gerenciados pelo usuário (ou todos se SuperAdmin). */
   listMeusServidores(semUsuario = false): Observable<ServidorListItem[]> {
     const query = semUsuario ? '?semUsuario=true' : '';
-    return this.http.get<ServidorListItem[]>(`${this.base}/api/servidores/meus${query}`);
+    return this.http
+      .get<unknown[]>(`${this.base}/api/servidores/meus${query}`)
+      .pipe(map((items) => items.map(mapServidorListItem)));
   }
 
   getServidor(id: string): Observable<ServidorListItem> {
-    return this.http.get<ServidorListItem>(`${this.base}/api/servidores/${id}`);
+    return this.http
+      .get<unknown>(`${this.base}/api/servidores/${id}`)
+      .pipe(map(mapServidorListItem));
   }
 
   createServidor(payload: CreateServidorPayload): Observable<ServidorListItem> {
-    return this.http.post<ServidorListItem>(`${this.base}/api/servidores`, payload);
+    return this.http
+      .post<unknown>(`${this.base}/api/servidores`, payload)
+      .pipe(map(mapServidorListItem));
   }
 
   updateServidor(id: string, payload: UpdateServidorPayload): Observable<ServidorListItem> {
-    return this.http.put<ServidorListItem>(`${this.base}/api/servidores/${id}`, payload);
+    return this.http
+      .put<unknown>(`${this.base}/api/servidores/${id}`, payload)
+      .pipe(map(mapServidorListItem));
   }
 
   getServidorExclusaoImpacto(id: string): Observable<ServidorExclusaoImpacto> {
@@ -135,7 +154,9 @@ export class AdminApiService {
   }
 
   listSetores(): Observable<SetorListItem[]> {
-    return this.http.get<SetorListItem[]>(`${this.base}/api/setores`);
+    return this.http
+      .get<unknown[]>(`${this.base}/api/setores`)
+      .pipe(map((items) => items.map(mapSetorListItem)));
   }
 
   /** Setores acessíveis ao usuário (chefia) ou todos se SuperAdmin. */
@@ -191,7 +212,9 @@ export class AdminApiService {
   }
 
   listCargos(): Observable<CargoListItem[]> {
-    return this.http.get<CargoListItem[]>(`${this.base}/api/cargos`);
+    return this.http
+      .get<unknown[]>(`${this.base}/api/cargos`)
+      .pipe(map((items) => items.map(mapCargoListItem)));
   }
 
   private toParams(query: PaginationQuery): HttpParams {

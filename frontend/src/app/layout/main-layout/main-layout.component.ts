@@ -39,7 +39,6 @@ export class MainLayoutComponent {
     'estrutura-organizacional': '/estrutura-organizacional',
     escalas: '/escalas',
     afastamentos: '/afastamentos',
-    'solicitacoes-trocas': '/solicitacoes-trocas',
   };
 
   readonly activeItemId = computed(() => this.navActive.navId());
@@ -52,39 +51,37 @@ export class MainLayoutComponent {
       },
     ];
 
-    if (
-      this.auth.hasAnyPermission([
-        'nucleos.listar',
-        'setores.listar',
-        'servidores.listar',
-        'cargos.listar',
-      ])
-    ) {
-      groups.push({
-        title: 'Gestão Institucional',
-        items: [
-          { id: 'servidores', label: 'Servidores', icon: 'users' },
-          { id: 'estrutura-organizacional', label: 'Estrutura Organizacional', icon: 'building' },
-        ],
-      });
+    const gestaoInstitucional = [
+      ...(this.auth.hasPermission('servidores.listar')
+        ? [{ id: 'servidores', label: 'Servidores', icon: 'users' as const }]
+        : []),
+      ...(this.auth.hasAnyPermission(['nucleos.listar', 'setores.listar'])
+        ? [
+            {
+              id: 'estrutura-organizacional',
+              label: 'Estrutura Organizacional',
+              icon: 'building' as const,
+            },
+          ]
+        : []),
+    ];
+    if (gestaoInstitucional.length) {
+      groups.push({ title: 'Gestão Institucional', items: gestaoInstitucional });
     }
 
-    if (this.auth.hasAnyPermission(['escalas.listar', 'afastamentos.listar'])) {
-      groups.push({
-        title: 'Gestão do Setor',
-        items: [
-          ...(this.auth.hasPermission('escalas.listar')
-            ? [{ id: 'escalas', label: 'Escalas', icon: 'schedule' as const }]
-            : []),
-          ...(this.auth.hasPermission('afastamentos.listar')
-            ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'calendar' as const }]
-            : []),
-          { id: 'solicitacoes-trocas', label: 'Solicitações de trocas', icon: 'refresh' as const },
-        ],
-      });
+    const gestaoSetor = [
+      ...(this.auth.hasPermission('escalas.listar')
+        ? [{ id: 'escalas', label: 'Escalas', icon: 'schedule' as const }]
+        : []),
+      ...(this.auth.hasPermission('afastamentos.listar')
+        ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'calendar' as const }]
+        : []),
+    ];
+    if (gestaoSetor.length) {
+      groups.push({ title: 'Gestão do Setor', items: gestaoSetor });
     }
 
-    if (this.auth.hasAnyPermission(['usuarios.listar', 'perfis.listar'])) {
+    if (this.auth.isSuperAdmin()) {
       groups.push({
         title: 'Administração do Sistema',
         items: [

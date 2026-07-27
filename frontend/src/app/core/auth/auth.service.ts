@@ -3,7 +3,13 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { AuthSession, AuthUser, LoginResponse } from './models/auth-user.model';
+import {
+  Abrangencia,
+  AuthSession,
+  AuthUser,
+  LoginResponse,
+  PerfilAuthDetalhe,
+} from './models/auth-user.model';
 
 const SESSION_KEY = 'sigad-ic.auth.session';
 
@@ -73,11 +79,8 @@ export class AuthService {
     return this.accessToken;
   }
 
+  /** Gate grosso (união de permissões) — usar em route guards. Sem bypass de SuperAdmin. */
   hasPermission(code: string): boolean {
-    if (this.isSuperAdmin()) {
-      return true;
-    }
-
     const user = this.currentUserSignal();
     return !!user?.permissoes.includes(code);
   }
@@ -86,8 +89,86 @@ export class AuthService {
     return codes.some((code) => this.hasPermission(code));
   }
 
+  /**
+   * Avaliação por perfil: permissão + abrangência daquela permissão no mesmo perfil.
+   * SuperAdmin não bypassa escopo de setor.
+   */
+  canAccess(permissao: string, setorId?: string | null): boolean {
+    const user = this.currentUserSignal();
+    if (!user) {
+      return false;
+    }
+
+    const detalhes = user.perfisDetalhe ?? [];
+
+    if (detalhes.length === 0) {
+      if (!user.permissoes.includes(permissao)) {
+        return false;
+      }
+      return this.abrangerMeusSetores(user, setorId);
+    }
+
+    return detalhes.some(
+      (perfil) =>
+        perfil.permissoes.includes(permissao) &&
+        this.abrangerPermissao(perfil, permissao, setorId, user),
+    );
+  }
+
+  /** Indica se o usuário pode mutar recursos do setor (perfil + abrangência). */
+  canManageSetor(setorId: string): boolean {
+    return (
+      this.canAccess('escalas.editar', setorId) ||
+      this.canAccess('escalas.criar', setorId) ||
+      this.canAccess('afastamentos.criar', setorId) ||
+      this.canAccess('afastamentos.editar', setorId) ||
+      this.canAccess('servidores.editar', setorId)
+    );
+  }
+
   isSuperAdmin(): boolean {
     return this.currentUserSignal()?.perfis.includes('SUPERADMINISTRADOR') ?? false;
+  }
+
+  private abrangerPermissao(
+    perfil: PerfilAuthDetalhe,
+    permissao: string,
+    setorId: string | null | undefined,
+    user: AuthUser,
+  ): boolean {
+    if (this.resolveAbrangenciaPermissao(perfil, permissao) === 'TodosOsSetores') {
+      return true;
+    }
+    return this.abrangerMeusSetores(user, setorId);
+  }
+
+  private abrangerMeusSetores(user: AuthUser, setorId: string | null | undefined): boolean {
+    return !setorId || user.setoresGerenciadosIds.includes(setorId);
+  }
+
+  private resolveAbrangenciaPermissao(
+    perfil: PerfilAuthDetalhe,
+    permissao: string,
+  ): 'MeusSetores' | 'TodosOsSetores' {
+    const map = perfil.abrangenciaPorPermissao ?? {};
+    const raw =
+      map[permissao] ??
+      map[permissao.toLowerCase()] ??
+      Object.entries(map).find(([key]) => key.toLowerCase() === permissao.toLowerCase())?.[1];
+
+    return this.normalizeAbrangencia(raw);
+  }
+
+  private normalizeAbrangencia(value: Abrangencia | undefined): 'MeusSetores' | 'TodosOsSetores' {
+    if (value === 'TodosOsSetores' || value === 2) {
+      return 'TodosOsSetores';
+    }
+    return 'MeusSetores';
+  }
+
+  private moduloDe(permissionCode: string): string {
+    const sep = permissionCode.indexOf('.');
+    return (sep > 0 ? permissionCode.slice(0, sep) : permissionCode).toLowerCase();
   }
 
   private clearDeveAlterarSenha(): void {
@@ -116,6 +197,11 @@ export class AuthService {
       email: response.usuario.email,
       perfis: response.usuario.perfis ?? [],
       permissoes: response.usuario.permissoes ?? [],
+      perfisDetalhe: (response.usuario.perfisDetalhe ?? []).map((p) => ({
+        codigo: p.codigo,
+        permissoes: p.permissoes ?? [],
+        abrangenciaPorPermissao: p.abrangenciaPorPermissao ?? {},
+      })),
       servidorId: response.usuario.servidorId,
       setorLotacaoId: response.usuario.setorLotacaoId ?? null,
       setorLotacaoNome: response.usuario.setorLotacaoNome ?? null,
@@ -162,6 +248,14 @@ export class AuthService {
         setoresGerenciadosIds: session.user.setoresGerenciadosIds ?? [],
         permissoes: session.user.permissoes ?? [],
         perfis: session.user.perfis ?? [],
+        perfisDetalhe: (session.user.perfisDetalhe ?? []).map((p) => ({
+          codigo: p.codigo,
+          permissoes: p.permissoes ?? [],
+          abrangenciaPorPermissao:
+            p.abrangenciaPorPermissao ??
+            (p as { abrangenciaPorModulo?: Record<string, Abrangencia> }).abrangenciaPorModulo ??
+            {},
+        })),
         deveAlterarSenha: session.user.deveAlterarSenha === true,
         meta:
           session.user.setorLotacaoNome ??

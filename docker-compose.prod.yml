@@ -1,9 +1,20 @@
-# Produção — acesso único via nginx em http://<HOST>/ (porta 80).
+# Produção SIGAD-IC — coexiste com gestao-SCFA na mesma máquina.
+# Acesso público do SIGAD: http://<HOST>:8080/ via nginx de borda (docker-compose.edge.yml).
+# SCFA continua em http://<HOST>/ (porta 80) — este compose NÃO toca o SCFA.
+#
 # Uso:
-#   cp .env.prod.example .env.prod   # preencha DB_PASSWORD, JWT_KEY, NODE_AUTH_TOKEN
+#   cp .env.prod.example .env.prod
 #   ./scripts/docker-up-prod.sh
 #
 # Postgres e API NÃO são publicados no host (só rede interna Docker).
+
+name: sigad-ic
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   postgres:
@@ -14,6 +25,18 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD em .env.prod}
       POSTGRES_DB: ${DB_NAME:-gestao_ic}
+      # Dois Postgres na mesma máquina (SIGAD + SCFA): buffers conservadores.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - max_connections=100
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     healthcheck:
@@ -21,6 +44,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *default-logging
     networks:
       - sigad-ic
 
@@ -38,10 +62,24 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE:-sigad-ic-frontend}
       Jwt__Key: ${JWT_KEY:?Defina JWT_KEY (>=32 caracteres) em .env.prod}
       Jwt__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-480}
-      Cors__Origins__0: ${APP_ORIGIN:-http://10.9.233.98}
+      Cors__Origins__0: ${APP_ORIGIN:-http://10.9.233.98:8080}
+      AllowedHosts: ${ALLOWED_HOSTS:-10.9.233.98;localhost;127.0.0.1}
+      ForwardedHeaders__ClearKnownNetworks: "true"
+      ForwardedHeaders__ClearKnownProxies: "true"
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    logging: *default-logging
     networks:
       - sigad-ic
 
@@ -53,12 +91,14 @@ services:
         NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:?Defina NODE_AUTH_TOKEN em .env.prod}
     container_name: sigad-ic-frontend
     restart: unless-stopped
-    ports:
-      - "${HTTP_PORT:-80}:80"
+    # Sem portas no host — o nginx de borda (edge) é a única publicação.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    logging: *default-logging
     networks:
       - sigad-ic
+      - edge
 
 volumes:
   postgres_data_prod:
@@ -66,3 +106,6 @@ volumes:
 networks:
   sigad-ic:
     name: sigad-ic
+  edge:
+    external: true
+    name: edge

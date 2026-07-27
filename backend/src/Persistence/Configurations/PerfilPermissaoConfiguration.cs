@@ -11,6 +11,11 @@ public class PerfilPermissaoConfiguration : IEntityTypeConfiguration<PerfilPermi
         builder.ToTable("PerfilPermissao");
         builder.HasKey(x => new { x.PerfilId, x.PermissaoId });
 
+        builder.Property(x => x.Abrangencia)
+            .HasConversion<int>()
+            .IsRequired()
+            .HasDefaultValue(Domain.Enums.Abrangencia.MeusSetores);
+
         builder.HasOne(x => x.Perfil)
             .WithMany(x => x.PerfilPermissoes)
             .HasForeignKey(x => x.PerfilId)

@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using TemplateSistema.Application.Abstractions;
+using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Application.Escalas;
 using TemplateSistema.Domain.Entities;
 using TemplateSistema.Domain.Enums;
 using TemplateSistema.Infrastructure.Common;
+using TemplateSistema.Infrastructure.Security;
 using TemplateSistema.Persistence;
 
 namespace TemplateSistema.Infrastructure.Services;
@@ -24,11 +26,10 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var q = db.Escalas.AsNoTracking().Include(x => x.Setor).AsQueryable();
 
-        // SuperAdmin e chefe da Direção IC: visão global.
-        // Demais chefes: somente setores em que são chefia.
-        if (!actor.IsSuperAdmin && !actor.IsDirecaoIcChefe)
+        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
+        if (setoresVisiveis is not null)
         {
-            q = q.Where(x => actor.SetoresGerenciadosIds.Contains(x.SetorId));
+            q = q.Where(x => setoresVisiveis.Contains(x.SetorId));
         }
 
         if (query.SetorId is Guid setorId)
@@ -183,7 +184,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!CanMutate(actor, request.SetorId))
+        if (!actor.PodeAcessar(PermissionCodes.EscalasCriar, request.SetorId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para criar escala neste setor.");
         }
@@ -721,7 +722,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
+        if (!CanSolicitarDevolucao(actor, escala.SetorId))
         {
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Sem permissão para esta escala.");
         }
@@ -790,10 +791,6 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!await CanApproveDevolucaoAsync(actor, cancellationToken))
-        {
-            return Result<EscalaDetailDto>.Failure("Sem permissão para devolver esta escala.");
-        }
 
         var escala = await db.Escalas
             .Include(x => x.Setor)
@@ -801,6 +798,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         if (escala is null)
         {
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.EscalasDevolver, escala.SetorId))
+        {
+            return Result<EscalaDetailDto>.Failure("Sem permissão para devolver esta escala.");
         }
 
         if (!SetorSiglas.IsDirecaoIc(escala.Setor.Sigla))
@@ -841,7 +843,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!await CanApproveDevolucaoAsync(actor, cancellationToken))
+        if (!actor.TemPermissao(PermissionCodes.EscalasDevolver))
         {
             return [];
         }
@@ -899,10 +901,6 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         CancellationToken cancellationToken)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!await CanApproveDevolucaoAsync(actor, cancellationToken))
-        {
-            return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Sem permissão para responder devoluções.");
-        }
 
         var solicitacao = await db.SolicitacoesDevolucaoEscala
             .Include(x => x.Escala).ThenInclude(x => x.Setor)
@@ -912,6 +910,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         if (solicitacao is null)
         {
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Solicitação não encontrada.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.EscalasDevolver, solicitacao.Escala.SetorId))
+        {
+            return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Sem permissão para responder devoluções.");
         }
 
         try
@@ -1889,56 +1892,20 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .Include(x => x.Servidores).ThenInclude(x => x.Jornadas).ThenInclude(x => x.PadraoEscala)
             .Include(x => x.Servidores).ThenInclude(x => x.Ocorrencias).ThenInclude(x => x.TipoOcorrencia);
 
-    private async Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken)
-    {
-        var normalized = login.Trim().ToLowerInvariant();
-        var usuario = await db.Usuarios
-            .AsNoTracking()
-            .Include(x => x.Servidor)
-            .Include(x => x.UsuarioPerfis).ThenInclude(x => x.Perfil)
-            .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
-
-        if (usuario is null)
-        {
-            return new ActorContext(false, Guid.Empty, Guid.Empty, [], false);
-        }
-
-        var isSuper = usuario.UsuarioPerfis.Any(x =>
-            x.Perfil.Ativo && x.Perfil.Codigo == PerfilCodes.SuperAdministrador);
-
-        var managedSetores = await db.SetorChefias
-            .AsNoTracking()
-            .Where(x => x.ServidorId == usuario.ServidorId)
-            .Select(x => new { x.SetorId, x.Setor.Sigla, x.TipoChefia })
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        var setores = managedSetores.Select(x => x.SetorId).Distinct().ToList();
-        // Visão global somente para o Diretor da Direção IC (não Subcoordenador).
-        var isDirecaoIcChefe = managedSetores.Any(x =>
-            SetorSiglas.IsDirecaoIc(x.Sigla) && x.TipoChefia == TipoChefia.Diretor);
-
-        return new ActorContext(isSuper, usuario.Id, usuario.ServidorId, setores, isDirecaoIcChefe);
-    }
+    private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
+        ActorContextLoader.LoadAsync(db, login, cancellationToken);
 
     private static bool CanMutate(ActorContext actor, Guid setorId) =>
-        actor.IsSuperAdmin || actor.SetoresGerenciadosIds.Contains(setorId);
+        actor.PodeAcessar(PermissionCodes.EscalasEditar, setorId);
+
+    private static bool CanSolicitarDevolucao(ActorContext actor, Guid setorId) =>
+        actor.PodeAcessar(PermissionCodes.EscalasSolicitarDevolucao, setorId);
 
     private static bool CanView(ActorContext actor, Guid setorId) =>
-        CanMutate(actor, setorId) || actor.IsDirecaoIcChefe;
+        actor.PodeVer(PermissionCodes.EscalasListar, setorId);
 
     private static bool IsEditableStatus(StatusEscala status) =>
         status is StatusEscala.Rascunho or StatusEscala.Finalizada;
-
-    private async Task<bool> CanApproveDevolucaoAsync(ActorContext actor, CancellationToken cancellationToken)
-    {
-        if (actor.IsSuperAdmin || actor.IsDirecaoIcChefe)
-        {
-            return true;
-        }
-
-        return false;
-    }
 
     private async Task<string?> ResolveResponsavelNomeAsync(
         string? createdByLogin,
@@ -2090,11 +2057,4 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             servidores.Sum(x => x.CargaHorariaRemota),
             servidores);
     }
-
-    private sealed record ActorContext(
-        bool IsSuperAdmin,
-        Guid UsuarioId,
-        Guid ServidorId,
-        IReadOnlyList<Guid> SetoresGerenciadosIds,
-        bool IsDirecaoIcChefe);
 }

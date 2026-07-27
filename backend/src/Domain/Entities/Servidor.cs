@@ -35,7 +35,7 @@ public class Servidor : BaseEntity
         string matricula,
         string cpf,
         Guid cargoId,
-        string email,
+        string? email,
         Guid setorId,
         DateOnly dataNascimento,
         string? telefone = null,
@@ -70,7 +70,7 @@ public class Servidor : BaseEntity
         string matricula,
         string cpf,
         Guid cargoId,
-        string email,
+        string? email,
         Guid setorId,
         DateOnly dataNascimento,
         string? telefone = null,
@@ -101,7 +101,8 @@ public class Servidor : BaseEntity
     public static string NormalizeCpf(string cpf) =>
         new string(cpf.Where(char.IsDigit).ToArray());
 
-    public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+    public static string NormalizeEmail(string? email) =>
+        string.IsNullOrWhiteSpace(email) ? string.Empty : email.Trim().ToLowerInvariant();
 
     public static string? NormalizeTelefone(string? telefone) =>
         string.IsNullOrWhiteSpace(telefone) ? null : telefone.Trim();

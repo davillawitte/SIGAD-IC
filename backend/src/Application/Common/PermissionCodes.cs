@@ -7,6 +7,45 @@ public static class PermissionAreas
     public const string AdministracaoDoSistema = "Administração do Sistema";
 }
 
+/// <summary>
+/// Módulos do catálogo de permissões. A abrangência de um perfil é definida por módulo.
+/// </summary>
+public static class PermissionModules
+{
+    public const string Usuarios = "usuarios";
+    public const string Perfis = "perfis";
+    public const string Permissoes = "permissoes";
+    public const string Nucleos = "nucleos";
+    public const string Setores = "setores";
+    public const string Cargos = "cargos";
+    public const string Servidores = "servidores";
+    public const string Escalas = "escalas";
+    public const string Afastamentos = "afastamentos";
+
+    /// <summary>Módulos cuja abrangência não faz sentido: são globais por natureza.</summary>
+    public static readonly IReadOnlySet<string> SemAbrangencia =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Usuarios,
+            Perfis,
+            Permissoes,
+            Cargos,
+        };
+
+    public static readonly IReadOnlyList<string> All =
+    [
+        Escalas,
+        Afastamentos,
+        Servidores,
+        Setores,
+        Nucleos,
+        Cargos,
+        Usuarios,
+        Perfis,
+        Permissoes,
+    ];
+}
+
 public static class PermissionCodes
 {
     public const string UsuariosListar = "usuarios.listar";
@@ -93,6 +132,31 @@ public static class PermissionCodes
         (AfastamentosEditar, "Editar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Alterar afastamentos"),
         (AfastamentosExcluir, "Excluir afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Remover afastamentos"),
     ];
+
+    private static readonly IReadOnlyDictionary<string, string> ModulePorCodigo =
+        Catalog.ToDictionary(x => x.Codigo, x => x.Modulo, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlyDictionary<string, string> AreaPorCodigo =
+        Catalog.ToDictionary(x => x.Codigo, x => x.Area, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Módulo de uma permissão. Cai no prefixo antes do ponto quando o código não está
+    /// no catálogo (permissão criada fora dele).
+    /// </summary>
+    public static string ModuloDe(string codigo)
+    {
+        if (ModulePorCodigo.TryGetValue(codigo, out var modulo))
+        {
+            return modulo;
+        }
+
+        var separador = codigo.IndexOf('.');
+        return separador > 0 ? codigo[..separador].ToLowerInvariant() : codigo.ToLowerInvariant();
+    }
+
+    public static bool IsAdministracaoDoSistema(string codigo) =>
+        AreaPorCodigo.TryGetValue(codigo, out var area)
+        && string.Equals(area, PermissionAreas.AdministracaoDoSistema, StringComparison.Ordinal);
 }
 
 public static class SetorSiglas
@@ -170,4 +234,5 @@ public static class PerfilCodes
     public const string SuperAdministrador = "SUPERADMINISTRADOR";
     public const string ChefeSetor = "CHEFE_SETOR";
     public const string Servidor = "SERVIDOR";
+    public const string DirecaoIc = "DIRECAO_IC";
 }

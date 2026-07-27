@@ -1,0 +1,237 @@
+<div class="org">
+  <pci-page-header
+    title="Estrutura Organizacional"
+    description="Hierarquia de núcleos e setores do Instituto de Criminalística."
+  >
+    <pci-stack slot="actions" gap="3" direction="horizontal">
+      @if (canCreateAny) {
+        <pci-dropdown-menu
+          align="end"
+          [panelMinWidth]="180"
+          [open]="novoMenuOpen()"
+          (openChange)="novoMenuOpen.set($event)"
+        >
+          <pci-button pciDropdownTrigger variant="primary" icon="plus">Novo</pci-button>
+          <ul pciDropdownPanel class="pci-dropdown-menu__list">
+            @if (canCreateNucleo) {
+              <li role="none">
+                <button
+                  type="button"
+                  class="pci-dropdown-menu__item"
+                  role="menuitem"
+                  (click)="novoNucleo()"
+                >
+                  <pci-icon name="building" size="sm" />
+                  <span>Núcleo</span>
+                </button>
+              </li>
+            }
+            @if (canCreateSetor) {
+              <li role="none">
+                <button
+                  type="button"
+                  class="pci-dropdown-menu__item"
+                  role="menuitem"
+                  (click)="novoSetor()"
+                >
+                  <pci-icon name="layers" size="sm" />
+                  <span>Setor</span>
+                </button>
+              </li>
+            }
+          </ul>
+        </pci-dropdown-menu>
+      }
+    </pci-stack>
+  </pci-page-header>
+
+  @if (error()) {
+    <pci-alert variant="error" title="Operação inválida" [message]="error()!" />
+  }
+
+  <section class="org__panel" aria-label="Núcleos e setores">
+    <header class="org__panel-head">
+      <div>
+        <h2 class="org__panel-title">Núcleos e Setores</h2>
+      </div>
+      @if (totalNucleos() > 0) {
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button variant="ghost" size="sm" icon="expand-all" (clicked)="expandAll()">
+            Expandir
+          </pci-button>
+          <pci-button variant="ghost" size="sm" icon="collapse-all" (clicked)="collapseAll()">
+            Recolher
+          </pci-button>
+        </pci-stack>
+      }
+    </header>
+
+    @if (loading()) {
+      <p class="org__empty">Carregando estrutura…</p>
+    } @else if (!totalNucleos() && !direcao()) {
+      <div class="org__empty-state">
+        <pci-icon name="building" size="lg" />
+        <p class="org__empty-title">Nenhuma estrutura cadastrada</p>
+        <p class="org__empty">Comece criando um núcleo e, em seguida, os setores vinculados.</p>
+        @if (canCreateNucleo) {
+          <pci-button variant="primary" icon="plus" (clicked)="novoNucleo()">Novo núcleo</pci-button>
+        }
+      </div>
+    } @else {
+      <ul class="org-tree" role="tree">
+        @if (direcao(); as dir) {
+          <li class="org-tree__direcao" role="treeitem">
+            <div class="org-tree__row org-tree__row--direcao">
+              <span class="org-tree__root-mark" aria-hidden="true">
+                <pci-icon name="landmark" size="sm" />
+              </span>
+              <div class="org-tree__identity">
+                <pci-badge variant="accent">Direção</pci-badge>
+                <div class="org-tree__text">
+                  <span class="org-tree__name">{{ dir.nome }}</span>
+                  <span class="org-tree__meta">
+                    {{ dir.sigla }} ·
+                    {{ chefiaMeta(dir) }}
+                  </span>
+                </div>
+              </div>
+              <div class="org-tree__actions">
+                @if (canEditSetor) {
+                  <pci-tooltip text="Editar direção" position="top">
+                    <pci-icon-button
+                      pciTooltipChild
+                      icon="edit"
+                      ariaLabel="Editar direção"
+                      (clicked)="editarSetor(dir.id)"
+                    />
+                  </pci-tooltip>
+                }
+              </div>
+            </div>
+          </li>
+        }
+
+        @for (nucleo of nucleos(); track nucleo.id) {
+          <li class="org-tree__nucleo" role="treeitem" [attr.aria-expanded]="isExpanded(nucleo.id)">
+            <div class="org-tree__row org-tree__row--nucleo">
+              <button
+                type="button"
+                class="org-tree__toggle"
+                [attr.aria-label]="isExpanded(nucleo.id) ? 'Recolher núcleo' : 'Expandir núcleo'"
+                (click)="toggle(nucleo.id)"
+              >
+                <pci-icon
+                  [name]="isExpanded(nucleo.id) ? 'chevron-down' : 'chevron-right'"
+                  size="sm"
+                />
+              </button>
+
+              <div class="org-tree__identity">
+                <pci-badge variant="secondary">Núcleo</pci-badge>
+                <div class="org-tree__text">
+                  <span class="org-tree__name">{{ nucleo.nome }}</span>
+                  <span class="org-tree__meta">
+                    {{ nucleo.sigla }} · {{ setorCountLabel(nucleo) }}
+                    @if (nucleo.chefeNome) {
+                      · Chefe: {{ nucleo.chefeNome }}
+                    } @else {
+                      · Sem chefe
+                    }
+                  </span>
+                </div>
+              </div>
+
+              <div class="org-tree__actions">
+                @if (canCreateSetor) {
+                  <pci-tooltip text="Adicionar setor neste núcleo" position="top">
+                    <pci-icon-button
+                      pciTooltipChild
+                      icon="plus"
+                      ariaLabel="Adicionar setor neste núcleo"
+                      (clicked)="novoSetorNoNucleo(nucleo.id)"
+                    />
+                  </pci-tooltip>
+                }
+                @if (canEditNucleo) {
+                  <pci-tooltip text="Editar núcleo" position="top">
+                    <pci-icon-button
+                      pciTooltipChild
+                      icon="edit"
+                      ariaLabel="Editar núcleo"
+                      (clicked)="editarNucleo(nucleo.id)"
+                    />
+                  </pci-tooltip>
+                }
+                @if (canDeleteNucleo) {
+                  <pci-tooltip text="Excluir núcleo" position="top">
+                    <pci-icon-button
+                      pciTooltipChild
+                      icon="trash"
+                      ariaLabel="Excluir núcleo"
+                      (clicked)="excluirNucleo(nucleo)"
+                    />
+                  </pci-tooltip>
+                }
+              </div>
+            </div>
+
+            @if (isExpanded(nucleo.id)) {
+              <ul class="org-tree__children" role="group">
+                @if (nucleo.setores.length === 0) {
+                  <li class="org-tree__empty-child">
+                    <span class="org-tree__branch" aria-hidden="true">└</span>
+                    <span class="org__empty">Nenhum setor neste núcleo.</span>
+                    @if (canCreateSetor) {
+                      <button type="button" class="org-tree__link" (click)="novoSetorNoNucleo(nucleo.id)">
+                        Adicionar setor
+                      </button>
+                    }
+                  </li>
+                } @else {
+                  @for (setor of nucleo.setores; track setor.id; let last = $last) {
+                    <li class="org-tree__setor" role="treeitem">
+                      <div class="org-tree__row org-tree__row--setor">
+                        <span class="org-tree__branch" aria-hidden="true">{{ last ? '└' : '├' }}</span>
+                        <div class="org-tree__identity">
+                          <pci-badge variant="outline">Setor</pci-badge>
+                          <div class="org-tree__text">
+                            <span class="org-tree__name">{{ setor.nome }}</span>
+                            <span class="org-tree__meta">
+                              {{ setor.sigla }}{{ chefiaMeta(setor) }}
+                            </span>
+                          </div>
+                        </div>
+                        <div class="org-tree__actions">
+                          @if (canEditSetor) {
+                            <pci-tooltip text="Editar setor" position="top">
+                              <pci-icon-button
+                                pciTooltipChild
+                                icon="edit"
+                                ariaLabel="Editar setor"
+                                (clicked)="editarSetor(setor.id)"
+                              />
+                            </pci-tooltip>
+                          }
+                          @if (canDeleteSetor) {
+                            <pci-tooltip text="Excluir setor" position="top">
+                              <pci-icon-button
+                                pciTooltipChild
+                                icon="trash"
+                                ariaLabel="Excluir setor"
+                                (clicked)="excluirSetor(setor)"
+                              />
+                            </pci-tooltip>
+                          }
+                        </div>
+                      </div>
+                    </li>
+                  }
+                }
+              </ul>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</div>

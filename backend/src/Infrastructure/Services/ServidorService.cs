@@ -1,10 +1,12 @@
 using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
 using TemplateSistema.Application.Abstractions;
+using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Application.Servidores;
 using TemplateSistema.Domain.Entities;
 using TemplateSistema.Domain.Enums;
+using TemplateSistema.Infrastructure.Security;
 using TemplateSistema.Persistence;
 
 namespace TemplateSistema.Infrastructure.Services;
@@ -31,40 +33,24 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         bool? semUsuario = null,
         CancellationToken cancellationToken = default)
     {
-        var normalized = actorLogin.Trim().ToLowerInvariant();
-        var usuario = await db.Usuarios
-            .AsNoTracking()
-            .Include(x => x.UsuarioPerfis).ThenInclude(x => x.Perfil)
-            .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
-
-        if (usuario is null)
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        if (actor.UsuarioId == Guid.Empty)
         {
             return [];
         }
 
-        var isSuper = usuario.UsuarioPerfis.Any(x =>
-            x.Perfil.Ativo && x.Perfil.Codigo == PerfilCodes.SuperAdministrador);
-
-        // SuperAdmin: todos. Demais (inclui Direção IC): somente setores de chefia —
-        // criar/editar afastamento não usa visão global.
-        if (isSuper)
+        var query = LoadQuery();
+        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Servidores);
+        if (setoresVisiveis is not null)
         {
-            return await ListAsync(semUsuario, cancellationToken);
+            if (setoresVisiveis.Count == 0)
+            {
+                return [];
+            }
+
+            query = query.Where(x => setoresVisiveis.Contains(x.SetorId));
         }
 
-        var setorIds = await db.SetorChefias
-            .AsNoTracking()
-            .Where(x => x.ServidorId == usuario.ServidorId)
-            .Select(x => x.SetorId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (setorIds.Count == 0)
-        {
-            return [];
-        }
-
-        var query = LoadQuery().Where(x => setorIds.Contains(x.SetorId));
         if (semUsuario == true)
         {
             query = query.Where(x => x.Usuario == null && x.Status == StatusServidor.Ativo);
@@ -74,12 +60,24 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         return items.Select(Map).ToList();
     }
 
-    public async Task<Result<ServidorListItemDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Result<ServidorListItemDto>> GetByIdAsync(
+        Guid id,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
     {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var servidor = await LoadQuery().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        return servidor is null
-            ? Result<ServidorListItemDto>.Failure("Servidor não encontrado.")
-            : Result<ServidorListItemDto>.Success(Map(servidor));
+        if (servidor is null)
+        {
+            return Result<ServidorListItemDto>.Failure("Servidor não encontrado.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.ServidoresListar, servidor.SetorId))
+        {
+            return Result<ServidorListItemDto>.Failure("Sem permissão para este servidor.");
+        }
+
+        return Result<ServidorListItemDto>.Success(Map(servidor));
     }
 
     public async Task<Result<ServidorListItemDto>> CreateAsync(
@@ -87,6 +85,12 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        if (!actor.PodeAcessar(PermissionCodes.ServidoresCriar, request.SetorId))
+        {
+            return Result<ServidorListItemDto>.Failure("Sem permissão para cadastrar servidor neste setor.");
+        }
+
         var validation = await ValidateAsync(
             request.Nome,
             request.Cpf,
@@ -118,7 +122,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
 
         db.Servidores.Add(servidor);
         await db.SaveChangesAsync(cancellationToken);
-        return await GetByIdAsync(servidor.Id, cancellationToken);
+        return await GetByIdAsync(servidor.Id, actorLogin, cancellationToken);
     }
 
     public async Task<Result<ServidorListItemDto>> UpdateAsync(
@@ -127,10 +131,17 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (servidor is null)
         {
             return Result<ServidorListItemDto>.Failure("Servidor não encontrado.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.ServidoresEditar, servidor.SetorId)
+            || !actor.PodeAcessar(PermissionCodes.ServidoresEditar, request.SetorId))
+        {
+            return Result<ServidorListItemDto>.Failure("Sem permissão para alterar servidor neste setor.");
         }
 
         var validation = await ValidateAsync(
@@ -167,29 +178,42 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         servidor.DefinirStatus(request.Status, actorLogin);
 
         await db.SaveChangesAsync(cancellationToken);
-        return await GetByIdAsync(id, cancellationToken);
+        return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
     public async Task<Result<ServidorExclusaoImpactoDto>> GetExclusaoImpactoAsync(
         Guid id,
+        string actorLogin,
         CancellationToken cancellationToken = default)
     {
-        var exists = await db.Servidores.AsNoTracking().AnyAsync(x => x.Id == id, cancellationToken);
-        if (!exists)
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        var servidor = await db.Servidores.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (servidor is null)
         {
             return Result<ServidorExclusaoImpactoDto>.Failure("Servidor não encontrado.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.ServidoresExcluir, servidor.SetorId))
+        {
+            return Result<ServidorExclusaoImpactoDto>.Failure("Sem permissão para excluir servidor neste setor.");
         }
 
         var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
         return Result<ServidorExclusaoImpactoDto>.Success(impacto);
     }
 
-    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default)
     {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (servidor is null)
         {
             return Result.Failure("Servidor não encontrado.");
+        }
+
+        if (!actor.PodeAcessar(PermissionCodes.ServidoresExcluir, servidor.SetorId))
+        {
+            return Result.Failure("Sem permissão para excluir servidor neste setor.");
         }
 
         var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
@@ -204,6 +228,9 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
+
+    private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
+        ActorContextLoader.LoadAsync(db, login, cancellationToken);
 
     private async Task<ServidorExclusaoImpactoDto> BuildExclusaoImpactoAsync(
         Guid id,
@@ -229,7 +256,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         string nome,
         string cpfRaw,
         string matricula,
-        string email,
+        string? email,
         string? telefone,
         DateOnly dataNascimento,
         Guid cargoId,

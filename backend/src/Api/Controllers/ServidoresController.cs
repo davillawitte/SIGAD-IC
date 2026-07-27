@@ -32,7 +32,7 @@ public class ServidoresController(IServidorService servidorService) : Controller
     [RequiresPermission(PermissionCodes.ServidoresListar)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await servidorService.GetByIdAsync(id, cancellationToken);
+        var result = await servidorService.GetByIdAsync(id, User.GetLogin(), cancellationToken);
         return result.Succeeded ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
 
@@ -58,7 +58,7 @@ public class ServidoresController(IServidorService servidorService) : Controller
     [RequiresPermission(PermissionCodes.ServidoresExcluir)]
     public async Task<IActionResult> GetExclusaoImpacto(Guid id, CancellationToken cancellationToken)
     {
-        var result = await servidorService.GetExclusaoImpactoAsync(id, cancellationToken);
+        var result = await servidorService.GetExclusaoImpactoAsync(id, User.GetLogin(), cancellationToken);
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
@@ -66,7 +66,7 @@ public class ServidoresController(IServidorService servidorService) : Controller
     [RequiresPermission(PermissionCodes.ServidoresExcluir)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var result = await servidorService.DeleteAsync(id, cancellationToken);
+        var result = await servidorService.DeleteAsync(id, User.GetLogin(), cancellationToken);
         return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
     }
 }

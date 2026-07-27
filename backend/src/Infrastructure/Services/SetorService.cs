@@ -23,20 +23,11 @@ public class SetorService(ApplicationDbContext db) : ISetorService
         var normalized = actorLogin.Trim().ToLowerInvariant();
         var usuario = await db.Usuarios
             .AsNoTracking()
-            .Include(x => x.UsuarioPerfis).ThenInclude(x => x.Perfil)
             .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
 
         if (usuario is null)
         {
             return [];
-        }
-
-        var isSuper = usuario.UsuarioPerfis.Any(x =>
-            x.Perfil.Ativo && x.Perfil.Codigo == PerfilCodes.SuperAdministrador);
-
-        if (isSuper)
-        {
-            return await ListAsync(cancellationToken);
         }
 
         var setorIds = await db.SetorChefias

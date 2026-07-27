@@ -1,0 +1,46 @@
+.perm-matrix-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.perm-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.perm-matrix th,
+.perm-matrix td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--pci-color-border, #e4e7ec);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.perm-matrix thead th {
+  font-weight: 600;
+  color: var(--pci-color-text-secondary, #475467);
+  white-space: nowrap;
+  background: var(--pci-color-background-muted, #f9fafb);
+}
+
+.perm-matrix tbody th {
+  font-weight: 600;
+  color: var(--pci-color-text-primary, #101828);
+  white-space: nowrap;
+}
+
+.perm-matrix__na {
+  color: var(--pci-color-text-disabled, #98a2b3);
+}
+
+.perm-matrix__extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.perm-matrix__abrangencia {
+  min-width: 11rem;
+  display: block;
+}

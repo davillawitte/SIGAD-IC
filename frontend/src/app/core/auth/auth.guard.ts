@@ -75,7 +75,7 @@ export const permissionGuard = (code: string): CanActivateFn => {
     const auth = inject(AuthService);
     const router = inject(Router);
 
-    if (auth.isAuthenticated() && (auth.isSuperAdmin() || auth.hasPermission(code))) {
+    if (auth.isAuthenticated() && auth.hasPermission(code)) {
       return true;
     }
 
@@ -88,10 +88,7 @@ export const anyPermissionGuard = (...codes: string[]): CanActivateFn => {
     const auth = inject(AuthService);
     const router = inject(Router);
 
-    if (
-      auth.isAuthenticated() &&
-      (auth.isSuperAdmin() || codes.some((code) => auth.hasPermission(code)))
-    ) {
+    if (auth.isAuthenticated() && codes.some((code) => auth.hasPermission(code))) {
       return true;
     }
 

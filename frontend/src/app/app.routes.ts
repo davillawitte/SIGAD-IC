@@ -7,14 +7,14 @@ export const routes: Routes = [
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () =>
-      import('./features/auth/pages/login/login.component').then((m) => m.LoginComponent),
+      import('./features/auth/pages/login-form/login-form').then((m) => m.LoginForm),
   },
   {
     path: 'trocar-senha',
     canActivate: [mustChangePasswordGuard],
     loadComponent: () =>
-      import('./features/auth/pages/trocar-senha/trocar-senha-page.component').then(
-        (m) => m.TrocarSenhaPageComponent,
+      import('./features/auth/pages/trocar-senha-form/trocar-senha-form').then(
+        (m) => m.TrocarSenhaForm,
       ),
   },
   {
@@ -39,6 +39,11 @@ export const routes: Routes = [
       {
         path: '',
         loadChildren: () =>
+          import('./features/afastamentos/afastamentos.routes').then((m) => m.AFASTAMENTOS_ROUTES),
+      },
+      {
+        path: '',
+        loadChildren: () =>
           import('./features/gestao-setor/gestao-setor.routes').then((m) => m.GESTAO_SETOR_ROUTES),
       },
     ],
@@ -46,8 +51,8 @@ export const routes: Routes = [
   {
     path: '**',
     loadComponent: () =>
-      import('./features/not-found/pages/not-found/not-found.component').then(
-        (m) => m.NotFoundComponent,
+      import('./features/not-found/pages/not-found/not-found').then(
+        (m) => m.NotFound,
       ),
   },
 ];

@@ -1,8 +1,13 @@
+using System.Net;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using TemplateSistema.Api.Authorization;
 using TemplateSistema.Application;
 using TemplateSistema.Infrastructure;
 using TemplateSistema.Persistence;
@@ -23,12 +28,51 @@ try
         .Enrich.FromLogContext()
         .WriteTo.Console());
 
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders =
+            ForwardedHeaders.XForwardedFor
+            | ForwardedHeaders.XForwardedProto
+            | ForwardedHeaders.XForwardedHost;
+
+        // Em produção o ASP.NET só vê o nginx interno; o IP real vem de X-Forwarded-*.
+        // Com ClearKnown* = true (docker-compose.prod), confiamos nos proxies da rede Docker.
+        if (builder.Configuration.GetValue("ForwardedHeaders:ClearKnownNetworks", false))
+        {
+            options.KnownIPNetworks.Clear();
+        }
+
+        if (builder.Configuration.GetValue("ForwardedHeaders:ClearKnownProxies", false))
+        {
+            options.KnownProxies.Clear();
+        }
+
+        foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+        {
+            if (IPAddress.TryParse(proxy, out var ip))
+            {
+                options.KnownProxies.Add(ip);
+            }
+        }
+
+        foreach (var cidr in builder.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [])
+        {
+            if (System.Net.IPNetwork.TryParse(cidr, out var network))
+            {
+                options.KnownIPNetworks.Add(network);
+            }
+        }
+    });
+
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+    builder.Services.AddSingleton<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
 
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
+            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         });
@@ -79,6 +123,9 @@ try
     });
 
     var app = builder.Build();
+
+    // Precisa ser o primeiro middleware: rate limit / auth usam o IP e o scheme reais.
+    app.UseForwardedHeaders();
 
     if (app.Environment.IsDevelopment()
         || app.Environment.IsEnvironment("Docker")

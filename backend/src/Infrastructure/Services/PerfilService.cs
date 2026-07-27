@@ -3,6 +3,7 @@ using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Application.Perfis;
 using TemplateSistema.Domain.Entities;
+using TemplateSistema.Domain.Enums;
 using TemplateSistema.Infrastructure.Common;
 using TemplateSistema.Persistence;
 
@@ -10,6 +11,9 @@ namespace TemplateSistema.Infrastructure.Services;
 
 public class PerfilService(ApplicationDbContext db) : IPerfilService
 {
+    private const string PermissaoAdminNaoDelegavel =
+        "Permissões de Administração do Sistema não podem ser atribuídas a outros perfis. Elas são exclusivas do Super Administrador.";
+
     public async Task<PagedResult<PerfilListItemDto>> ListAsync(
         PaginationQuery pagination,
         CancellationToken cancellationToken = default)
@@ -62,13 +66,24 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
 
         if (request.PermissaoIds is { Count: > 0 })
         {
-            var validIds = await ValidatePermissaoIdsAsync(request.PermissaoIds, cancellationToken);
-            if (validIds is null)
+            var permissoes = await ResolvePermissoesAsync(request.PermissaoIds, cancellationToken);
+            if (permissoes is null)
             {
                 return Result<PerfilDetailDto>.Failure("Uma ou mais permissões são inválidas.");
             }
 
-            perfil.DefinirPermissoes(validIds, actorLogin);
+            if (ContemAdministracaoDoSistema(permissoes))
+            {
+                return Result<PerfilDetailDto>.Failure(PermissaoAdminNaoDelegavel);
+            }
+
+            foreach (var permissao in permissoes)
+            {
+                var abr = ResolveAbrangencia(permissao, request.AbrangenciaPorPermissao);
+                perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissao.Id, abr));
+            }
+
+            perfil.MarkUpdated(actorLogin);
         }
 
         db.Perfis.Add(perfil);
@@ -226,16 +241,22 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
                 "As permissões do Super Administrador não podem ser alteradas. Este perfil possui acesso total.");
         }
 
-        var validIds = await ValidatePermissaoIdsAsync(request.PermissaoIds, cancellationToken);
-        if (validIds is null)
+        var permissoes = await ResolvePermissoesAsync(request.PermissaoIds, cancellationToken);
+        if (permissoes is null)
         {
             return Result<PerfilDetailDto>.Failure("Uma ou mais permissões são inválidas.");
         }
 
-        db.PerfilPermissoes.RemoveRange(perfil.PerfilPermissoes);
-        foreach (var permissaoId in validIds)
+        if (ContemAdministracaoDoSistema(permissoes))
         {
-            perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissaoId));
+            return Result<PerfilDetailDto>.Failure(PermissaoAdminNaoDelegavel);
+        }
+
+        db.PerfilPermissoes.RemoveRange(perfil.PerfilPermissoes);
+        foreach (var permissao in permissoes)
+        {
+            var abr = ResolveAbrangencia(permissao, request.AbrangenciaPorPermissao);
+            perfil.PerfilPermissoes.Add(PerfilPermissao.Create(perfil.Id, permissao.Id, abr));
         }
 
         perfil.MarkUpdated(actorLogin);
@@ -278,17 +299,46 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
         return candidate;
     }
 
-    private async Task<List<Guid>?> ValidatePermissaoIdsAsync(
+    private async Task<List<Permissao>?> ResolvePermissoesAsync(
         IReadOnlyList<Guid> permissaoIds,
         CancellationToken cancellationToken)
     {
         var distinct = permissaoIds.Distinct().ToList();
         var valid = await db.Permissoes
+            .AsNoTracking()
             .Where(x => distinct.Contains(x.Id) && x.Ativo)
-            .Select(x => x.Id)
             .ToListAsync(cancellationToken);
 
         return valid.Count == distinct.Count ? valid : null;
+    }
+
+    /// <summary>
+    /// Permissões de Administração do Sistema não são delegáveis: só o Super Administrador
+    /// (perfil de sistema, sincronizado pelo seed) as possui.
+    /// </summary>
+    private static bool ContemAdministracaoDoSistema(IEnumerable<Permissao> permissoes) =>
+        permissoes.Any(x =>
+            string.Equals(x.Area, PermissionAreas.AdministracaoDoSistema, StringComparison.Ordinal)
+            || PermissionCodes.IsAdministracaoDoSistema(x.Codigo));
+
+    private static Abrangencia ResolveAbrangencia(
+        Permissao permissao,
+        IReadOnlyDictionary<string, Abrangencia>? porCodigo)
+    {
+        if (PermissionModules.SemAbrangencia.Contains(permissao.Modulo))
+        {
+            return Abrangencia.MeusSetores;
+        }
+
+        if (porCodigo is not null
+            && (porCodigo.TryGetValue(permissao.Codigo, out var byCode)
+                || porCodigo.TryGetValue(permissao.Codigo.ToLowerInvariant(), out byCode))
+            && Enum.IsDefined(byCode))
+        {
+            return byCode;
+        }
+
+        return Abrangencia.MeusSetores;
     }
 
     private async Task<Perfil?> LoadAsync(Guid id, CancellationToken cancellationToken) =>
@@ -306,5 +356,8 @@ public class PerfilService(ApplicationDbContext db) : IPerfilService
             perfil.Sistema,
             perfil.Ativo,
             perfil.PerfilPermissoes.Select(x => x.PermissaoId).ToList(),
-            perfil.PerfilPermissoes.Select(x => x.Permissao.Codigo).OrderBy(x => x).ToList());
+            perfil.PerfilPermissoes.Select(x => x.Permissao.Codigo).OrderBy(x => x).ToList(),
+            perfil.PerfilPermissoes
+                .Where(x => x.Abrangencia != Abrangencia.MeusSetores)
+                .ToDictionary(x => x.Permissao.Codigo, x => x.Abrangencia, StringComparer.OrdinalIgnoreCase));
 }

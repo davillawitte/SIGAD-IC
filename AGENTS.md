@@ -21,3 +21,37 @@ Só use Angular Material cru, HTML custom ou CSS próprio quando **não existir*
 1. Consultar exports do pacote `@davillawitte/pci-design-system`.
 2. Seguir o mesmo padrão visual das telas já alinhadas à lib.
 3. Não reinventar controles que a lib já oferece.
+
+## Organização de features (frontend)
+
+Cada feature em `frontend/src/app/features/<feature>/`:
+
+```text
+pages/
+  <nome>-list/     # listagem/consulta → .ts + .html + .scss
+  <nome>-form/     # cadastro/edição (wizard em etapas e cópia também são form)
+  <nome>-detail/   # só visualização, quando não for list nem form
+components/        # pedaços reutilizáveis (pasta por componente)
+services/
+models/
+<feature>.routes.ts
+```
+
+- Lista → `*-list/`. Cadastra/edita → `*-form/`.
+- Sempre `templateUrl` / `styleUrl` externos (proibido HTML/CSS inline no `.ts`).
+- Arquivos **sem** sufixo `.component` (`escala-list.ts`, não `escala-list.component.ts`).
+- Detalhe da regra: `.cursor/rules/frontend-feature-layout.mdc`.
+
+### Ao implementar uma funcionalidade:
+1. Verifique se o projeto compila sem erros.
+2. Execute os testes automatizados existentes.
+3. Verifique se as APIs afetadas continuam funcionando.
+4. Verifique se as funcionalidades relacionadas à alteração continuam funcionando.
+5. Não altere funcionalidades existentes sem necessidade.
+6. Se uma alteração puder causar impacto em outra área do sistema,
+   faça uma análise de regressão.
+7. Informe no final:
+   - O que foi alterado;
+   - Quais testes foram executados;
+   - Quais áreas foram verificadas;
+   - Se existe algum risco de regressão.

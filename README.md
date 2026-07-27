@@ -137,6 +137,12 @@ docker compose up --build
 docker compose down
 ```
 
+### Produção (mesma máquina que o gestao-SCFA)
+
+O SCFA permanece em **:80**. O SIGAD sobe em **:8080** via nginx de borda, sem alterar o SCFA.
+
+Ver [docs/deploy-prod.md](docs/deploy-prod.md) e `./scripts/docker-up-prod.sh`.
+
 ## Testes
 
 ```bash

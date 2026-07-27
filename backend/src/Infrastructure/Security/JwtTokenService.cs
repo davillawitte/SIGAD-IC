@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Auth;
+using TemplateSistema.Application.Common;
 
 namespace TemplateSistema.Infrastructure.Security;
 
@@ -15,6 +16,9 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
     public (string Token, DateTime ExpiresAtUtc) CreateToken(UsuarioAuthDto usuario)
     {
         var expires = DateTime.UtcNow.AddMinutes(_options.ExpirationMinutes);
+        var isSuperAdmin = usuario.Perfis.Any(p =>
+            string.Equals(p, PerfilCodes.SuperAdministrador, StringComparison.OrdinalIgnoreCase));
+
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
@@ -22,6 +26,7 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
             new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
             new(ClaimTypes.Name, usuario.Nome),
             new("login", usuario.Login),
+            new("is_super_admin", isSuperAdmin ? "true" : "false"),
         };
 
         claims.Add(new Claim("servidorId", usuario.ServidorId.ToString()));
