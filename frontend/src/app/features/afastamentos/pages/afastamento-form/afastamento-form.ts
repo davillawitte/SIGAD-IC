@@ -73,13 +73,15 @@ export class AfastamentoForm implements OnInit {
 
     this.adminApi.listMeusServidores().subscribe({
       next: (servidores) => {
-        const doSetor = servidores.filter((s) =>
-          this.auth.canAccess('afastamentos.criar', s.setorId),
+        const doSetor = servidores.filter(
+          (s) => !!s.setorId && this.auth.canAccess('afastamentos.criar', s.setorId),
         );
 
         this.servidorSetorById.clear();
         for (const s of doSetor) {
-          this.servidorSetorById.set(s.id, s.setorId);
+          if (s.setorId) {
+            this.servidorSetorById.set(s.id, s.setorId);
+          }
         }
 
         this.servidorOptions.set(

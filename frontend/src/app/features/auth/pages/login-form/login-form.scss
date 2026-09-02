@@ -1,0 +1,15 @@
+.app-login-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+
+  p {
+    margin: 0;
+  }
+}

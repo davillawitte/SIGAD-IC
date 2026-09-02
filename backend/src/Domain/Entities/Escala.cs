@@ -5,7 +5,8 @@ namespace TemplateSistema.Domain.Entities;
 
 public class Escala : BaseEntity
 {
-    public Guid SetorId { get; private set; }
+    public Guid? SetorId { get; private set; }
+    public Guid? NucleoId { get; private set; }
     public int Ano { get; private set; }
     public int Mes { get; private set; }
     public TipoFuncionamento TipoFuncionamento { get; private set; } = TipoFuncionamento.Expediente;
@@ -14,7 +15,8 @@ public class Escala : BaseEntity
     public DateTime? PublicadaEm { get; private set; }
     public string? PublicadaPor { get; private set; }
 
-    public Setor Setor { get; private set; } = null!;
+    public Setor? Setor { get; private set; }
+    public Nucleo? Nucleo { get; private set; }
     public ICollection<EscalaServidor> Servidores { get; private set; } = [];
     public ICollection<SolicitacaoDevolucaoEscala> SolicitacoesDevolucao { get; private set; } = [];
 
@@ -28,18 +30,21 @@ public class Escala : BaseEntity
     }
 
     public static Escala Create(
-        Guid setorId,
+        Guid? setorId,
+        Guid? nucleoId,
         int ano,
         int mes,
         TipoFuncionamento tipoFuncionamento = TipoFuncionamento.Expediente,
         string? observacao = null,
         string? createdBy = null)
     {
+        ValidateLotacao(setorId, nucleoId);
         ValidatePeriodo(ano, mes);
 
         var escala = new Escala
         {
             SetorId = setorId,
+            NucleoId = nucleoId,
             Ano = ano,
             Mes = mes,
             TipoFuncionamento = tipoFuncionamento,
@@ -49,6 +54,15 @@ public class Escala : BaseEntity
 
         escala.MarkCreated(createdBy);
         return escala;
+    }
+
+    private static void ValidateLotacao(Guid? setorId, Guid? nucleoId)
+    {
+        if (setorId.HasValue == nucleoId.HasValue)
+        {
+            throw new ArgumentException(
+                "Informe o setor da escala ou o núcleo da escala, nunca os dois nem nenhum.");
+        }
     }
 
     public void Atualizar(

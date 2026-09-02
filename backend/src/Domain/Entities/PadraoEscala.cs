@@ -15,6 +15,10 @@ public class PadraoEscala : BaseEntity
     public string? DiasSemana { get; private set; }
     public string TipoOcorrenciaTrabalho { get; private set; } = null!;
     public string TipoOcorrenciaFolga { get; private set; } = null!;
+
+    /// <summary>Só usado quando <c>RecorrenciaTipo == CicloPersonalizado</c>: sequência de
+    /// códigos de ocorrência, um por dia do ciclo (ex.: "PT,D,D,D,TL12,D").</summary>
+    public string? SequenciaCiclo { get; private set; }
     public TimeOnly? HoraInicioPadrao { get; private set; }
     public TimeOnly? HoraFimPadrao { get; private set; }
     public decimal? HorasPadrao { get; private set; }
@@ -39,6 +43,7 @@ public class PadraoEscala : BaseEntity
         int? diasTrabalho = null,
         int? diasFolga = null,
         string? diasSemana = null,
+        string? sequenciaCiclo = null,
         TimeOnly? horaInicioPadrao = null,
         TimeOnly? horaFimPadrao = null,
         decimal? horasPadrao = null,
@@ -59,6 +64,7 @@ public class PadraoEscala : BaseEntity
             DiasSemana = string.IsNullOrWhiteSpace(diasSemana) ? null : diasSemana.Trim(),
             TipoOcorrenciaTrabalho = tipoOcorrenciaTrabalho.Trim().ToUpperInvariant(),
             TipoOcorrenciaFolga = tipoOcorrenciaFolga.Trim().ToUpperInvariant(),
+            SequenciaCiclo = string.IsNullOrWhiteSpace(sequenciaCiclo) ? null : sequenciaCiclo.Trim().ToUpperInvariant(),
             HoraInicioPadrao = horaInicioPadrao,
             HoraFimPadrao = horaFimPadrao,
             HorasPadrao = horasPadrao,

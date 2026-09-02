@@ -37,6 +37,7 @@ type ServidorRow = {
   setor: string;
   setorId: string;
   email: string;
+  usuario: string;
   status: string;
 };
 
@@ -110,6 +111,7 @@ export class ServidorList implements OnInit {
     { key: 'cargo', label: 'Cargo' },
     { key: 'setor', label: 'Setor' },
     { key: 'email', label: 'E-mail' },
+    { key: 'usuario', label: 'Usuário' },
     { key: 'status', label: 'Status' },
   ];
 
@@ -299,9 +301,10 @@ export class ServidorList implements OnInit {
             nome: s.nome,
             matricula: s.matricula,
             cargo: s.cargo,
-            setor: s.setorNome,
-            setorId: s.setorId,
+            setor: s.setorNome ?? (s.nucleoNome ? `${s.nucleoNome} (núcleo)` : '—'),
+            setorId: s.setorId ?? '',
             email: s.email ?? '',
+            usuario: !s.possuiUsuario ? 'Sem usuário' : s.usuarioAtivo ? 'Ativo' : 'Inativo',
             status: s.status,
           })),
         );

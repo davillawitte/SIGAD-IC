@@ -30,6 +30,15 @@ public sealed class CenarioBuilder(ApplicationDbContext db, Cargo cargo)
         return setor;
     }
 
+    /// <summary>Setor que pertence a um núcleo — servidores lotados aqui também são
+    /// visíveis pra quem chefia o núcleo (não só pra quem chefia o setor).</summary>
+    public Setor AdicionarSetor(string nome, string sigla, Nucleo nucleo)
+    {
+        var setor = Setor.Create(nome, sigla, nucleo.Id, createdBy: "teste");
+        db.Setores.Add(setor);
+        return setor;
+    }
+
     /// <summary>
     /// A sigla precisa ser exatamente a esperada por <see cref="SetorSiglas.IsDirecaoIc"/>,
     /// que hoje decide por comparação de string.
@@ -47,6 +56,26 @@ public sealed class CenarioBuilder(ApplicationDbContext db, Cargo cargo)
             cargoId: cargo.Id,
             email: null,
             setorId: setor.Id,
+            nucleoId: null,
+            dataNascimento: new DateOnly(1990, 1, 1),
+            status: status,
+            createdBy: "teste");
+        db.Servidores.Add(servidor);
+        return servidor;
+    }
+
+    /// <summary>Servidor lotado direto no núcleo (chefe de núcleo ou sem setor específico).</summary>
+    public Servidor AdicionarServidorNoNucleo(Nucleo nucleo, string nome, StatusServidor status = StatusServidor.Ativo)
+    {
+        var n = Interlocked.Increment(ref _sequencial);
+        var servidor = Servidor.Create(
+            nome,
+            matricula: $"{n / 1000 % 1000:000}.{n % 1000:000}-0",
+            cpf: $"{n:00000000000}",
+            cargoId: cargo.Id,
+            email: null,
+            setorId: null,
+            nucleoId: nucleo.Id,
             dataNascimento: new DateOnly(1990, 1, 1),
             status: status,
             createdBy: "teste");
@@ -86,13 +115,31 @@ public sealed class CenarioBuilder(ApplicationDbContext db, Cargo cargo)
         return chefia;
     }
 
+    public Nucleo AdicionarNucleo(string nome, string sigla, Guid? chefeServidorId = null)
+    {
+        var nucleo = Nucleo.Create(nome, sigla, chefeServidorId, createdBy: "teste");
+        db.Nucleos.Add(nucleo);
+        return nucleo;
+    }
+
     public Escala AdicionarEscala(
         Setor setor,
         int ano,
         int mes,
         TipoFuncionamento tipoFuncionamento = TipoFuncionamento.Expediente)
     {
-        var escala = Escala.Create(setor.Id, ano, mes, tipoFuncionamento, observacao: null, createdBy: "teste");
+        var escala = Escala.Create(setor.Id, null, ano, mes, tipoFuncionamento, observacao: null, createdBy: "teste");
+        db.Escalas.Add(escala);
+        return escala;
+    }
+
+    public Escala AdicionarEscalaDeNucleo(
+        Nucleo nucleo,
+        int ano,
+        int mes,
+        TipoFuncionamento tipoFuncionamento = TipoFuncionamento.Expediente)
+    {
+        var escala = Escala.Create(null, nucleo.Id, ano, mes, tipoFuncionamento, observacao: null, createdBy: "teste");
         db.Escalas.Add(escala);
         return escala;
     }

@@ -152,7 +152,7 @@ export class PerfilList implements OnInit {
         this.allRows.set(
           result.items.map((p: PerfilListItem) => ({
             id: p.id,
-            nome: p.nome,
+            nome: this.displayPerfilNome(p.nome),
             descricao: p.descricao || '—',
             permissoes: String(p.quantidadePermissoes),
             status: p.ativo ? 'Ativo' : 'Inativo',
@@ -165,5 +165,11 @@ export class PerfilList implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  /** Só rótulo de exibição nesta listagem — o `Nome` real do perfil no banco continua "Chefe de
+   * Setor" (perfil também cobre chefia de núcleo, mas renomear o dado em si fica pra depois). */
+  private displayPerfilNome(nome: string): string {
+    return nome === 'Chefe de Setor' ? 'Chefe de Setor/Núcleo' : nome;
   }
 }

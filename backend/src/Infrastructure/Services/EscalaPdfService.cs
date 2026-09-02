@@ -61,14 +61,16 @@ public class EscalaPdfService(
             .ToDictionaryAsync(x => x.Codigo, StringComparer.OrdinalIgnoreCase, cancellationToken);
         var brasaoPci = LoadImageBytes("logo-pci-govrn-footer.png");
         var brasaoRn = LoadImageBytes("brasao-rn.png");
+        var chefe = await ResolveChefeAsync(escala.SetorId, escala.NucleoId, cancellationToken);
         var isHorizontal = !string.Equals(layout, "vertical", StringComparison.OrdinalIgnoreCase);
 
         var bytes = isHorizontal
-            ? BuildHorizontal(escala, tipos, brasaoPci, brasaoRn)
-            : BuildVertical(escala, tipos, brasaoPci, brasaoRn);
+            ? BuildHorizontal(escala, tipos, brasaoPci, brasaoRn, chefe)
+            : BuildVertical(escala, tipos, brasaoPci, brasaoRn, chefe);
 
         var suffix = isHorizontal ? "horizontal" : "vertical";
-        var fileName = $"escala-{escala.SetorSigla}-{escala.Ano}-{escala.Mes:00}-{suffix}.pdf"
+        var sigla = escala.SetorSigla ?? escala.NucleoSigla ?? "escala";
+        var fileName = $"escala-{sigla}-{escala.Ano}-{escala.Mes:00}-{suffix}.pdf"
             .Replace(" ", "-");
 
         return Result<(byte[], string)>.Success((bytes, fileName));
@@ -78,6 +80,49 @@ public class EscalaPdfService(
         !string.IsNullOrWhiteSpace(error)
         && (error.Contains("Sem permissão", StringComparison.OrdinalIgnoreCase)
             || error.Contains("só pode ser alterada", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Chefia imediata do setor (ou Diretor, se o setor for a Direção IC) — ou o chefe
+    /// do núcleo, quando a escala é de núcleo. `null` se não houver chefia cadastrada.</summary>
+    private async Task<(string Nome, string Matricula)?> ResolveChefeAsync(
+        Guid? setorId, Guid? nucleoId, CancellationToken cancellationToken)
+    {
+        if (setorId is Guid s)
+        {
+            var sigla = await db.Setores
+                .Where(x => x.Id == s)
+                .Select(x => x.Sigla)
+                .FirstOrDefaultAsync(cancellationToken);
+            var tipo = SetorSiglas.IsDirecaoIc(sigla) ? TipoChefia.Diretor : TipoChefia.ChefiaImediata;
+
+            var chefia = await db.SetorChefias
+                .Where(x => x.SetorId == s && x.TipoChefia == tipo)
+                .Select(x => new { x.Servidor.Nome, x.Servidor.Matricula })
+                .FirstOrDefaultAsync(cancellationToken);
+            return chefia is null ? null : (chefia.Nome, chefia.Matricula);
+        }
+
+        if (nucleoId is Guid n)
+        {
+            var chefe = await db.Nucleos
+                .Where(x => x.Id == n && x.ChefeServidorId != null)
+                .Select(x => new { x.ChefeServidor!.Nome, x.ChefeServidor.Matricula })
+                .FirstOrDefaultAsync(cancellationToken);
+            return chefe is null ? null : (chefe.Nome, chefe.Matricula);
+        }
+
+        return null;
+    }
+
+    private static void ComposeSignature(
+        ColumnDescriptor col, (string Nome, string Matricula)? chefe, string unidadeLabel)
+    {
+        col.Item().PaddingTop(16).AlignCenter().Column(sig =>
+        {
+            sig.Item().AlignCenter().Text(
+                chefe is null ? "—" : $"{chefe.Value.Nome} - {chefe.Value.Matricula}").FontSize(9);
+            sig.Item().AlignCenter().Text($"Chefe do {unidadeLabel}").FontSize(8);
+        });
+    }
 
     private byte[]? LoadImageBytes(string fileName)
     {
@@ -137,11 +182,13 @@ public class EscalaPdfService(
         var cargos = string.Join(", ", cargosFn().Where(x => !string.IsNullOrWhiteSpace(x)).Distinct());
         col.Item().Text(
             $"Ano: {escala.Ano}  |  Mês: {MesNome(escala.Mes)}  |  Instituto/Regional: IC/Natal");
+        var unidadeNome = escala.SetorNome ?? escala.NucleoNome;
+        var unidadeSigla = escala.SetorSigla ?? escala.NucleoSigla;
         col.Item().Text(
-            $"Setor/Núcleo: {escala.SetorNome} ({escala.SetorSigla})  |  " +
+            $"Setor/Núcleo: {unidadeNome} ({unidadeSigla})  |  " +
             $"Responsável: {escala.CreatedBy ?? "—"}");
         col.Item().Text($"Cargos: {(string.IsNullOrWhiteSpace(cargos) ? "—" : cargos)}");
-        col.Item().Text($"Gerado em {DateTime.Now:dd/MM/yyyy HH:mm}  |  Status: {escala.Status}");
+        col.Item().Text($"Gerado em {NowBrasil():dd/MM/yyyy HH:mm}  |  Status: {escala.Status}");
         col.Item().PaddingTop(6);
     }
 
@@ -149,7 +196,8 @@ public class EscalaPdfService(
         EscalaDetailDto escala,
         Dictionary<string, Domain.Entities.TipoOcorrencia> tipos,
         byte[]? brasaoPci,
-        byte[]? brasaoRn)
+        byte[]? brasaoRn,
+        (string Nome, string Matricula)? chefe)
     {
         var days = Enumerable
             .Range(0, escala.DataFim.DayNumber - escala.DataInicio.DayNumber + 1)
@@ -176,63 +224,69 @@ public class EscalaPdfService(
                         () => escala.Servidores.Select(s =>
                             string.IsNullOrWhiteSpace(s.CargoCodigo) ? s.CargoNome : s.CargoCodigo)));
 
-                page.Content().Table(table =>
+                page.Content().Column(content =>
                 {
-                    table.ColumnsDefinition(columns =>
+                    content.Item().Table(table =>
                     {
-                        columns.ConstantColumn(52);
-                        columns.RelativeColumn(2.2f);
-                        columns.ConstantColumn(36);
-                        foreach (var _ in days)
+                        table.ColumnsDefinition(columns =>
                         {
-                            columns.ConstantColumn(16);
-                        }
+                            columns.ConstantColumn(52);
+                            columns.RelativeColumn(2.2f);
+                            columns.ConstantColumn(36);
+                            foreach (var _ in days)
+                            {
+                                columns.ConstantColumn(16);
+                            }
 
-                        columns.ConstantColumn(28);
-                        columns.ConstantColumn(28);
+                            columns.ConstantColumn(28);
+                            columns.ConstantColumn(28);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(HeaderCell).Text("Matrícula");
+                            header.Cell().Element(HeaderCell).Text("Nome do Servidor");
+                            header.Cell().Element(HeaderCell).Text("Cargo");
+                            for (var i = 0; i < days.Count; i++)
+                            {
+                                var weekend = IsWeekend(days[i]);
+                                header.Cell().Element(c => DayHeaderCell(c, weekend)).AlignCenter()
+                                    .Text($"{days[i].Day}\n{weekLetters[i]}");
+                            }
+
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("CH Pres.");
+                            header.Cell().Element(HeaderCell).AlignCenter().Text("CH Rem.");
+                        });
+
+                        foreach (var s in servidores)
+                        {
+                            var map = s.Ocorrencias.ToDictionary(o => o.Data);
+                            var chPres = s.Ocorrencias
+                                .Where(o => IsPresencial(o.TipoOcorrenciaCodigo))
+                                .Sum(o => o.Horas ?? tipos.GetValueOrDefault(o.TipoOcorrenciaCodigo)?.HorasPadrao ?? 0);
+                            var chRem = s.Ocorrencias
+                                .Where(o => o.TipoOcorrenciaCodigo.StartsWith("TL", StringComparison.OrdinalIgnoreCase))
+                                .Sum(o => o.Horas ?? tipos.GetValueOrDefault(o.TipoOcorrenciaCodigo)?.HorasPadrao ?? 0);
+
+                            table.Cell().Element(BodyCell).Text(s.Matricula);
+                            table.Cell().Element(BodyCell).Text(s.ServidorNome);
+                            table.Cell().Element(BodyCell).Text(
+                                string.IsNullOrWhiteSpace(s.CargoCodigo) ? (s.CargoNome ?? "—") : s.CargoCodigo);
+
+                            foreach (var day in days)
+                            {
+                                var weekend = IsWeekend(day);
+                                var codigo = map.TryGetValue(day, out var oc) ? oc.TipoOcorrenciaCodigo : "";
+                                table.Cell().Element(c => DayBodyCell(c, weekend, codigo)).AlignCenter().Text(codigo);
+                            }
+
+                            table.Cell().Element(BodyCell).AlignCenter().Text($"{chPres:0}");
+                            table.Cell().Element(BodyCell).AlignCenter().Text($"{chRem:0}");
+                        }
                     });
 
-                    table.Header(header =>
-                    {
-                        header.Cell().Element(HeaderCell).Text("Matrícula");
-                        header.Cell().Element(HeaderCell).Text("Nome do Servidor");
-                        header.Cell().Element(HeaderCell).Text("Cargo");
-                        for (var i = 0; i < days.Count; i++)
-                        {
-                            var weekend = IsWeekend(days[i]);
-                            header.Cell().Element(c => DayHeaderCell(c, weekend)).AlignCenter()
-                                .Text($"{days[i].Day}\n{weekLetters[i]}");
-                        }
-
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("CH Pres.");
-                        header.Cell().Element(HeaderCell).AlignCenter().Text("CH Rem.");
-                    });
-
-                    foreach (var s in servidores)
-                    {
-                        var map = s.Ocorrencias.ToDictionary(o => o.Data);
-                        var chPres = s.Ocorrencias
-                            .Where(o => IsPresencial(o.TipoOcorrenciaCodigo))
-                            .Sum(o => o.Horas ?? tipos.GetValueOrDefault(o.TipoOcorrenciaCodigo)?.HorasPadrao ?? 0);
-                        var chRem = s.Ocorrencias
-                            .Where(o => o.TipoOcorrenciaCodigo.StartsWith("TL", StringComparison.OrdinalIgnoreCase))
-                            .Sum(o => o.Horas ?? tipos.GetValueOrDefault(o.TipoOcorrenciaCodigo)?.HorasPadrao ?? 0);
-
-                        table.Cell().Element(BodyCell).Text(s.Matricula);
-                        table.Cell().Element(BodyCell).Text(s.ServidorNome);
-                        table.Cell().Element(BodyCell).Text(
-                            string.IsNullOrWhiteSpace(s.CargoCodigo) ? (s.CargoNome ?? "—") : s.CargoCodigo);
-
-                        foreach (var day in days)
-                        {
-                            var weekend = IsWeekend(day);
-                            var codigo = map.TryGetValue(day, out var oc) ? oc.TipoOcorrenciaCodigo : "";
-                            table.Cell().Element(c => DayBodyCell(c, weekend, codigo)).AlignCenter().Text(codigo);
-                        }
-
-                        table.Cell().Element(BodyCell).AlignCenter().Text($"{chPres:0}");
-                        table.Cell().Element(BodyCell).AlignCenter().Text($"{chRem:0}");
-                    }
+                    content.Item().Column(sig => ComposeSignature(
+                        sig, chefe, escala.SetorNome ?? escala.NucleoNome ?? "—"));
                 });
 
                 page.Footer().PaddingTop(8).Text(text =>
@@ -248,7 +302,8 @@ public class EscalaPdfService(
         EscalaDetailDto escala,
         Dictionary<string, Domain.Entities.TipoOcorrencia> tipos,
         byte[]? brasaoPci,
-        byte[]? brasaoRn)
+        byte[]? brasaoRn,
+        (string Nome, string Matricula)? chefe)
     {
         var days = Enumerable
             .Range(0, escala.DataFim.DayNumber - escala.DataInicio.DayNumber + 1)
@@ -273,44 +328,55 @@ public class EscalaPdfService(
                         () => escala.Servidores.Select(s =>
                             string.IsNullOrWhiteSpace(s.CargoCodigo) ? s.CargoNome : s.CargoCodigo)));
 
-                page.Content().Table(table =>
+                page.Content().Column(content =>
                 {
-                    table.ColumnsDefinition(columns =>
+                    content.Item().Table(table =>
                     {
-                        columns.ConstantColumn(70);
-                        foreach (var _ in servidores)
+                        table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn();
+                            columns.ConstantColumn(70);
+                            foreach (var _ in servidores)
+                            {
+                                columns.RelativeColumn();
+                            }
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(HeaderCell).Text("Data");
+                            foreach (var s in servidores)
+                            {
+                                var cargo = string.IsNullOrWhiteSpace(s.CargoCodigo) ? s.CargoNome : s.CargoCodigo;
+                                header.Cell().Element(HeaderCell)
+                                    .Text($"{cargo} — {s.ServidorNome} — Mat. {s.Matricula}");
+                            }
+                        });
+
+                        foreach (var day in days)
+                        {
+                            table.Cell().Element(BodyCell).Text(FormatVerticalDate(day));
+                            foreach (var s in servidores)
+                            {
+                                var oc = s.Ocorrencias.FirstOrDefault(o => o.Data == day);
+                                var codigo = oc?.TipoOcorrenciaCodigo ?? "—";
+                                var weekend = IsWeekend(day);
+                                table.Cell().Element(c => DayBodyCell(c, weekend, oc?.TipoOcorrenciaCodigo ?? ""))
+                                    .Text(codigo);
+                            }
                         }
                     });
 
-                    table.Header(header =>
-                    {
-                        header.Cell().Element(HeaderCell).Text("Data");
-                        foreach (var s in servidores)
-                        {
-                            var cargo = string.IsNullOrWhiteSpace(s.CargoCodigo) ? s.CargoNome : s.CargoCodigo;
-                            header.Cell().Element(HeaderCell)
-                                .Text($"{cargo} — {s.ServidorNome} — Mat. {s.Matricula}");
-                        }
-                    });
-
-                    foreach (var day in days)
-                    {
-                        table.Cell().Element(BodyCell).Text(FormatVerticalDate(day));
-                        foreach (var s in servidores)
-                        {
-                            var oc = s.Ocorrencias.FirstOrDefault(o => o.Data == day);
-                            var codigo = oc?.TipoOcorrenciaCodigo ?? "—";
-                            var weekend = IsWeekend(day);
-                            table.Cell().Element(c => DayBodyCell(c, weekend, oc?.TipoOcorrenciaCodigo ?? ""))
-                                .Text(codigo);
-                        }
-                    }
+                    content.Item().Column(sig => ComposeSignature(
+                        sig, chefe, escala.SetorNome ?? escala.NucleoNome ?? "—"));
                 });
             });
         }).GeneratePdf();
     }
+
+    /// <summary>O servidor roda em UTC (container Docker) — Brasil (RN) é sempre UTC-3, sem
+    /// horário de verão desde 2019, então um offset fixo é mais robusto do que depender do
+    /// tz database do ambiente (IANA/Windows).</summary>
+    private static DateTime NowBrasil() => DateTime.UtcNow.AddHours(-3);
 
     private static bool IsPresencial(string codigo) =>
         !codigo.StartsWith("TL", StringComparison.OrdinalIgnoreCase)

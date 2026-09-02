@@ -26,7 +26,8 @@ public class EscalaJornadaExpanderTests
         int? diasTrabalho = null,
         int? diasFolga = null,
         string? codigoFolga = null,
-        DateOnly? dataInicioCiclo = null) =>
+        DateOnly? dataInicioCiclo = null,
+        string? sequenciaCiclo = null) =>
         EscalaJornada.Create(
             escalaServidorId: Guid.NewGuid(),
             tipoJornada: TipoJornada.Plantao,
@@ -39,6 +40,7 @@ public class EscalaJornadaExpanderTests
             diasTrabalho: diasTrabalho,
             diasFolga: diasFolga,
             tipoOcorrenciaFolgaCodigo: codigoFolga,
+            sequenciaCiclo: sequenciaCiclo,
             dataInicioCiclo: dataInicioCiclo);
 
     [Fact]
@@ -205,6 +207,37 @@ public class EscalaJornadaExpanderTests
             dataInicioCiclo: Quarta);
 
         EscalaJornadaExpander.Expand(jornada).Select(x => x.Codigo).ShouldBe(["PT", "F"]);
+    }
+
+    [Fact]
+    public void Ciclo_personalizado_expande_a_sequencia_de_fases_e_repete_o_ciclo()
+    {
+        // Modelo dos peritos: 24h trabalho (PT), 72h folga, 12h laudo (TL12), 36h folga —
+        // 6 unidades de dia no ciclo, cada uma com seu próprio código.
+        var jornada = Jornada(
+            Quarta,
+            Quarta.AddDays(6),
+            RecorrenciaTipo.CicloPersonalizado,
+            sequenciaCiclo: "PT,D,D,D,TL12,D",
+            dataInicioCiclo: Quarta);
+
+        var resultado = EscalaJornadaExpander.Expand(jornada).ToList();
+
+        resultado.Select(x => x.Codigo).ShouldBe(["PT", "D", "D", "D", "TL12", "D", "PT"]);
+        resultado.Select(x => x.IsTrabalho).ShouldBe([true, false, false, false, true, false, true]);
+    }
+
+    [Fact]
+    public void Ciclo_personalizado_sem_sequencia_nao_emite_nada()
+    {
+        var jornada = Jornada(
+            Quarta,
+            Quarta.AddDays(2),
+            RecorrenciaTipo.CicloPersonalizado,
+            sequenciaCiclo: null,
+            dataInicioCiclo: Quarta);
+
+        EscalaJornadaExpander.Expand(jornada).ShouldBeEmpty();
     }
 
     [Fact]

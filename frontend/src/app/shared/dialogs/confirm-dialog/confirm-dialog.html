@@ -1,11 +1,24 @@
 <div class="pci-app-dialog">
-  <h2 class="pci-app-dialog__title">{{ data.title }}</h2>
-  <pci-form-card>
-    <p class="pci-app-dialog__message">{{ data.message }}</p>
-  </pci-form-card>
+  <app-dialog-header
+    [icon]="data.icon || (data.danger ? 'alert' : 'help-circle')"
+    [title]="data.title"
+    (closed)="cancel()"
+  />
+
+  <div class="pci-app-dialog__info-box">
+    <pci-icon [name]="data.danger ? 'alert' : 'info'" size="md" />
+    <p>{{ data.message }}</p>
+  </div>
+  @if (data.onViewDetails) {
+    <button type="button" class="pci-app-dialog__link" (click)="data.onViewDetails!()">
+      {{ data.viewDetailsLabel || 'Clique aqui para visualizar' }}
+    </button>
+  }
+
   <pci-form-actions>
     <pci-button variant="ghost" (clicked)="cancel()">{{ data.cancelLabel || 'Cancelar' }}</pci-button>
     <pci-button [variant]="data.danger ? 'danger' : 'primary'" (clicked)="confirm()">
+      <pci-icon slot="icon-left" [name]="data.icon || (data.danger ? 'trash' : 'check')" size="sm" />
       {{ data.confirmLabel || 'Confirmar' }}
     </pci-button>
   </pci-form-actions>

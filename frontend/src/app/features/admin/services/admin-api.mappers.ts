@@ -8,6 +8,13 @@ function normalizeGuid(value: unknown): string {
   return String(value ?? '').toLowerCase();
 }
 
+function normalizeGuidOrNull(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return String(value).toLowerCase();
+}
+
 /** Normaliza resposta da API (camelCase ou PascalCase legado). */
 export function mapServidorListItem(raw: unknown): ServidorListItem {
   const r = raw as Record<string, unknown>;
@@ -25,9 +32,12 @@ export function mapServidorListItem(raw: unknown): ServidorListItem {
     email: email ?? '',
     telefone: (pick<string | null>(r, 'telefone', 'Telefone') ?? null) || null,
     dataNascimento,
-    setorId: normalizeGuid(pick(r, 'setorId', 'SetorId')),
-    setorNome: String(pick(r, 'setorNome', 'SetorNome') ?? ''),
+    setorId: normalizeGuidOrNull(pick(r, 'setorId', 'SetorId')),
+    setorNome: (pick<string | null>(r, 'setorNome', 'SetorNome') ?? null) || null,
+    nucleoId: normalizeGuidOrNull(pick(r, 'nucleoId', 'NucleoId')),
+    nucleoNome: (pick<string | null>(r, 'nucleoNome', 'NucleoNome') ?? null) || null,
     possuiUsuario: Boolean(pick(r, 'possuiUsuario', 'PossuiUsuario')),
+    usuarioAtivo: Boolean(pick(r, 'usuarioAtivo', 'UsuarioAtivo')),
     status: (pick(r, 'status', 'Status') ?? 'Ativo') as StatusServidor,
   };
 }

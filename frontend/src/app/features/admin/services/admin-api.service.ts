@@ -195,6 +195,11 @@ export class AdminApiService {
     return this.http.get<NucleoListItem[]>(`${this.base}/api/nucleos`);
   }
 
+  /** Núcleos que o usuário chefia (Nucleo.ChefeServidorId). */
+  listMeusNucleos(): Observable<NucleoListItem[]> {
+    return this.http.get<NucleoListItem[]>(`${this.base}/api/nucleos/meus`);
+  }
+
   getNucleo(id: string): Observable<NucleoDetail> {
     return this.http.get<NucleoDetail>(`${this.base}/api/nucleos/${id}`);
   }

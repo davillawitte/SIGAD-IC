@@ -1,6 +1,6 @@
 <div class="escala-detail">
   @if (escala(); as e) {
-    <pci-page-header [title]="pageTitle()" [description]="e.setorNome">
+    <pci-page-header [title]="pageTitle()" [description]="unidadeLabel()">
       <pci-stack slot="actions" gap="2" direction="horizontal" class="escala-detail__header-actions">
         <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
       </pci-stack>

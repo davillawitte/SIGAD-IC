@@ -11,6 +11,7 @@ public static class TipoOcorrenciaSeed
         ("M", "Manhã 6h", CategoriaOcorrencia.Trabalho, 6m),
         ("T", "Tarde 6h", CategoriaOcorrencia.Trabalho, 6m),
         ("TL6", "Teletrabalho 6h", CategoriaOcorrencia.Trabalho, 6m),
+        ("TL12", "Teletrabalho 12h (laudo)", CategoriaOcorrencia.Trabalho, 12m),
         ("PD", "Plantão Diurno 12h", CategoriaOcorrencia.Trabalho, 12m),
         ("PN", "Plantão Noturno 12h", CategoriaOcorrencia.Trabalho, 12m),
         ("PT", "Plantão 24h", CategoriaOcorrencia.Trabalho, 24m),

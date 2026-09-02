@@ -1,0 +1,151 @@
+.escala-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #f3f4f6;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.escala-doc__scroll {
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #111;
+}
+
+.escala-doc__table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 0.75rem;
+}
+
+.escala-doc__table th,
+.escala-doc__table td {
+  border: 1px solid #111;
+  padding: 0.25rem 0.4rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.escala-doc__table th {
+  background: #d0d5dd;
+  font-weight: 600;
+}
+
+.escala-doc__setor-header {
+  background: #98a2b3;
+  color: #fff;
+}
+
+.escala-doc__sticky {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+  min-width: 4.5rem;
+  box-shadow: 1px 0 0 0 #111;
+}
+
+.escala-doc__table thead .escala-doc__sticky {
+  background: #d0d5dd;
+  z-index: 4;
+}
+
+.escala-doc__table td.is-weekend {
+  background: #fef9c3;
+}
+
+.escala-doc__table td.is-do {
+  background: #fecaca;
+}
+
+.escala-doc__table td.is-manual:not(.is-do) {
+  background: #dbeafe;
+}
+
+.escala-doc__cell-select {
+  display: block;
+  width: 100%;
+  min-width: 6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid #d0d5dd;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: inherit;
+}
+
+.escala-doc__cell-select:focus {
+  outline: 1px solid var(--pci-color-primary, #1b3a5c);
+  outline-offset: -1px;
+}
+
+.escala-doc__hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #667085;
+}
+
+.escala-doc__cell-selects {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.escala-doc__cell-selects__row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.escala-doc__cell-select--segunda {
+  min-width: 5rem;
+}
+
+.escala-doc__segunda-pessoa-add {
+  display: block;
+  width: 100%;
+  border: 1px dashed #98a2b3;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: #667085;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.2rem;
+  cursor: pointer;
+}
+
+.escala-doc__segunda-pessoa-add:hover {
+  color: var(--pci-color-primary, #1b3a5c);
+  border-color: var(--pci-color-primary, #1b3a5c);
+}
+
+.escala-doc__segunda-pessoa-remover {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: #b42318;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+}
+
+.escala-doc__reverter-regra {
+  flex-shrink: 0;
+  border: 1px solid var(--pci-color-primary, #1b3a5c);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--pci-color-primary, #1b3a5c);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.1rem 0.25rem;
+}
+
+.escala-doc__reverter-regra:hover {
+  background: var(--pci-color-primary, #1b3a5c);
+  color: #fff;
+}

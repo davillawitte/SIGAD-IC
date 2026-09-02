@@ -21,9 +21,9 @@
       variant="success"
       title="Usuário criado"
       [message]="
-        'Usuário criado para o servidor. Senha temporária: ' +
+        'Usuário criado para o servidor. Senha inicial: o CPF do servidor (' +
         senha +
-        '. Anote e informe ao servidor — no primeiro acesso será solicitada a troca.'
+        '). Informe ao servidor — no primeiro acesso será solicitada a troca.'
       "
     />
     <pci-stack gap="2" direction="horizontal">
@@ -38,7 +38,7 @@
               [appFormCol]="12"
               variant="info"
               title="Nenhum servidor disponível"
-              message="Cadastre um servidor em Gestão Institucional → Servidores antes de criar o usuário."
+              message="Cadastre um servidor pelo botão abaixo, ou em Gestão Institucional → Servidores, antes de criar o usuário."
             />
           }
           <label [appFormCol]="12" class="pci-field">
@@ -58,11 +58,16 @@
               </mat-select>
             </div>
           </label>
+          <pci-stack [appFormCol]="12" gap="2" direction="horizontal">
+            <pci-button variant="ghost" size="sm" (clicked)="abrirNovoServidor()">
+              <pci-icon slot="icon-left" name="plus" size="sm" />Adicionar servidor
+            </pci-button>
+          </pci-stack>
           <pci-alert
             [appFormCol]="12"
             variant="info"
             title="Credenciais automáticas"
-            message="Login = CPF do servidor. Senha = primeiro nome + último nome + 3 primeiros dígitos do CPF."
+            message="Login = CPF do servidor. A senha é gerada automaticamente pelo sistema (aleatória) e exibida uma única vez após o cadastro — anote e informe ao servidor."
           />
         </app-form-section>
       } @else {

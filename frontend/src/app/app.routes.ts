@@ -1,8 +1,20 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, guestGuard, mustChangePasswordGuard, passwordOkGuard } from './core/auth/auth.guard';
+import {
+  authGuard,
+  guestGuard,
+  mustChangePasswordGuard,
+  passwordOkGuard,
+  setupGuard,
+} from './core/auth/auth.guard';
 
 export const routes: Routes = [
+  {
+    path: 'setup',
+    canActivate: [setupGuard],
+    loadComponent: () =>
+      import('./features/auth/pages/setup-wizard/setup-wizard').then((m) => m.SetupWizard),
+  },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -45,6 +57,13 @@ export const routes: Routes = [
         path: '',
         loadChildren: () =>
           import('./features/gestao-setor/gestao-setor.routes').then((m) => m.GESTAO_SETOR_ROUTES),
+      },
+      {
+        path: '',
+        loadChildren: () =>
+          import('./features/calendario-institucional/calendario-institucional.routes').then(
+            (m) => m.CALENDARIO_INSTITUCIONAL_ROUTES,
+          ),
       },
     ],
   },

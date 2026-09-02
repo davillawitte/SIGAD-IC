@@ -1,0 +1,25 @@
+<pci-form-page
+  title="Editar calendário"
+  description="Ajuste a observação deste ano do calendário institucional."
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Dados">
+      <pci-textarea
+        [appFormCol]="12"
+        label="Observação"
+        placeholder="Ex.: ano com feriado extra decretado por..."
+        [rows]="4"
+        formControlName="observacao"
+      />
+    </app-form-section>
+  </form>
+</pci-form-page>

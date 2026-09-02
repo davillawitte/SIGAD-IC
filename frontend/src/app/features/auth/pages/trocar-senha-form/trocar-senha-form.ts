@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, HostListener, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -7,10 +7,14 @@ import {
   PciAuthLayoutComponent,
   PciButtonComponent,
   PciInputComponent,
+  PciPanelBodyComponent,
+  PciPanelComponent,
+  PciPanelHeaderComponent,
   PciStackComponent,
 } from '@davillawitte/pci-design-system';
 
 import { AuthService } from '../../../../core/auth/auth.service';
+import { AppDialogHeaderComponent } from '../../../../shared/dialogs/dialog-header/dialog-header';
 
 @Component({
   selector: 'app-trocar-senha-form',
@@ -21,7 +25,11 @@ import { AuthService } from '../../../../core/auth/auth.service';
     PciAuthLayoutComponent,
     PciButtonComponent,
     PciInputComponent,
+    PciPanelBodyComponent,
+    PciPanelComponent,
+    PciPanelHeaderComponent,
     PciStackComponent,
+    AppDialogHeaderComponent,
   ],
   templateUrl: './trocar-senha-form.html',
   styleUrl: './trocar-senha-form.scss',
@@ -39,6 +47,21 @@ export class TrocarSenhaForm {
     novaSenha: ['', [Validators.required, Validators.minLength(8)]],
     confirmarSenha: ['', Validators.required],
   });
+
+  /** Contorna o desencontro entre autopreenchimento do navegador e o pci-input: quando o
+   * browser escreve no <input> nativo sem passar pelo Angular (ver `:-webkit-autofill` em
+   * trocar-senha-form.scss), disparamos um evento `input` sintético no mesmo elemento — o
+   * próprio `(input)="onInput($event)"` do pci-input cuida de sincronizar o FormControl a
+   * partir daí, sem eu precisar descobrir qual campo é qual. */
+  @HostListener('animationstart', ['$event'])
+  onAutofillAnimationStart(event: AnimationEvent): void {
+    if (event.animationName !== 'pciAutofillDetect') return;
+    event.target?.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  cancel(): void {
+    void this.router.navigateByUrl('/');
+  }
 
   submit(): void {
     this.form.markAllAsTouched();

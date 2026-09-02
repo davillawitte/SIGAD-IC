@@ -128,19 +128,26 @@ export interface ServidorListItem {
   email?: string | null;
   telefone?: string | null;
   dataNascimento: string;
-  setorId: string;
-  setorNome: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
   possuiUsuario: boolean;
+  usuarioAtivo: boolean;
   status: StatusServidor;
 }
 
+/** Informe setorId (lotação num setor) ou nucleoId (lotação direta no núcleo — servidor
+ * que atua em todos os setores do núcleo; não implica chefia, que é definida à parte
+ * em Setor.SetorChefia / Nucleo.ChefeServidorId), nunca os dois nem nenhum. */
 export interface CreateServidorPayload {
   nome: string;
   matricula: string;
   cpf: string;
   cargoId: string;
   email?: string | null;
-  setorId: string;
+  setorId?: string | null;
+  nucleoId?: string | null;
   dataNascimento: string;
   telefone?: string | null;
   status?: StatusServidor | null;
@@ -152,7 +159,8 @@ export interface UpdateServidorPayload {
   cpf: string;
   cargoId: string;
   email?: string | null;
-  setorId: string;
+  setorId?: string | null;
+  nucleoId?: string | null;
   dataNascimento: string;
   telefone?: string | null;
   status: StatusServidor;

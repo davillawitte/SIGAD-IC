@@ -133,7 +133,7 @@
 }
 
 .escala-doc__table td.is-selected {
-  outline: 2px solid #b8860b;
+  outline: 2px solid var(--pci-color-primary, #1b3a5c);
   outline-offset: -2px;
 }
 
@@ -147,7 +147,7 @@
 }
 
 .escala-doc__cell:focus {
-  outline: 1px solid #b8860b;
+  outline: 1px solid var(--pci-color-primary, #1b3a5c);
 }
 
 .escala-doc__sub {

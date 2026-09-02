@@ -7,12 +7,14 @@ import {
   PciButtonComponent,
   PciFormActionsComponent,
   PciFormCardComponent,
+  PciIconComponent,
   PciInputComponent,
   PciSelectComponent,
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
+import { AppDialogHeaderComponent } from '../../../../shared/dialogs/dialog-header/dialog-header';
 import {
   AfastamentoItem,
   AfastamentosApiService,
@@ -35,10 +37,12 @@ export interface AfastamentoDialogData {
     PciButtonComponent,
     PciFormCardComponent,
     PciFormActionsComponent,
+    PciIconComponent,
     PciInputComponent,
     PciSelectComponent,
     AppFormSectionComponent,
     AppFormColDirective,
+    AppDialogHeaderComponent,
   ],
   templateUrl: './afastamento-dialog.html',
 })
@@ -50,6 +54,7 @@ export class AfastamentoDialog implements OnInit {
 
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly created = signal<AfastamentoItem | null>(null);
 
   readonly tipoOptions: PciSelectOption[] = [
     { label: 'FR — Férias', value: 'FR' },
@@ -111,7 +116,10 @@ export class AfastamentoDialog implements OnInit {
         sei: value.sei.trim() || null,
       })
       .subscribe({
-        next: (item) => this.dialogRef.close(item),
+        next: (item) => {
+          this.saving.set(false);
+          this.created.set(item);
+        },
         error: (err: { error?: { message?: string } }) => {
           this.error.set(err.error?.message ?? 'Não foi possível salvar o afastamento.');
           this.saving.set(false);
@@ -121,5 +129,13 @@ export class AfastamentoDialog implements OnInit {
 
   cancel(): void {
     this.dialogRef.close(false);
+  }
+
+  concluir(): void {
+    this.dialogRef.close(this.created()!);
+  }
+
+  close(): void {
+    this.dialogRef.close(this.created() ?? false);
   }
 }

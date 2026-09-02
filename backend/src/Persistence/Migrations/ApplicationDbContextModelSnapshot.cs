@@ -76,6 +76,53 @@ namespace TemplateSistema.Persistence.Migrations
                     b.ToTable("Afastamento", "public");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.CalendarioAno", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Ano")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("PublicadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PublicadoPor")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Ano")
+                        .IsUnique();
+
+                    b.ToTable("CalendarioAno", "public");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Cargo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -138,6 +185,9 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<int>("Mes")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("NucleoId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Observacao")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -149,7 +199,7 @@ namespace TemplateSistema.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid>("SetorId")
+                    b.Property<Guid?>("SetorId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")
@@ -171,14 +221,22 @@ namespace TemplateSistema.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("NucleoId");
+
                     b.HasIndex("SetorId");
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("NucleoId", "Ano", "Mes")
+                        .IsUnique();
+
                     b.HasIndex("SetorId", "Ano", "Mes")
                         .IsUnique();
 
-                    b.ToTable("Escala", "public");
+                    b.ToTable("Escala", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_Escala_Lotacao_SetorOuNucleo", "(\"SetorId\" IS NOT NULL AND \"NucleoId\" IS NULL) OR (\"SetorId\" IS NULL AND \"NucleoId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaJornada", b =>
@@ -240,6 +298,10 @@ namespace TemplateSistema.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<string>("SequenciaCiclo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("TipoJornada")
                         .IsRequired()
@@ -340,6 +402,277 @@ namespace TemplateSistema.Persistence.Migrations
                     b.ToTable("EscalaOcorrencia", "public");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumida", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Ano")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("EscalaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Mes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("NucleoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("SetorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EscalaId");
+
+                    b.HasIndex("NucleoId");
+
+                    b.HasIndex("SetorId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("NucleoId", "Ano", "Mes")
+                        .IsUnique();
+
+                    b.HasIndex("SetorId", "Ano", "Mes")
+                        .IsUnique();
+
+                    b.ToTable("EscalaResumida", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaDia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateOnly>("Data")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("EscalaResumidaEquipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsFolga")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsFolga2")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("RotacaoMembroId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ServidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ServidorId2")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ServidorNomeSnapshot")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ServidorNomeSnapshot2")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("TextoLivre")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Data");
+
+                    b.HasIndex("RotacaoMembroId");
+
+                    b.HasIndex("ServidorId");
+
+                    b.HasIndex("ServidorId2");
+
+                    b.HasIndex("EscalaResumidaEquipeId", "Data")
+                        .IsUnique();
+
+                    b.ToTable("EscalaResumidaDia", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaEquipe", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateOnly?>("DataInicioCiclo")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("EscalaResumidaSetorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EscalaResumidaSetorId");
+
+                    b.ToTable("EscalaResumidaEquipe", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaRotacaoMembro", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("EscalaResumidaEquipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Posicao")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ServidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ServidorId2")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServidorId");
+
+                    b.HasIndex("ServidorId2");
+
+                    b.HasIndex("EscalaResumidaEquipeId", "Posicao")
+                        .IsUnique();
+
+                    b.ToTable("EscalaResumidaRotacaoMembro", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaSetor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("EscalaResumidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SetorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SetorNomeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SetorSiglaSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetorId");
+
+                    b.HasIndex("EscalaResumidaId", "SetorId")
+                        .IsUnique();
+
+                    b.ToTable("EscalaResumidaSetor", "public");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaServidor", b =>
                 {
                     b.Property<Guid>("Id")
@@ -402,6 +735,69 @@ namespace TemplateSistema.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("EscalaServidor", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.MarcacaoCalendario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CalendarioAnoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateOnly>("Data")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("DataFim")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Local")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PublicoAlvo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CalendarioAnoId", "Data");
+
+                    b.ToTable("MarcacaoCalendario", "public");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Nucleo", b =>
@@ -499,6 +895,10 @@ namespace TemplateSistema.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
+
+                    b.Property<string>("SequenciaCiclo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid?>("SetorId")
                         .HasColumnType("uuid");
@@ -716,7 +1116,10 @@ namespace TemplateSistema.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid>("SetorId")
+                    b.Property<Guid?>("NucleoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SetorId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Status")
@@ -747,11 +1150,16 @@ namespace TemplateSistema.Persistence.Migrations
                     b.HasIndex("Matricula")
                         .IsUnique();
 
+                    b.HasIndex("NucleoId");
+
                     b.HasIndex("SetorId");
 
                     b.HasIndex("Status");
 
-                    b.ToTable("Servidor", "public");
+                    b.ToTable("Servidor", "public", t =>
+                        {
+                            t.HasCheckConstraint("CK_Servidor_Lotacao_SetorOuNucleo", "(\"SetorId\" IS NOT NULL AND \"NucleoId\" IS NULL) OR (\"SetorId\" IS NULL AND \"NucleoId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Setor", b =>
@@ -820,6 +1228,44 @@ namespace TemplateSistema.Persistence.Migrations
                     b.HasIndex("ServidorId");
 
                     b.ToTable("SetorChefia", "public");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.SetupToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash");
+
+                    b.ToTable("SetupToken", "public");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.SolicitacaoDevolucaoEscala", b =>
@@ -994,11 +1440,17 @@ namespace TemplateSistema.Persistence.Migrations
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Escala", b =>
                 {
+                    b.HasOne("TemplateSistema.Domain.Entities.Nucleo", "Nucleo")
+                        .WithMany()
+                        .HasForeignKey("NucleoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
                         .WithMany()
                         .HasForeignKey("SetorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Nucleo");
 
                     b.Navigation("Setor");
                 });
@@ -1055,6 +1507,116 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Navigation("TipoOcorrencia");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumida", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.Escala", "Escala")
+                        .WithMany()
+                        .HasForeignKey("EscalaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Nucleo", "Nucleo")
+                        .WithMany()
+                        .HasForeignKey("NucleoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
+                        .WithMany()
+                        .HasForeignKey("SetorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Escala");
+
+                    b.Navigation("Nucleo");
+
+                    b.Navigation("Setor");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaDia", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.EscalaResumidaEquipe", "EscalaResumidaEquipe")
+                        .WithMany("Dias")
+                        .HasForeignKey("EscalaResumidaEquipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TemplateSistema.Domain.Entities.EscalaResumidaRotacaoMembro", "RotacaoMembro")
+                        .WithMany()
+                        .HasForeignKey("RotacaoMembroId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Servidor")
+                        .WithMany()
+                        .HasForeignKey("ServidorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Servidor2")
+                        .WithMany()
+                        .HasForeignKey("ServidorId2")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("EscalaResumidaEquipe");
+
+                    b.Navigation("RotacaoMembro");
+
+                    b.Navigation("Servidor");
+
+                    b.Navigation("Servidor2");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaEquipe", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.EscalaResumidaSetor", "EscalaResumidaSetor")
+                        .WithMany("Equipes")
+                        .HasForeignKey("EscalaResumidaSetorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EscalaResumidaSetor");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaRotacaoMembro", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.EscalaResumidaEquipe", "EscalaResumidaEquipe")
+                        .WithMany("Rotacao")
+                        .HasForeignKey("EscalaResumidaEquipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Servidor")
+                        .WithMany()
+                        .HasForeignKey("ServidorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Servidor2")
+                        .WithMany()
+                        .HasForeignKey("ServidorId2")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("EscalaResumidaEquipe");
+
+                    b.Navigation("Servidor");
+
+                    b.Navigation("Servidor2");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaSetor", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.EscalaResumida", "EscalaResumida")
+                        .WithMany("Setores")
+                        .HasForeignKey("EscalaResumidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
+                        .WithMany()
+                        .HasForeignKey("SetorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("EscalaResumida");
+
+                    b.Navigation("Setor");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaServidor", b =>
                 {
                     b.HasOne("TemplateSistema.Domain.Entities.Cargo", "Cargo")
@@ -1080,6 +1642,15 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Navigation("Escala");
 
                     b.Navigation("Servidor");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.MarcacaoCalendario", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.CalendarioAno", null)
+                        .WithMany()
+                        .HasForeignKey("CalendarioAnoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Nucleo", b =>
@@ -1129,13 +1700,19 @@ namespace TemplateSistema.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TemplateSistema.Domain.Entities.Nucleo", "Nucleo")
+                        .WithMany()
+                        .HasForeignKey("NucleoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TemplateSistema.Domain.Entities.Setor", "Setor")
                         .WithMany("Servidores")
                         .HasForeignKey("SetorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Cargo");
+
+                    b.Navigation("Nucleo");
 
                     b.Navigation("Setor");
                 });
@@ -1233,6 +1810,23 @@ namespace TemplateSistema.Persistence.Migrations
             modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaJornada", b =>
                 {
                     b.Navigation("Ocorrencias");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumida", b =>
+                {
+                    b.Navigation("Setores");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaEquipe", b =>
+                {
+                    b.Navigation("Dias");
+
+                    b.Navigation("Rotacao");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaResumidaSetor", b =>
+                {
+                    b.Navigation("Equipes");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.EscalaServidor", b =>

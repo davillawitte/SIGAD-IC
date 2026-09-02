@@ -1,0 +1,81 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  [attr.stroke-width]="strokeWidth"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  [attr.aria-hidden]="label ? null : 'true'"
+  [attr.aria-label]="label ?? null"
+>
+  @if (label) {
+    <title>{{ label }}</title>
+  }
+
+  @for (node of iconNodes; track $index) {
+    @switch (tag(node)) {
+      @case ('path') {
+        <path
+          [attr.d]="attr(node, 'd')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('circle') {
+        <circle
+          [attr.cx]="attr(node, 'cx')"
+          [attr.cy]="attr(node, 'cy')"
+          [attr.r]="attr(node, 'r')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('rect') {
+        <rect
+          [attr.x]="attr(node, 'x')"
+          [attr.y]="attr(node, 'y')"
+          [attr.width]="attr(node, 'width')"
+          [attr.height]="attr(node, 'height')"
+          [attr.rx]="attr(node, 'rx')"
+          [attr.ry]="attr(node, 'ry')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('line') {
+        <line
+          [attr.x1]="attr(node, 'x1')"
+          [attr.y1]="attr(node, 'y1')"
+          [attr.x2]="attr(node, 'x2')"
+          [attr.y2]="attr(node, 'y2')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('polyline') {
+        <polyline
+          [attr.points]="attr(node, 'points')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('polygon') {
+        <polygon
+          [attr.points]="attr(node, 'points')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+      @case ('ellipse') {
+        <ellipse
+          [attr.cx]="attr(node, 'cx')"
+          [attr.cy]="attr(node, 'cy')"
+          [attr.rx]="attr(node, 'rx')"
+          [attr.ry]="attr(node, 'ry')"
+          [attr.fill]="attr(node, 'fill')"
+          [attr.stroke]="attr(node, 'stroke')"
+        />
+      }
+    }
+  }
+</svg>

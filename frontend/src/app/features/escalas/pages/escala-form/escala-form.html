@@ -6,7 +6,9 @@
           Salvar rascunho
         </pci-button>
       }
-      <pci-button variant="ghost" (clicked)="cancelar()">Cancelar</pci-button>
+      <pci-button variant="ghost" (clicked)="cancelar()">
+        <pci-icon slot="icon-left" name="x" size="sm" />Cancelar
+      </pci-button>
     </pci-stack>
   </pci-page-header>
 
@@ -14,69 +16,102 @@
     <pci-alert variant="error" title="Atenção" [message]="error()!" />
   }
 
-  <pci-stepper
-    class="wizard-stepper"
-    [linear]="false"
-    [selectedIndex]="stepperIndex()"
-    (selectedIndexChange)="onStepperIndexChange($event)"
-  >
-    <pci-step label="Período" [completed]="step() > 1"></pci-step>
-    <pci-step label="Regimes e servidores" [completed]="step() > 2"></pci-step>
-    <pci-step label="Escala e Afastamentos" [completed]="step() > 3"></pci-step>
-    <pci-step label="Revisão" [completed]="false"></pci-step>
-  </pci-stepper>
+  <pci-card class="wizard-stepper-card">
+    <pci-card-content>
+      <pci-stepper
+        #stepperRef
+        class="wizard-stepper"
+        [linear]="false"
+        [selectedIndex]="stepperIndex()"
+        (selectedIndexChange)="onStepperIndexChange($event)"
+      >
+        <pci-step label="Período" [completed]="isStepPast('periodo')"></pci-step>
+        <pci-step label="Regimes e servidores" [completed]="isStepPast('servidores')"></pci-step>
+        @if (resumidaAtiva()) {
+          <pci-step label="Escala Resumida" [completed]="resumidaHandled()"></pci-step>
+        }
+        <pci-step label="Escala definitiva e Afastamentos" [completed]="isStepPast('afastamentos')"></pci-step>
+        <pci-step label="Revisão" [completed]="false"></pci-step>
+      </pci-stepper>
+    </pci-card-content>
+  </pci-card>
 
   <!-- ===================== STEP 1 ===================== -->
-  @if (step() === 1) {
+  @if (step() === 'periodo') {
     <div class="wizard-panel">
-      <form [formGroup]="step1Form">
-        <app-form-section title="Período da escala">
-          @if (showSetorSelect()) {
-            <pci-select
-              [appFormCol]="12"
-              label="Setor"
-              [required]="true"
-              formControlName="setorId"
-              [options]="setorOptions()"
-              placeholder="Selecione o setor"
-            />
-          } @else if (setorUnicoLabel(); as setorNome) {
-            <p [appFormCol]="12" class="wizard-hint">Setor: <strong>{{ setorNome }}</strong></p>
-          }
+      <form class="wizard-step1-form" [formGroup]="step1Form">
+        <pci-card>
+          <pci-card-content>
+            <h3>Período da escala</h3>
+            <div class="pci-form-group">
+              @if (showSetorSelect()) {
+                <pci-select
+                  [appFormCol]="12"
+                  label="Setor"
+                  [required]="true"
+                  formControlName="setorId"
+                  [options]="setorOptions()"
+                  placeholder="Selecione o setor"
+                />
+              } @else if (setorUnicoLabel(); as setorNome) {
+                <p [appFormCol]="12" class="wizard-hint">Setor: <strong>{{ setorNome }}</strong></p>
+              }
 
-          <pci-select
-            [appFormCol]="6"
-            label="Mês"
-            [required]="true"
-            formControlName="mes"
-            [options]="mesOptions"
-            placeholder="Selecione o mês"
-          />
-
-          <pci-input [appFormCol]="6" label="Ano" formControlName="ano" type="number" [required]="true" />
-        </app-form-section>
-
-        @if (!isEditMode()) {
-          <app-form-section
-            title="Copiar escala existente (opcional)"
-            description="Selecione uma escala do setor para reaproveitar regimes, servidores e continuidade de plantão no mês de destino. Sem seleção, a escala é montada do zero."
-          >
-            <pci-select
-              [appFormCol]="12"
-              label="Escala de origem"
-              formControlName="origemEscalaId"
-              [options]="origemOptions()"
-              placeholder="Não copiar — Criar integralmente"
-            />
-            @if (origemEscalaId()) {
-              <pci-alert
-                [appFormCol]="12"
-                variant="info"
-                title="Continuidade"
-                message="Plantões 12h/24h preservam o ciclo (trabalho/folga). Expediente administrativo (seg–sex) é recalculado para o mês destino."
+              <pci-select
+                [appFormCol]="6"
+                label="Mês"
+                [required]="true"
+                formControlName="mes"
+                [options]="mesOptions"
+                placeholder="Selecione o mês"
               />
-            }
-          </app-form-section>
+
+              <pci-input [appFormCol]="6" label="Ano" formControlName="ano" type="number" [required]="true" />
+            </div>
+          </pci-card-content>
+        </pci-card>
+
+        @if (!isEditMode() && !escalaDeNucleo()) {
+          <pci-card>
+            <pci-card-content>
+              <h3>Copiar escala existente (opcional)</h3>
+              <p>Selecione uma escala do setor para reaproveitar regimes, servidores e continuidade de plantão no mês de destino. Sem seleção, a escala é montada do zero.</p>
+              <div class="pci-form-group">
+                <pci-select
+                  [appFormCol]="12"
+                  label="Escala de origem"
+                  formControlName="origemEscalaId"
+                  [options]="origemOptions()"
+                  placeholder="Não copiar — Criar integralmente"
+                />
+                @if (origemEscalaId()) {
+                  <pci-alert
+                    [appFormCol]="12"
+                    variant="info"
+                    title="Continuidade"
+                    message="Plantões 12h/24h preservam o ciclo (trabalho/folga). Expediente administrativo (seg–sex) é recalculado para o mês destino."
+                  />
+                }
+              </div>
+            </pci-card-content>
+          </pci-card>
+        }
+
+        @if (podeCriarResumida()) {
+          <pci-card>
+            <pci-card-content>
+              <h3>Escala resumida (opcional)</h3>
+              <p>Planeje antes as equipes e o rodízio deste setor numa grade resumida — os servidores e dias já entram sugeridos no passo seguinte.</p>
+              <div class="pci-form-group">
+                <pci-checkbox
+                  [appFormCol]="12"
+                  label="Utilizar escala resumida"
+                  [checked]="usarEscalaResumida()"
+                  (changed)="step1Form.controls.usarEscalaResumida.setValue($event)"
+                />
+              </div>
+            </pci-card-content>
+          </pci-card>
         }
       </form>
 
@@ -88,45 +123,197 @@
         />
       }
 
-      <pci-stack gap="2" direction="horizontal">
-        <pci-button
-          variant="primary"
-          [loading]="working()"
-          [disabled]="step1Form.invalid || periodoDuplicado()"
-          (clicked)="continuar1()"
-        >
-          {{ origemEscalaId() ? 'Copiar e abrir matriz' : 'Continuar' }}
-        </pci-button>
-      </pci-stack>
+      <pci-card class="wizard-nav-card">
+        <pci-card-content>
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button
+              variant="primary"
+              [loading]="working()"
+              [disabled]="step1Form.invalid || periodoDuplicado()"
+              (clicked)="continuar1()"
+            >
+              {{ origemEscalaId() ? (resumidaDesejada() ? 'Copiar e continuar' : 'Copiar e abrir matriz') : 'Continuar' }}
+              <pci-icon slot="icon-right" name="arrow-right" size="sm" />
+            </pci-button>
+          </pci-stack>
+        </pci-card-content>
+      </pci-card>
     </div>
   }
 
   <!-- ===================== STEP 2 ===================== -->
-  @if (step() === 2) {
+  @if (step() === 'servidores') {
     <div class="wizard-panel">
-      <app-form-section title="Regimes de trabalho" description="Selecione um ou mais regimes utilizados nesta escala.">
-        <div [appFormCol]="12" class="wizard-checkbox-row">
-          @for (opt of regimeOptions; track opt.codigo) {
-            <pci-checkbox
-              [label]="opt.label"
-              [checked]="isRegimeSelected(opt.codigo)"
-              (changed)="toggleRegime(opt.codigo)"
-            />
-          }
-        </div>
-      </app-form-section>
+      <h2 class="wizard-step2__title">Servidores e tipo de regime</h2>
 
-      <app-form-section title="Servidores do setor" description="Selecione os servidores que participam da escala do mês referência.">
-        <div [appFormCol]="12" class="wizard-servidor-list" [formGroup]="inicioCicloForm">
-          @for (s of servidoresSetor(); track s.id) {
-            <div class="wizard-servidor-row">
-              <pci-checkbox
-                [label]="s.nome + ' — ' + s.matricula"
-                [checked]="isServidorSelected(s.id)"
-                (changed)="toggleServidor(s.id)"
-              />
-              @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id)) {
-                <div class="wizard-servidor-tarde">
+      <div class="wizard-step2">
+        <!-- Sem componente pronto de "painel com lista de ícone+texto" no design system —
+             composto com pci-card + pci-icon (regra do projeto: só foge do design system
+             quando não existe equivalente). -->
+        <aside class="wizard-info-panel">
+          <pci-card>
+            <pci-card-content>
+            <div class="wizard-info-panel__header">
+              <pci-icon name="users" size="md" />
+              <h3>Como funciona?</h3>
+            </div>
+
+            <dl class="wizard-info-panel__meta">
+              <div>
+                <dt>Período</dt>
+                <dd>{{ periodoLabel() }}</dd>
+              </div>
+              <div>
+                <dt>Setor</dt>
+                <dd>{{ setorAtualLabel() }}</dd>
+              </div>
+              <div>
+                <dt>Escala resumida</dt>
+                <dd>{{ resumidaAtiva() ? 'Sim' : 'Não' }}</dd>
+              </div>
+            </dl>
+
+            @if (resumidaAtiva()) {
+              <p>Defina o tipo de regime para cada servidor selecionado.</p>
+            } @else {
+              <p>Para cada servidor selecionado, defina o tipo de regime e a data de início do ciclo.</p>
+            }
+
+            <div class="wizard-info-panel__item">
+              <pci-icon name="calendar" size="sm" />
+              <div>
+                <strong>Tipo de regime</strong>
+                <p>Escolha o regime que o servidor cumprirá neste mês.</p>
+              </div>
+            </div>
+
+            @if (resumidaAtiva()) {
+              <div class="wizard-info-panel__item">
+                <pci-icon name="rotate" size="sm" />
+                <div>
+                  <strong>O que é a escala resumida?</strong>
+                  <p>
+                    Um planejamento prévio das equipes e do rodízio numa grade simples. Permite visualizar melhor os dias sem servidor escalado ou com necessidade de extra.
+                  </p>
+                  <p>
+                    Escala resumida é melhor utilizada em setores que possuem equipes fixas em um rodízio cíclico (ex.:
+                    plantões 12h/24h com várias equipes no mesmo dia).
+                  </p>
+                </div>
+              </div>
+            } @else {
+              <div class="wizard-info-panel__item">
+                <pci-icon name="rotate" size="sm" />
+                <div>
+                  <strong>Regime individual</strong>
+                  <p>
+                    Sem escala resumida, o regime e a data de início do ciclo de cada servidor são
+                    definidos um a um na lista ao lado, sem depender de um rodízio pré-configurado.
+                  </p>
+                </div>
+              </div>
+            }
+
+            @if (!resumidaAtiva()) {
+              <div class="wizard-info-panel__item">
+                <pci-icon name="refresh" size="sm" />
+                <div>
+                  <strong>Início do ciclo</strong>
+                  <p>Informe a data em que o ciclo de plantão do servidor começa.</p>
+                </div>
+              </div>
+            }
+
+            <!-- <div class="wizard-info-panel__item">
+              <pci-icon name="info" size="sm" />
+              <div>
+                <strong>Informação</strong>
+                <p>O ciclo será repetido automaticamente de acordo com o regime selecionado.</p>
+              </div>
+            </div> -->
+
+            <div class="wizard-info-panel__important">
+              <pci-icon name="info" size="sm" />
+              <p>
+                O ciclo será repetido automaticamente de acordo com o regime selecionado.
+              </p>
+            </div>
+            </pci-card-content>
+          </pci-card>
+        </aside>
+
+        <pci-card class="wizard-servidor-card-wrap">
+          <pci-card-content>
+          <section class="wizard-servidor-section" [formGroup]="inicioCicloForm">
+            <div class="wizard-servidor-section__header">
+              <span class="wizard-servidor-section__title">
+                <pci-icon name="users" size="sm" />
+                Servidores selecionados ({{ selectedServidorIds().size }})
+              </span>
+              <pci-stack gap="2" direction="horizontal">
+                <pci-button variant="secondary" size="sm" icon="check-circle" (clicked)="selecionarTodos()">
+                  Selecionar todos
+                </pci-button>
+                <pci-button variant="danger" size="sm" icon="trash" (clicked)="removerSelecionados()">
+                  Remover selecionados
+                </pci-button>
+              </pci-stack>
+            </div>
+
+            @for (s of servidoresSetor(); track s.id) {
+              <div class="wizard-servidor-card">
+                <pci-checkbox
+                  [checked]="isServidorSelected(s.id)"
+                  (changed)="toggleServidor(s.id)"
+                />
+                <pci-avatar [name]="s.nome" size="md" />
+                <div class="wizard-servidor-card__info">
+                  <strong>{{ s.nome }}</strong>
+                  <span>{{ s.matricula }}{{ !s.setorId ? ' (núcleo)' : '' }}</span>
+                </div>
+
+                @if (isServidorSelected(s.id) && regimeForm.contains(s.id)) {
+                  <div class="wizard-servidor-card__field" [formGroup]="regimeForm">
+                    <pci-select
+                      label="Tipo de regime"
+                      [required]="true"
+                      [options]="regimeSelectOptions"
+                      [formControlName]="s.id"
+                      placeholder="Selecione o regime"
+                    />
+                  </div>
+                } @else {
+                  <div class="wizard-servidor-card__field"></div>
+                }
+
+                @if (isServidorRegimeCiclico(s.id) && isServidorSelected(s.id) && inicioCicloForm.contains(s.id) && !resumidaAtiva()) {
+                  <div class="wizard-servidor-card__field">
+                    <pci-select
+                      label="Início do ciclo"
+                      [required]="true"
+                      [options]="inicioCicloOptions()"
+                      [formControlName]="s.id"
+                      placeholder="Selecione o dia"
+                    />
+                  </div>
+                } @else {
+                  <div class="wizard-servidor-card__field"></div>
+                }
+
+                @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id)) {
+                  <pci-icon-button
+                    [icon]="isServidorCardExpanded(s.id) ? 'chevron-up' : 'chevron-down'"
+                    variant="outline"
+                    size="sm"
+                    ariaLabel="Mais detalhes"
+                    (clicked)="toggleServidorCardExpanded(s.id)"
+                  />
+                } @else {
+                  <div class="wizard-servidor-card__toggle-spacer"></div>
+                }
+              </div>
+              @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id) && isServidorCardExpanded(s.id)) {
+                <div class="wizard-servidor-card__extra">
                   <span class="wizard-servidor-tarde__label">Expediente tarde (T)</span>
                   <div class="wizard-checkbox-row">
                     @for (wd of weekdayOptions; track wd.value) {
@@ -139,92 +326,177 @@
                   </div>
                 </div>
               }
-              @if (needsInicioCiclo() && isServidorSelected(s.id) && inicioCicloForm.contains(s.id)) {
-                <pci-select
-                  class="wizard-inicio-ciclo"
-                  label="Início do ciclo"
-                  [required]="true"
-                  [options]="inicioCicloOptions()"
-                  [formControlName]="s.id"
-                  placeholder="Selecione o dia"
-                />
-              }
-            </div>
-          } @empty {
-            <p class="wizard-hint">Nenhum servidor encontrado para este setor.</p>
-          }
-        </div>
-      </app-form-section>
+            } @empty {
+              <p class="wizard-hint">Nenhum servidor encontrado para este setor.</p>
+            }
+          </section>
+          </pci-card-content>
+        </pci-card>
+      </div>
 
-      <pci-stack gap="2" direction="horizontal">
-        @if (!periodLocked()) {
-          <pci-button variant="ghost" (clicked)="voltarStep(1)">Voltar</pci-button>
+      <pci-card class="wizard-nav-card">
+        <pci-card-content>
+        <pci-stack gap="2" direction="horizontal">
+          <pci-button variant="ghost" (clicked)="voltarStep('periodo')">
+            <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+          </pci-button>
+          <pci-button variant="primary" [loading]="working()" (clicked)="continuar2()">
+            Continuar<pci-icon slot="icon-right" name="arrow-right" size="sm" />
+          </pci-button>
+        </pci-stack>
+        </pci-card-content>
+      </pci-card>
+    </div>
+  }
+
+  <!-- ============= STEP OPCIONAL: ESCALA RESUMIDA ============= -->
+  @if (step() === 'resumida') {
+    <div class="wizard-panel">
+      <h2 class="wizard-step2__title">Escala Resumida (opcional)</h2>
+      <p>
+        {{
+          escalaDeNucleo()
+            ? 'Planeje as equipes e o rodízio dos setores do núcleo antes de continuar — os dados já entram sugeridos no passo seguinte.'
+            : podeGerenciarOutrosSetoresDoNucleo()
+              ? 'Você também gerencia o núcleo deste setor — pode incluir os demais setores do núcleo nesta mesma escala resumida antes de continuar.'
+              : 'Defina as equipes e o rodízio deste setor antes de continuar — os dados já entram sugeridos no passo seguinte.'
+        }}
+      </p>
+      <div class="pci-form-group">
+        @if (!resumidaEscala()) {
+          @if (resumidaAnteriorId()) {
+            <pci-alert
+              [appFormCol]="12"
+              variant="info"
+              title="Escala resumida anterior encontrada"
+              [message]="'Existe a escala resumida ' + resumidaAnteriorLabel() + '. Copiar a estrutura (setores, equipes e rodízio) e continuar o ciclo ou criar do zero?'"
+            />
+            <div [appFormCol]="12">
+              <pci-card class="wizard-nav-card">
+                <pci-card-content>
+                  <pci-stack gap="2" direction="horizontal">
+                    <pci-button variant="primary" [loading]="resumidaWorking()" (clicked)="copiarResumidaAnterior()">
+                      Copiar do mês anterior
+                    </pci-button>
+                    <pci-button variant="secondary" [loading]="resumidaWorking()" (clicked)="criarResumidaDoZero()">
+                      Criar do zero
+                    </pci-button>
+                    <pci-button variant="ghost" (clicked)="voltarResumida()">
+                      <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+                    </pci-button>
+                  </pci-stack>
+                </pci-card-content>
+              </pci-card>
+            </div>
+          } @else {
+            <p [appFormCol]="12" class="wizard-hint">Preparando a escala resumida…</p>
+            <div [appFormCol]="12">
+              <pci-card class="wizard-nav-card">
+                <pci-card-content>
+                  <pci-stack gap="2" direction="horizontal">
+                    <pci-button variant="ghost" (clicked)="voltarResumida()">
+                      <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+                    </pci-button>
+                  </pci-stack>
+                </pci-card-content>
+              </pci-card>
+            </div>
+          }
+        } @else {
+          <div [appFormCol]="12">
+            <app-escala-resumida-manager
+              [escala]="resumidaEscala()!"
+              [podeGerenciarSetores]="podeGerenciarOutrosSetoresDoNucleo()"
+              (escalaChange)="onResumidaChange($event)"
+            />
+          </div>
+          <div [appFormCol]="12">
+            <pci-card class="wizard-nav-card">
+              <pci-card-content>
+                <pci-stack gap="2" direction="horizontal">
+                  <pci-button variant="ghost" (clicked)="voltarResumida()">
+                    <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+                  </pci-button>
+                  <pci-button variant="primary" (clicked)="continuarResumida()">
+                    Continuar para Escala e Afastamentos<pci-icon slot="icon-right" name="arrow-right" size="sm" />
+                  </pci-button>
+                </pci-stack>
+              </pci-card-content>
+            </pci-card>
+          </div>
         }
-        <pci-button variant="primary" [loading]="working()" (clicked)="continuar2()">Continuar</pci-button>
-      </pci-stack>
+      </div>
     </div>
   }
 
   <!-- ===================== STEP 3 ===================== -->
-  @if (step() === 3) {
+  @if (step() === 'afastamentos') {
     <div class="wizard-panel">
-      <app-form-section title="Afastamentos no período">
-        <div [appFormCol]="12">
-          <pci-button variant="secondary" size="sm" (clicked)="openAfastamentoModal()">
-            Adicionar afastamento
-          </pci-button>
-        </div>
-        <div [appFormCol]="12">
-          @if (afastamentos().length) {
-            <table class="wizard-table">
-              <thead>
-                <tr>
-                  <th>Servidor</th>
-                  <th>Período</th>
-                  <th>Tipo</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (a of afastamentos(); track a.id) {
-                  <tr>
-                    <td>{{ a.servidorNome }}</td>
-                    <td>{{ fmt(a.dataInicio) }} – {{ fmt(a.dataFim) }}</td>
-                    <td>{{ a.tipoOcorrenciaNome }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          } @else {
-            <p class="wizard-hint">Nenhum afastamento registrado para os servidores desta escala no período.</p>
-          }
-        </div>
-      </app-form-section>
+      <pci-card>
+        <pci-card-content>
+          <h3>Afastamentos no período</h3>
+          <div class="pci-form-group">
+            <div [appFormCol]="12">
+              <pci-button variant="secondary" size="sm" (clicked)="openAfastamentoModal()">
+                Adicionar afastamento
+              </pci-button>
+            </div>
+            <div [appFormCol]="12">
+              @if (afastamentos().length) {
+                <table class="wizard-table">
+                  <thead>
+                    <tr>
+                      <th>Servidor</th>
+                      <th>Período</th>
+                      <th>Tipo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (a of afastamentos(); track a.id) {
+                      <tr>
+                        <td>{{ a.servidorNome }}</td>
+                        <td>{{ fmt(a.dataInicio) }} – {{ fmt(a.dataFim) }}</td>
+                        <td>{{ a.tipoOcorrenciaNome }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @else {
+                <p class="wizard-hint">Nenhum afastamento registrado para os servidores desta escala no período.</p>
+              }
+            </div>
+          </div>
+        </pci-card-content>
+      </pci-card>
 
       @if (hoServidores().length) {
-        <app-form-section
-          title="Home office (expediente administrativo)"
-          description="Selecione os dias da semana em teletrabalho por servidor e aplique. Servidores sem dias marcados não são alterados."
-        >
-          <div [appFormCol]="12" class="wizard-ho-list">
-            @for (s of hoServidores(); track s.servidorId) {
-              <div class="wizard-ho-row">
-                <strong>{{ s.servidorNome }}</strong>
-                <div class="wizard-checkbox-row">
-                  @for (wd of weekdayOptions; track wd.value) {
-                    <pci-checkbox
-                      [label]="wd.label"
-                      [checked]="isHomeOfficeDay(s.servidorId, wd.value)"
-                      (changed)="toggleHomeOfficeDay(s.servidorId, wd.value)"
-                    />
-                  }
-                </div>
+        <pci-card>
+          <pci-card-content>
+            <h3>Home office (expediente administrativo)</h3>
+            <p>Selecione os dias da semana em teletrabalho por servidor e aplique. Servidores sem dias marcados não são alterados.</p>
+            <div class="pci-form-group">
+              <div [appFormCol]="12" class="wizard-ho-list">
+                @for (s of hoServidores(); track s.servidorId) {
+                  <div class="wizard-ho-row">
+                    <strong>{{ s.servidorNome }}</strong>
+                    <div class="wizard-checkbox-row">
+                      @for (wd of weekdayOptions; track wd.value) {
+                        <pci-checkbox
+                          [label]="wd.label"
+                          [checked]="isHomeOfficeDay(s.servidorId, wd.value)"
+                          (changed)="toggleHomeOfficeDay(s.servidorId, wd.value)"
+                        />
+                      }
+                    </div>
+                  </div>
+                }
               </div>
-            }
-          </div>
-          <pci-button [appFormCol]="12" variant="secondary" (clicked)="aplicarHomeOffice()">
-            Aplicar home office
-          </pci-button>
-        </app-form-section>
+              <pci-button [appFormCol]="12" variant="secondary" (clicked)="aplicarHomeOffice()">
+                Aplicar home office
+              </pci-button>
+            </div>
+          </pci-card-content>
+        </pci-card>
       }
 
       <pci-tabs [selectedIndex]="step3TabIndex()" (selectedIndexChange)="onStep3TabIndexChange($event)">
@@ -287,15 +559,23 @@
         </div>
       }
 
-      <pci-stack gap="2" direction="horizontal">
-        <pci-button variant="ghost" (clicked)="voltarStep(2)">Voltar</pci-button>
-        <pci-button variant="primary" (clicked)="continuar3()">Continuar</pci-button>
-      </pci-stack>
+      <pci-card class="wizard-nav-card">
+        <pci-card-content>
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button variant="ghost" (clicked)="voltarDeStep3()">
+              <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+            </pci-button>
+            <pci-button variant="primary" (clicked)="continuar3()">
+              Continuar<pci-icon slot="icon-right" name="arrow-right" size="sm" />
+            </pci-button>
+          </pci-stack>
+        </pci-card-content>
+      </pci-card>
     </div>
   }
 
   <!-- ===================== STEP 4 ===================== -->
-  @if (step() === 4) {
+  @if (step() === 'revisao') {
     <div class="wizard-panel">
       @if (escala(); as e) {
         <pci-tabs [selectedIndex]="reviewTabIndex()" (selectedIndexChange)="onReviewTabIndexChange($event)">
@@ -316,13 +596,19 @@
           <app-escala-matrix [escala]="e" layout="vertical" />
         }
 
-        <pci-stack gap="2" direction="horizontal">
-          <pci-button variant="ghost" (clicked)="voltarStep(3)">Voltar</pci-button>
-          <pci-button variant="secondary" [loading]="working()" (clicked)="salvarRascunho()">
-            Salvar rascunho
-          </pci-button>
-          <pci-button variant="primary" [loading]="working()" (clicked)="finalizar()">Finalizar</pci-button>
-        </pci-stack>
+        <pci-card class="wizard-nav-card">
+          <pci-card-content>
+            <pci-stack gap="2" direction="horizontal">
+              <pci-button variant="ghost" (clicked)="voltarStep('afastamentos')">
+                <pci-icon slot="icon-left" name="arrow-left" size="sm" />Voltar
+              </pci-button>
+              <pci-button variant="secondary" [loading]="working()" (clicked)="salvarRascunho()">
+                Salvar rascunho
+              </pci-button>
+              <pci-button variant="primary" [loading]="working()" (clicked)="finalizar()">Finalizar</pci-button>
+            </pci-stack>
+          </pci-card-content>
+        </pci-card>
       }
     </div>
   }

@@ -1,4 +1,5 @@
 using FluentValidation;
+using TemplateSistema.Domain.Common;
 
 namespace TemplateSistema.Application.Auth;
 
@@ -7,6 +8,12 @@ public class AlterarSenhaRequestValidator : AbstractValidator<AlterarSenhaReques
     public AlterarSenhaRequestValidator()
     {
         RuleFor(x => x.SenhaAtual).NotEmpty();
-        RuleFor(x => x.NovaSenha).NotEmpty().MinimumLength(8).MaximumLength(200);
+        RuleFor(x => x.NovaSenha).Custom((senha, context) =>
+        {
+            if (!PasswordPolicy.IsValid(senha, out var erro))
+            {
+                context.AddFailure(erro!);
+            }
+        });
     }
 }

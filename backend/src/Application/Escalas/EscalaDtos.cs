@@ -6,9 +6,12 @@ namespace TemplateSistema.Application.Escalas;
 public record EscalaListItemDto(
     Guid Id,
     string Identificacao,
-    Guid SetorId,
-    string SetorNome,
-    string SetorSigla,
+    Guid? SetorId,
+    string? SetorNome,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoNome,
+    string? NucleoSigla,
     int Ano,
     int Mes,
     DateOnly DataInicio,
@@ -18,14 +21,18 @@ public record EscalaListItemDto(
     DateTime? PublicadaEm,
     string? PublicadaPor,
     DateTime CreatedAt,
-    string? CreatedBy);
+    string? CreatedBy,
+    Guid? ResumidaId);
 
 public record EscalaDetailDto(
     Guid Id,
     string Identificacao,
-    Guid SetorId,
-    string SetorNome,
-    string SetorSigla,
+    Guid? SetorId,
+    string? SetorNome,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoNome,
+    string? NucleoSigla,
     int Ano,
     int Mes,
     DateOnly DataInicio,
@@ -73,6 +80,7 @@ public record EscalaJornadaDto(
     int? DiasTrabalho,
     int? DiasFolga,
     string? TipoOcorrenciaFolgaCodigo,
+    string? SequenciaCiclo,
     string? Observacao);
 
 public record EscalaOcorrenciaDto(
@@ -123,14 +131,18 @@ public record PadraoEscalaDto(
     string? DiasSemana,
     string TipoOcorrenciaTrabalho,
     string TipoOcorrenciaFolga,
+    string? SequenciaCiclo,
     TimeOnly? HoraInicioPadrao,
     TimeOnly? HoraFimPadrao,
     decimal? HorasPadrao,
     bool Sistema,
     bool Ativo);
 
+/// <summary>Informe SetorId ou NucleoId (escala de servidores lotados diretamente no núcleo),
+/// nunca os dois nem nenhum.</summary>
 public record CreateEscalaRequest(
-    Guid SetorId,
+    Guid? SetorId,
+    Guid? NucleoId,
     int Ano,
     int Mes,
     TipoFuncionamento TipoFuncionamento,
@@ -158,6 +170,7 @@ public record CreateEscalaJornadaRequest(
     int? DiasTrabalho,
     int? DiasFolga,
     string? TipoOcorrenciaFolgaCodigo,
+    string? SequenciaCiclo,
     string? Observacao,
     Guid? PadraoEscalaId,
     DateOnly? DataInicioCiclo);
@@ -206,6 +219,20 @@ public record SyncOcorrenciasRequest(IReadOnlyList<SyncOcorrenciaItemRequest> It
 
 public record CopiarEscalaRequest(int Ano, int Mes, bool SobrescreverManuais = false);
 
+/// <summary>Checagem pró-ativa (antes de salvar) de que nenhum servidor selecionado já está em
+/// outra escala (por setor ou núcleo) no mesmo período. Escala resumida não entra nessa
+/// checagem — é só planejamento/visualização, não gera nem sofre conflito.</summary>
+public record CheckConflitosServidoresRequest(
+    int Ano,
+    int Mes,
+    IReadOnlyList<Guid> ServidorIds,
+    Guid? ExcluirEscalaId = null);
+
+/// <summary>Um servidor já escalado em outro lugar no mesmo período — <c>Origem</c> identifica
+/// onde (setor/núcleo da escala), pra quem vê o erro saber exatamente aonde ir resolver o
+/// conflito.</summary>
+public record ConflitoServidorDto(Guid ServidorId, string ServidorNome, string Origem);
+
 public record PublicarEscalaRequest(bool ConfirmarConflitos = false);
 
 public record SolicitarDevolucaoEscalaRequest(string Justificativa);
@@ -216,9 +243,12 @@ public record SolicitacaoDevolucaoEscalaDto(
     Guid Id,
     Guid EscalaId,
     string EscalaIdentificacao,
-    Guid SetorId,
-    string SetorNome,
-    string SetorSigla,
+    Guid? SetorId,
+    string? SetorNome,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoNome,
+    string? NucleoSigla,
     int Ano,
     int Mes,
     Guid SolicitanteUsuarioId,
@@ -265,6 +295,7 @@ public record EscalaAnteriorInfoDto(
 public record EscalaListQuery : PaginationQuery
 {
     public Guid? SetorId { get; init; }
+    public Guid? NucleoId { get; init; }
     public int? Mes { get; init; }
     public int? Ano { get; init; }
     public StatusEscala? Status { get; init; }

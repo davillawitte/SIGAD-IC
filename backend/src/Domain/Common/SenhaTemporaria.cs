@@ -1,38 +1,27 @@
+using System.Security.Cryptography;
+
 namespace TemplateSistema.Domain.Common;
 
 /// <summary>
-/// Senha temporária padrão: primeiroNome + ultimoNome + 3 primeiros dígitos do CPF.
+/// Senha temporária de novos usuários: aleatória, gerada com <see cref="RandomNumberGenerator"/>
+/// — nada previsível a partir de nome/CPF. Sempre acima do mínimo de <see cref="PasswordPolicy"/>.
+/// O usuário troca no primeiro login (<c>DeveAlterarSenha = true</c>).
 /// </summary>
 public static class SenhaTemporaria
 {
-    public static string Gerar(string nomeCompleto, string cpf)
+    // Sem 0/O, 1/l/I — evita ambiguidade quando a senha é lida/digitada por alguém.
+    private const string Alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private const int Tamanho = 16;
+
+    public static string Gerar()
     {
-        var parts = (nomeCompleto ?? string.Empty)
-            .Trim()
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        var primeiro = parts.Length > 0 ? parts[0] : "Usuario";
-        var ultimo = parts.Length > 1 ? parts[^1] : primeiro;
-        var cpfDigits = new string((cpf ?? string.Empty).Where(char.IsDigit).ToArray());
-        var prefixoCpf = cpfDigits.Length >= 3
-            ? cpfDigits[..3]
-            : cpfDigits.PadRight(3, '0');
-
-        var senha = $"{primeiro}{ultimo}{prefixoCpf}";
-
-        // Garante mínimo de 8 caracteres (requisito de senha do sistema).
-        var i = 3;
-        while (senha.Length < 8 && i < cpfDigits.Length)
+        Span<char> chars = stackalloc char[Tamanho];
+        for (var i = 0; i < Tamanho; i++)
         {
-            senha += cpfDigits[i++];
+            chars[i] = Alfabeto[RandomNumberGenerator.GetInt32(Alfabeto.Length)];
         }
 
-        while (senha.Length < 8)
-        {
-            senha += '0';
-        }
-
-        return senha;
+        return new string(chars);
     }
 
     public static string NormalizeLoginCpf(string loginOuCpf)

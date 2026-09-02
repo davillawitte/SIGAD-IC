@@ -1,0 +1,54 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="user-plus" title="Cadastrar usuário" (closed)="close()" />
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  @if (created(); as usuario) {
+    <pci-alert
+      variant="success"
+      title="Usuário criado"
+      [message]="
+        'Usuário criado para ' + data.servidorLabel + '. Senha inicial: o CPF do servidor (' +
+        usuario.senhaTemporaria +
+        '). Informe ao servidor — no primeiro acesso será solicitada a troca.'
+      "
+    />
+
+    <pci-form-actions>
+      <pci-button variant="primary" (clicked)="concluir()">
+        <pci-icon slot="icon-left" name="check" size="sm" />
+        Concluir
+      </pci-button>
+    </pci-form-actions>
+  } @else {
+    <pci-form-card>
+      <app-form-section title="Vínculo">
+        <p [appFormCol]="12" class="pci-app-dialog__message">
+          Servidor: <strong>{{ data.servidorLabel }}</strong>
+        </p>
+      </app-form-section>
+
+      <app-form-section title="Perfis">
+        <pci-selection-list
+          [appFormCol]="12"
+          title="Perfis do usuário"
+          ariaLabel="Perfis do usuário"
+          variant="divided"
+          [items]="perfilItems()"
+          [selectedIds]="selectedPerfilIds()"
+          (selectedIdsChange)="selectedPerfilIds.set($event)"
+        />
+      </app-form-section>
+    </pci-form-card>
+
+    <pci-form-actions>
+      <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+      <pci-button variant="primary" [loading]="saving()" (clicked)="save()">
+        <pci-icon slot="icon-left" name="check" size="sm" />
+        Salvar
+      </pci-button>
+    </pci-form-actions>
+  }
+</div>

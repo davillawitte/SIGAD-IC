@@ -7,8 +7,11 @@ import {
   PciButtonComponent,
   PciFormActionsComponent,
   PciFormCardComponent,
+  PciIconComponent,
   PciTextareaComponent,
 } from '@davillawitte/pci-design-system';
+
+import { AppDialogHeaderComponent } from '../dialog-header/dialog-header';
 
 export interface PromptDialogData {
   title: string;
@@ -29,7 +32,9 @@ export interface PromptDialogData {
     PciButtonComponent,
     PciFormCardComponent,
     PciFormActionsComponent,
+    PciIconComponent,
     PciTextareaComponent,
+    AppDialogHeaderComponent,
   ],
   templateUrl: './prompt-dialog.html',
 })

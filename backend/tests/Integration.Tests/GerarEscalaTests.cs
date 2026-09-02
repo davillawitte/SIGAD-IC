@@ -200,6 +200,35 @@ public class GerarEscalaTests(PostgresFixture fixture) : IntegrationTestBase(fix
     }
 
     [Fact]
+    public async Task Ciclo_customizado_PT24_TL12_usa_a_duracao_de_cada_fase_pelo_proprio_codigo()
+    {
+        // PT24_TL12 (sequência "PT,D,D,D,TL12,D") mistura uma fase de 24h ("PT") com uma de
+        // 12h ("TL12") sob o mesmo padrão — a duração de cada dia tem que vir do catálogo de
+        // TipoOcorrencia por código, não do valor único do padrão (que é 24h), senão TL12
+        // herda 24h e a carga horária remota conta em dobro.
+        var ctx = await PrepararAsync();
+        var padraoPT24TL12 = await PadraoIdAsync("PT24_TL12");
+
+        await using var db = NewContext();
+        var resultado = await new EscalaService(db).GerarEscalaAsync(
+            ctx.EscalaId,
+            new GerarEscalaRequest([Item(ctx.AnaId, padraoPT24TL12)], false, null),
+            Login);
+
+        resultado.Succeeded.ShouldBeTrue(resultado.Error);
+
+        var ocorrencias = await OcorrenciasAsync(ctx.AnaId);
+
+        var diasPT = ocorrencias.Where(x => x.TipoOcorrenciaCodigo == "PT").ToList();
+        diasPT.ShouldNotBeEmpty();
+        diasPT.ShouldAllBe(x => x.Horas == 24m);
+
+        var diasTL12 = ocorrencias.Where(x => x.TipoOcorrenciaCodigo == "TL12").ToList();
+        diasTL12.ShouldNotBeEmpty();
+        diasTL12.ShouldAllBe(x => x.Horas == 12m, "TL12 é 12h — não pode herdar as 24h do padrão PT24_TL12");
+    }
+
+    [Fact]
     public async Task Gerar_sem_itens_falha()
     {
         var ctx = await PrepararAsync();
@@ -248,7 +277,43 @@ public class GerarEscalaTests(PostgresFixture fixture) : IntegrationTestBase(fix
             Login);
 
         resultado.Succeeded.ShouldBeFalse();
-        resultado.Error.ShouldBe("Há servidores inválidos ou de outro setor.");
+        resultado.Error.ShouldBe("Há servidores inválidos ou que não pertencem a este setor/núcleo.");
+    }
+
+    private sealed record ContextoNucleo(Guid EscalaId, string Login);
+
+    private Task<ContextoNucleo> PrepararNucleoAsync() =>
+        SemearAsync(b =>
+        {
+            const string login = "chefe-nucleo-teste";
+            var setor = b.AdicionarSetor("Setor do Núcleo Central", "SNC");
+            var admin = b.AdicionarServidor(setor, "Administrador Núcleo");
+            var nucleo = b.AdicionarNucleo("Núcleo Central", "NC", admin.Id);
+            b.AdicionarSuperAdmin(admin, login, CatalogSeed.PerfilChefeSetorId);
+            var escala = b.AdicionarEscalaDeNucleo(nucleo, Ano, Mes);
+            return new ContextoNucleo(escala.Id, login);
+        });
+
+    [Fact]
+    public async Task Gerar_com_servidor_de_outro_nucleo_falha()
+    {
+        var ctx = await PrepararNucleoAsync();
+        var padrao12x36 = await PadraoIdAsync("12X36");
+
+        var forasteiroId = await SemearAsync(b =>
+        {
+            var outroSetor = b.AdicionarSetor("Núcleo de Papiloscopia", "NP2");
+            return b.AdicionarServidor(outroSetor, "Forasteiro").Id;
+        });
+
+        await using var db = NewContext();
+        var resultado = await new EscalaService(db).GerarEscalaAsync(
+            ctx.EscalaId,
+            new GerarEscalaRequest([Item(forasteiroId, padrao12x36)], false, null),
+            ctx.Login);
+
+        resultado.Succeeded.ShouldBeFalse();
+        resultado.Error.ShouldBe("Há servidores inválidos ou que não pertencem a este setor/núcleo.");
     }
 
     [Fact]

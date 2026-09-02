@@ -1,5 +1,28 @@
 # Deploy em produção (LAN) — SIGAD-IC ao lado do gestao-SCFA
 
+## Checklist do deploy de hoje (rotação da instância em 10.9.233.98)
+
+A 10.9.233.98 já está no ar, provisionada antes de existir a tela `/setup` — ainda com a
+credencial fictícia `vitorlopes` / `Vitor@123` (ver seção 11). O plano é: subir o código
+atual (todas as correções desta fase) por cima do que já está rodando, sem perder dados, e
+então trocar essa credencial fictícia por um superadministrador real. Ordem recomendada:
+
+1. **Backup antes de tudo** (rede de segurança caso algo dê errado no passo 2) — seção 5.
+2. **Redeploy do código atual** — `git pull` + `./scripts/docker-up-prod.sh` (seção 3). Isso
+   reconstrói as imagens e aplica as migrations pendentes automaticamente (rodam a cada
+   subida, não só na primeira — são idempotentes). `/setup` continua 410 Gone o tempo todo
+   nesse passo, porque o `vitorlopes` já existe como superadministrador ativo.
+3. **Rotacionar a credencial fictícia** — seção 12, subseção "Rotação da instância já
+   implantada": `reset-admin-password`, corrigir o `Servidor` fictício pela tela e renomear
+   o `Usuario.Login` pro CPF real.
+4. **Validar** (passo 4 da mesma subseção): login com o CPF real funciona; `vitorlopes` não
+   existe mais como login; `GET /api/setup/status` continua respondendo `410 Gone` (prova de
+   que a tela de provisionamento não volta a aparecer).
+
+As seções abaixo têm o detalhe de cada passo. A explicação completa do wizard `/setup` (para
+quando um banco **novo**, sem nenhum superadministrador, precisar ser provisionado do zero —
+próxima instalação, ambiente de homologação, etc.) está na seção 11.
+
 Acesso previsto nesta etapa (sem DNS / sem TLS):
 
 | Sistema | URL | Porta no host |
@@ -54,7 +77,8 @@ URLs:
 - Health: http://10.9.233.98:8080/health
 - API (mesmo host): http://10.9.233.98:8080/api/...
 
-Na primeira subida a API aplica migrations e seed (ambiente `Production`).
+A cada subida (não só a primeira) a API aplica migrations pendentes e o seed de catálogo
+(cargos, setores, perfis) automaticamente, antes de aceitar conexões — ambiente `Production`.
 
 ## 4. Parar (só o SIGAD)
 
@@ -119,3 +143,79 @@ Não fazemos mudanças no repositório do SCFA. Quando houver janela de manuten�
 1. Acrescentar `server_name` no edge para hostnames definidos.
 2. `listen 443 ssl` + redirect 301 de `:80` + HSTS.
 3. O frontend do SIGAD **não precisa rebuild** (`apiUrl` relativo).
+
+## 11. Provisionamento do superadministrador (`/setup`)
+
+Não existe mais credencial fixa no código. No primeiro start sem superadministrador
+ativo, a API gera um token de uso único (TTL 60 min) e imprime o valor **uma vez** no
+log:
+
+```bash
+docker compose -f docker-compose.prod.yml logs api | grep "SETUP:"
+```
+
+Acesse `http://<host>:8080/setup` e informe o token + os dados reais do primeiro
+superadministrador (CPF, nome, matrícula, e-mail, data de nascimento, senha — mínimo de
+8 caracteres, sem exigência de maiúscula/símbolo, mas bloqueando uma lista curta de senhas
+muito comuns — que inclui de propósito `vitor@123`/`vitorlopes`, pra ninguém reintroduzir a
+credencial fictícia como senha real). O wizard cria a cadeia completa (Servidor + Usuario +
+perfil SuperAdministrador + chefia de Diretor na Direção IC) e já força troca de senha no
+primeiro login (`DeveAlterarSenha = true`).
+
+**Recomendação operacional**: rode o setup a partir da própria máquina servidora
+(`http://localhost:8080/setup`) antes de divulgar o endereço na rede — enquanto for HTTP
+puro, o token e a senha cruzam a rede em texto claro. Aceitável numa LAN controlada por
+alguns minutos, mas é exatamente o motivo para priorizar TLS (seção 10).
+
+Depois que existir um superadministrador ativo, todo `/api/setup/*` (inclusive
+`status`) responde `410 Gone` — o wizard se autodesativa.
+
+Se o TTL expirar antes de concluir:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api new-setup-token
+```
+
+`allow 10.9.233.0/24;` em `docker/edge-nginx.conf` restringe `/api/setup/` à rede
+institucional — ajuste a faixa se a rede real for outra.
+
+## 12. Recuperação de senha do superadministrador
+
+Sem SMTP configurado, se o único superadministrador perder a senha o sistema fica
+inacessível por essa via. Comando interativo (pede confirmação explícita do login alvo e
+registra a operação no log da API):
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm api reset-admin-password
+```
+
+### Rotação da instância já implantada (10.9.233.98)
+
+A instância em produção foi provisionada antes desta mudança e ainda usa a credencial
+antiga (`vitorlopes` / `Vitor@123`, presente no histórico do Git). Passos operacionais —
+não há mais nada a mudar no código:
+
+1. Rodar `reset-admin-password` (comando acima) na instância existente.
+2. Corrigir o `Servidor` semeado, que hoje tem dados fictícios (CPF `00000000000`,
+   matrícula `000.001-0`, nascimento `1990-01-01`) — atualizar pela própria tela de
+   edição de servidor com os dados reais da pessoa. Atenção: `Servidor.Cpf` é único, o
+   CPF falso ocupa um slot real e precisa ser **atualizado**, não duplicado.
+3. Alinhar o login ao CPF real (todo o resto do sistema usa CPF como login via
+   `SenhaTemporaria.NormalizeLoginCpf`; `vitorlopes` era a única exceção). **Não existe
+   tela nem endpoint para renomear login** — corrigir o `Servidor` (passo 2) não muda o
+   `Usuario.Login`. Requer um `UPDATE` direto no banco:
+   ```sql
+   UPDATE "Usuario" SET "Login" = '<cpf-normalizado-11-digitos>' WHERE "Login" = 'vitorlopes';
+   ```
+   Faça isso com o Postgres do SIGAD parado ou em janela de manutenção, e valide o login
+   novo antes de divulgar.
+4. Validar o resultado:
+   - Login com o CPF real (senha nova do passo 1) funciona e força troca de senha
+     (`DeveAlterarSenha = true`, herdada do `reset-admin-password`).
+   - `vitorlopes` não autentica mais (login não existe).
+   - `/api/setup/status` continua `410 Gone` — nunca existiu (nem vai existir) uma janela em
+     que a tela de provisionamento reaparece, porque o gate é "existe superadministrador
+     ativo no banco", não o token:
+     ```bash
+     curl -i http://127.0.0.1:8080/api/setup/status
+     ```

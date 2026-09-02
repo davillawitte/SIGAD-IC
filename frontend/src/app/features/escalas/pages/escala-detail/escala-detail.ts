@@ -19,7 +19,11 @@ import {
 import { filter, switchMap } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
-import { openConfirmDialog, openPromptDialog } from '../../../../shared/dialogs/dialog.helpers';
+import {
+  openConfirmDialog,
+  openConflitosDialog,
+  openPromptDialog,
+} from '../../../../shared/dialogs/dialog.helpers';
 import { EscalaMatrix, MES_NOMES } from '../../components/escala-matrix/escala-matrix';
 import { EscalasApiService } from '../../services/escalas-api.service';
 import type { EscalaDetail as EscalaDetailDto, StatusEscala } from '../../models/escalas.models';
@@ -89,6 +93,11 @@ export class EscalaDetail implements OnInit {
     return MES_NOMES[e.mes] ?? String(e.mes);
   });
 
+  readonly unidadeLabel = computed(() => {
+    const e = this.escala();
+    return e?.setorNome ?? e?.nucleoNome ?? '';
+  });
+
   ngOnInit(): void {
     const escopo = (this.route.snapshot.data['escopo'] as string | undefined) ?? 'setor';
     this.listBasePath.set(escopo === 'institucional' ? '/escalas-institucionais' : '/escalas');
@@ -101,33 +110,37 @@ export class EscalaDetail implements OnInit {
   }
 
   canEdit(): boolean {
-    return this.auth.canAccess('escalas.editar', this.escala()?.setorId);
+    const e = this.escala();
+    return this.auth.canAccessEscala('escalas.editar', e?.setorId, e?.nucleoId);
   }
 
   canPublish(): boolean {
-    return this.auth.canAccess('escalas.publicar', this.escala()?.setorId);
+    const e = this.escala();
+    return this.auth.canAccessEscala('escalas.publicar', e?.setorId, e?.nucleoId);
   }
 
   canFinalizar(): boolean {
-    return this.auth.canAccess('escalas.finalizar', this.escala()?.setorId);
+    const e = this.escala();
+    return this.auth.canAccessEscala('escalas.finalizar', e?.setorId, e?.nucleoId);
   }
 
   canExcluir(): boolean {
-    return this.auth.canAccess('escalas.excluir', this.escala()?.setorId);
+    const e = this.escala();
+    return this.auth.canAccessEscala('escalas.excluir', e?.setorId, e?.nucleoId);
   }
 
   canSolicitarDevolucao(): boolean {
     const e = this.escala();
     if (!e || e.status !== 'Publicada') return false;
     if (isDirecaoIcSigla(e.setorSigla)) return false;
-    return this.auth.canAccess('escalas.solicitar_devolucao', e.setorId);
+    return this.auth.canAccessEscala('escalas.solicitar_devolucao', e.setorId, e.nucleoId);
   }
 
   canDevolverDireto(): boolean {
     const e = this.escala();
     if (!e || !isDirecaoIcSigla(e.setorSigla)) return false;
     if (e.status !== 'Publicada' && e.status !== 'DevolucaoSolicitada') return false;
-    return this.auth.canAccess('escalas.devolver', e.setorId);
+    return this.auth.canAccessEscala('escalas.devolver', e.setorId, e.nucleoId);
   }
 
   canExport(): boolean {
@@ -178,6 +191,9 @@ export class EscalaDetail implements OnInit {
           message: `Esta escala possui ${conflitos.totalCriticos} conflito(s) crítico(s). Deseja publicar mesmo assim?`,
           confirmLabel: 'Publicar',
           danger: true,
+          onViewDetails: () => {
+            openConflitosDialog(this.dialog, { itens: conflitos.itens }).subscribe();
+          },
         })
           .pipe(filter(Boolean))
           .subscribe(() =>

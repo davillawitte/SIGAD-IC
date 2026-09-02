@@ -1,0 +1,19 @@
+@if (error()) {
+  <pci-alert variant="error" title="Erro" [message]="error()!" />
+}
+
+<pci-list-page
+  title="Calendário Institucional"
+  description="Feriados, pontos facultativos e eventos institucionais definidos pela Direção do IC, por ano."
+  currentPath="/calendario-institucional"
+  [routePages]="routePages"
+  [columns]="columns"
+  [rows]="rows()"
+  [total]="rows().length"
+  [loading]="loading()"
+  [showCreateButton]="canGerar()"
+  createLabel="Novo calendário"
+  [rowActions]="rowActions()"
+  (createClicked)="onCreate()"
+  (rowAction)="onRowAction($event)"
+/>

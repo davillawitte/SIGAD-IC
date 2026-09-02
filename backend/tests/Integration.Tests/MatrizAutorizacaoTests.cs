@@ -72,12 +72,12 @@ public class MatrizAutorizacaoTests(PostgresFixture fixture) : IntegrationTestBa
 
             var service = new EscalaService(db);
             var criadoNp = await service.CreateAsync(
-                new CreateEscalaRequest(npId, 2026, 8, TipoFuncionamento.Expediente, null),
+                new CreateEscalaRequest(npId, null, 2026, 8, TipoFuncionamento.Expediente, null),
                 "hibrido");
             criadoNp.Succeeded.ShouldBeFalse();
 
             var criadoNb = await service.CreateAsync(
-                new CreateEscalaRequest(nbId, 2026, 8, TipoFuncionamento.Expediente, null),
+                new CreateEscalaRequest(nbId, null, 2026, 8, TipoFuncionamento.Expediente, null),
                 "hibrido");
             criadoNb.Succeeded.ShouldBeTrue(criadoNb.Error);
         }

@@ -1,0 +1,55 @@
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.app-dialog-header__close {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pci-radius-full, 999px);
+  background: transparent;
+  color: var(--pci-color-text-secondary, #667085);
+  cursor: pointer;
+}
+
+.app-dialog-header__close:hover {
+  background: var(--pci-color-background-muted, #f2f4f7);
+}
+
+.app-dialog-header__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--pci-radius-full, 999px);
+  background: #fdf1d8;
+  color: var(--pci-gold-600, #b8922e);
+}
+
+.app-dialog-header__title {
+  margin: 0;
+  font-size: var(--pci-font-size-xl, 1.5rem);
+  font-weight: var(--pci-font-weight-bold, 700);
+  color: var(--pci-color-text-primary, #101828);
+}
+
+.app-dialog-header__underline {
+  width: 2.75rem;
+  height: 3px;
+  border-radius: var(--pci-radius-full, 999px);
+  background: var(--pci-gold-600, #b8922e);
+  box-shadow: 0 0 8px #c8a04080;
+}

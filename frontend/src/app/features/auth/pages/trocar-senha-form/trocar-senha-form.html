@@ -1,37 +1,44 @@
 <pci-auth-layout>
-  <div class="trocar-senha">
-    <h1>Trocar senha</h1>
-    <p>Por segurança, defina uma nova senha antes de continuar.</p>
+  <pci-panel width="md">
+    <pci-panel-header align="center">
+      <app-dialog-header icon="lock" title="Trocar senha" [closable]="false" />
+      <p>Por segurança, defina uma nova senha antes de continuar.</p>
+    </pci-panel-header>
 
-    @if (error()) {
-      <pci-alert variant="error" title="Atenção" [message]="error()!" />
-    }
+    <pci-panel-body>
+      @if (error()) {
+        <pci-alert variant="error" title="Atenção" [message]="error()!" />
+      }
 
-    <form [formGroup]="form" (ngSubmit)="submit()">
-      <pci-stack gap="3" [fullWidth]="true">
-        <pci-input
-          label="Senha atual"
-          type="password"
-          formControlName="senhaAtual"
-          [required]="true"
-        />
-        <pci-input
-          label="Nova senha"
-          type="password"
-          formControlName="novaSenha"
-          hint="Mínimo de 8 caracteres"
-          [required]="true"
-        />
-        <pci-input
-          label="Confirmar nova senha"
-          type="password"
-          formControlName="confirmarSenha"
-          [required]="true"
-        />
-        <pci-button variant="primary" [loading]="loading()" (clicked)="submit()">
-          Salvar nova senha
-        </pci-button>
-      </pci-stack>
-    </form>
-  </div>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <pci-stack gap="3" [fullWidth]="true">
+          <pci-input
+            label="Senha atual"
+            type="password"
+            formControlName="senhaAtual"
+            [required]="true"
+          />
+          <pci-input
+            label="Nova senha"
+            type="password"
+            formControlName="novaSenha"
+            hint="Mínimo de 8 caracteres"
+            [required]="true"
+          />
+          <pci-input
+            label="Confirmar nova senha"
+            type="password"
+            formControlName="confirmarSenha"
+            [required]="true"
+          />
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button variant="ghost" type="button" (clicked)="cancel()">Cancelar</pci-button>
+            <pci-button variant="primary" [loading]="loading()" (clicked)="submit()">
+              Salvar nova senha
+            </pci-button>
+          </pci-stack>
+        </pci-stack>
+      </form>
+    </pci-panel-body>
+  </pci-panel>
 </pci-auth-layout>

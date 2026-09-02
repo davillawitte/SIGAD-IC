@@ -1,0 +1,26 @@
+.calendario-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 0 2rem;
+}
+
+.calendario-detail__resumo {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+  color: var(--pci-color-text-muted, #667085);
+}
+
+.calendario-detail__dot {
+  opacity: 0.6;
+}
+
+.calendario-detail__observacao {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--pci-color-text-secondary, #475467);
+}

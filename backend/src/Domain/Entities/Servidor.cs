@@ -17,14 +17,19 @@ public class Servidor : BaseEntity
     public string Email { get; private set; } = null!;
     public string? Telefone { get; private set; }
     public DateOnly DataNascimento { get; private set; }
-    public Guid SetorId { get; private set; }
+    public Guid? SetorId { get; private set; }
+    public Guid? NucleoId { get; private set; }
     public StatusServidor Status { get; private set; } = StatusServidor.Ativo;
 
     public Cargo Cargo { get; private set; } = null!;
-    public Setor Setor { get; private set; } = null!;
+    public Setor? Setor { get; private set; }
+    public Nucleo? Nucleo { get; private set; }
     public Usuario? Usuario { get; private set; }
 
     public bool EstaAtivo => Status == StatusServidor.Ativo;
+
+    /// <summary>Servidor vinculado direto ao núcleo (chefe de núcleo ou lotado sem setor específico).</summary>
+    public bool LotadoDiretoNoNucleo => NucleoId.HasValue;
 
     private Servidor()
     {
@@ -36,13 +41,16 @@ public class Servidor : BaseEntity
         string cpf,
         Guid cargoId,
         string? email,
-        Guid setorId,
+        Guid? setorId,
+        Guid? nucleoId,
         DateOnly dataNascimento,
         string? telefone = null,
         StatusServidor status = StatusServidor.Ativo,
         string? createdBy = null,
         Guid? id = null)
     {
+        ValidateLotacao(setorId, nucleoId);
+
         var servidor = new Servidor
         {
             Nome = nome.Trim(),
@@ -53,6 +61,7 @@ public class Servidor : BaseEntity
             Telefone = NormalizeTelefone(telefone),
             DataNascimento = dataNascimento,
             SetorId = setorId,
+            NucleoId = nucleoId,
             Status = status,
         };
 
@@ -71,11 +80,14 @@ public class Servidor : BaseEntity
         string cpf,
         Guid cargoId,
         string? email,
-        Guid setorId,
+        Guid? setorId,
+        Guid? nucleoId,
         DateOnly dataNascimento,
         string? telefone = null,
         string? updatedBy = null)
     {
+        ValidateLotacao(setorId, nucleoId);
+
         Nome = nome.Trim();
         Matricula = NormalizeMatricula(matricula);
         Cpf = NormalizeCpf(cpf);
@@ -84,7 +96,17 @@ public class Servidor : BaseEntity
         Telefone = NormalizeTelefone(telefone);
         DataNascimento = dataNascimento;
         SetorId = setorId;
+        NucleoId = nucleoId;
         MarkUpdated(updatedBy);
+    }
+
+    private static void ValidateLotacao(Guid? setorId, Guid? nucleoId)
+    {
+        if (setorId.HasValue == nucleoId.HasValue)
+        {
+            throw new ArgumentException(
+                "Informe o setor de lotação ou o núcleo de lotação direta, nunca os dois nem nenhum.");
+        }
     }
 
     public void DefinirStatus(StatusServidor status, string? updatedBy = null)

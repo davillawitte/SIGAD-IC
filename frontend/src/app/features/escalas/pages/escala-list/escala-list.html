@@ -4,7 +4,7 @@
     @for (item of devolucoes(); track item.id) {
       <div class="escalas-devolucoes__card">
         <p class="escalas-devolucoes__line">
-          <strong>{{ item.escalaIdentificacao }}</strong> — {{ item.setorSigla }}
+          <strong>{{ item.escalaIdentificacao }}</strong> — {{ item.setorSigla ?? item.nucleoSigla }}
         </p>
         <p class="escalas-devolucoes__line">Solicitante: {{ item.solicitanteNome }}</p>
         <p class="escalas-devolucoes__line">Justificativa: {{ item.justificativa }}</p>
@@ -38,7 +38,7 @@
   [description]="pageDescription()"
   [currentPath]="listBasePath()"
   [routePages]="routePages"
-  [filterFields]="filterFields"
+  [filterFields]="filterFields()"
   [filterValues]="filterValues()"
   [filtersExpanded]="filtersExpanded()"
   [columns]="columns"

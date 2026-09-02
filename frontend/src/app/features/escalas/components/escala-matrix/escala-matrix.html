@@ -37,7 +37,10 @@
         </div>
         <div>
           <div><strong>Mês:</strong> {{ mesNome() }}</div>
-          <div><strong>Setor/Núcleo:</strong> {{ escala().setorNome }} ({{ escala().setorSigla }})</div>
+          <div>
+            <strong>Setor/Núcleo:</strong>
+            {{ escala().setorNome ?? escala().nucleoNome }} ({{ escala().setorSigla ?? escala().nucleoSigla }})
+          </div>
         </div>
         <div>
           <div><strong>Responsável:</strong> {{ escala().createdBy || '—' }}</div>

@@ -8,7 +8,9 @@ public class EscalaConfiguration : IEntityTypeConfiguration<Escala>
 {
     public void Configure(EntityTypeBuilder<Escala> builder)
     {
-        builder.ToTable("Escala");
+        builder.ToTable("Escala", t => t.HasCheckConstraint(
+            "CK_Escala_Lotacao_SetorOuNucleo",
+            "(\"SetorId\" IS NOT NULL AND \"NucleoId\" IS NULL) OR (\"SetorId\" IS NULL AND \"NucleoId\" IS NOT NULL)"));
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(40).IsRequired();
@@ -23,11 +25,18 @@ public class EscalaConfiguration : IEntityTypeConfiguration<Escala>
 
         builder.HasIndex(x => x.SetorId);
         builder.HasIndex(x => new { x.SetorId, x.Ano, x.Mes }).IsUnique();
+        builder.HasIndex(x => x.NucleoId);
+        builder.HasIndex(x => new { x.NucleoId, x.Ano, x.Mes }).IsUnique();
         builder.HasIndex(x => x.Status);
 
         builder.HasOne(x => x.Setor)
             .WithMany()
             .HasForeignKey(x => x.SetorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.Nucleo)
+            .WithMany()
+            .HasForeignKey(x => x.NucleoId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -18,6 +18,11 @@ public class NucleosController(INucleoService nucleoService) : ControllerBase
     public async Task<IActionResult> List(CancellationToken cancellationToken) =>
         Ok(await nucleoService.ListAsync(cancellationToken));
 
+    [HttpGet("meus")]
+    [RequiresAnyPermission(PermissionCodes.NucleosListar, PermissionCodes.EscalasCriar, PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> ListMeus(CancellationToken cancellationToken) =>
+        Ok(await nucleoService.ListMeusAsync(User.GetLogin(), cancellationToken));
+
     [HttpGet("{id:guid}")]
     [RequiresPermission(PermissionCodes.NucleosListar)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)

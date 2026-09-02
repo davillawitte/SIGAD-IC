@@ -29,13 +29,14 @@ public interface IEscalaService
     Task<Result<EscalaDetailDto>> CopiarAsync(Guid id, CopiarEscalaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TipoOcorrenciaDto>> ListTiposOcorrenciaAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PadraoEscalaDto>> ListPadroesAsync(TipoFuncionamento? tipo, CancellationToken cancellationToken = default);
-    Task<EscalaAnteriorInfoDto?> GetEscalaAnteriorAsync(Guid setorId, int ano, int mes, string actorLogin, CancellationToken cancellationToken = default);
+    Task<EscalaAnteriorInfoDto?> GetEscalaAnteriorAsync(Guid? setorId, Guid? nucleoId, int ano, int mes, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> GerarEscalaAsync(Guid id, GerarEscalaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> AplicarAfastamentosAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaCoberturaDto>> GetCoberturaAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaConflitosDto>> GetConflitosAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> UpsertOcorrenciasLoteAsync(Guid id, UpsertOcorrenciasLoteRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> SyncOcorrenciasAsync(Guid id, SyncOcorrenciasRequest request, string actorLogin, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ConflitoServidorDto>> CheckConflitosServidoresAsync(CheckConflitosServidoresRequest request, string actorLogin, CancellationToken cancellationToken = default);
 }
 
 public interface IEscalaPdfService
@@ -43,6 +44,14 @@ public interface IEscalaPdfService
     Task<Result<(byte[] Content, string FileName)>> GenerateAsync(
         Guid id,
         string layout,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IEscalaCsvService
+{
+    Task<Result<(byte[] Content, string FileName)>> GenerateResumidoAsync(
+        Guid id,
         string actorLogin,
         CancellationToken cancellationToken = default);
 }

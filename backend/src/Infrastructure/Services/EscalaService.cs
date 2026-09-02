@@ -24,18 +24,24 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var normalized = query.Normalize();
 
-        var q = db.Escalas.AsNoTracking().Include(x => x.Setor).AsQueryable();
+        var q = db.Escalas.AsNoTracking().Include(x => x.Setor).Include(x => x.Nucleo).AsQueryable();
 
         var escopo = (query.Escopo ?? string.Empty).Trim().ToLowerInvariant();
         if (escopo is "setor" or "meus")
         {
-            var meus = actor.SetoresGerenciadosIds;
-            if (meus.Count == 0)
+            var meusSetores = actor.SetoresGerenciadosIds
+                .Concat(actor.SetoresDosNucleosGerenciadosIds)
+                .Distinct()
+                .ToList();
+            var meusNucleos = actor.NucleosGerenciadosIds;
+            if (meusSetores.Count == 0 && meusNucleos.Count == 0)
             {
                 return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
             }
 
-            q = q.Where(x => meus.Contains(x.SetorId));
+            q = q.Where(x =>
+                (x.SetorId != null && meusSetores.Contains(x.SetorId.Value)) ||
+                (x.NucleoId != null && meusNucleos.Contains(x.NucleoId.Value)));
         }
         else if (escopo is "institucional" or "outros")
         {
@@ -45,10 +51,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             }
 
             // Institucional: todos os setores, exceto a Direção do IC (gerida em Gestão do Setor).
+            // Escalas de núcleo passam direto — um núcleo nunca é a Direção do IC.
             var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
             if (direcaoIds.Count > 0)
             {
-                q = q.Where(x => !direcaoIds.Contains(x.SetorId));
+                q = q.Where(x => x.SetorId == null || !direcaoIds.Contains(x.SetorId.Value));
             }
         }
         else
@@ -56,13 +63,25 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
             if (setoresVisiveis is not null)
             {
-                q = q.Where(x => setoresVisiveis.Contains(x.SetorId));
+                var setoresIncluidos = setoresVisiveis
+                    .Concat(actor.SetoresDosNucleosGerenciadosIds)
+                    .Distinct()
+                    .ToList();
+                var meusNucleos = actor.NucleosGerenciadosIds;
+                q = q.Where(x =>
+                    (x.SetorId != null && setoresIncluidos.Contains(x.SetorId.Value)) ||
+                    (x.NucleoId != null && meusNucleos.Contains(x.NucleoId.Value)));
             }
         }
 
         if (query.SetorId is Guid setorId)
         {
             q = q.Where(x => x.SetorId == setorId);
+        }
+
+        if (query.NucleoId is Guid nucleoIdFilter)
+        {
+            q = q.Where(x => x.NucleoId == nucleoIdFilter);
         }
 
         if (query.Status is StatusEscala status)
@@ -84,11 +103,12 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         {
             var term = normalized.Search.ToLowerInvariant();
             q = q.Where(x =>
-                x.Setor.Nome.ToLower().Contains(term) ||
-                x.Setor.Sigla.ToLower().Contains(term));
+                (x.Setor != null && (x.Setor.Nome.ToLower().Contains(term) || x.Setor.Sigla.ToLower().Contains(term))) ||
+                (x.Nucleo != null && (x.Nucleo.Nome.ToLower().Contains(term) || x.Nucleo.Sigla.ToLower().Contains(term))));
         }
 
-        q = q.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes).ThenBy(x => x.Setor.Nome);
+        q = q.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes)
+            .ThenBy(x => x.Setor != null ? x.Setor.Nome : x.Nucleo!.Nome);
 
         var totalItems = await q.CountAsync(cancellationToken);
         if (totalItems == 0)
@@ -103,8 +123,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             {
                 x.Id,
                 x.SetorId,
-                SetorNome = x.Setor.Nome,
-                SetorSigla = x.Setor.Sigla,
+                SetorNome = x.Setor != null ? x.Setor.Nome : null,
+                SetorSigla = x.Setor != null ? x.Setor.Sigla : null,
+                x.NucleoId,
+                NucleoNome = x.Nucleo != null ? x.Nucleo.Nome : null,
+                NucleoSigla = x.Nucleo != null ? x.Nucleo.Sigla : null,
                 x.Ano,
                 x.Mes,
                 x.TipoFuncionamento,
@@ -125,6 +148,12 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var responsavelByLogin = await ResolveResponsavelNomesAsync(createdByLogins, cancellationToken);
 
+        var idsDaPagina = pageItems.Select(x => x.Id).ToList();
+        var resumidaIdByEscalaId = await db.EscalasResumidas
+            .Where(r => r.EscalaId != null && idsDaPagina.Contains(r.EscalaId.Value))
+            .Select(r => new { r.EscalaId, r.Id })
+            .ToDictionaryAsync(r => r.EscalaId!.Value, r => (Guid?)r.Id, cancellationToken);
+
         var items = pageItems.Select(x =>
         {
             var inicio = new DateOnly(x.Ano, x.Mes, 1);
@@ -132,10 +161,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             var responsavelNome = ResolveResponsavelFromMap(x.CreatedBy, responsavelByLogin);
             return new EscalaListItemDto(
                 x.Id,
-                Escala.FormatIdentificacao(x.Mes, x.Ano, x.SetorNome),
+                Escala.FormatIdentificacao(x.Mes, x.Ano, x.SetorNome ?? x.NucleoNome ?? string.Empty),
                 x.SetorId,
                 x.SetorNome,
                 x.SetorSigla,
+                x.NucleoId,
+                x.NucleoNome,
+                x.NucleoSigla,
                 x.Ano,
                 x.Mes,
                 inicio,
@@ -145,7 +177,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 x.PublicadaEm,
                 x.PublicadaPor,
                 x.CreatedAt,
-                responsavelNome);
+                responsavelNome,
+                resumidaIdByEscalaId.GetValueOrDefault(x.Id));
         }).ToList();
 
         return PagedResult<EscalaListItemDto>.Create(items, normalized.Page, normalized.PageSize, totalItems);
@@ -163,7 +196,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanView(actor, escala.SetorId))
+        if (!CanView(actor, escala.SetorId, escala.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
@@ -212,21 +245,50 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!actor.PodeAcessar(PermissionCodes.EscalasCriar, request.SetorId))
-        {
-            return Result<EscalaDetailDto>.Failure("Sem permissão para criar escala neste setor.");
-        }
 
-        if (!await db.Setores.AnyAsync(x => x.Id == request.SetorId, cancellationToken))
+        if (request.SetorId is Guid setorId)
         {
-            return Result<EscalaDetailDto>.Failure("Setor inválido.");
-        }
+            if (!actor.PodeAcessar(PermissionCodes.EscalasCriar, setorId)
+                && !actor.GerenciaSetorViaNucleo(setorId))
+            {
+                return Result<EscalaDetailDto>.Failure("Sem permissão para criar escala neste setor.");
+            }
 
-        if (await db.Escalas.AnyAsync(
-                x => x.SetorId == request.SetorId && x.Ano == request.Ano && x.Mes == request.Mes,
-                cancellationToken))
+            if (!await db.Setores.AnyAsync(x => x.Id == setorId, cancellationToken))
+            {
+                return Result<EscalaDetailDto>.Failure("Setor inválido.");
+            }
+
+            if (await db.Escalas.AnyAsync(
+                    x => x.SetorId == setorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                    cancellationToken))
+            {
+                return Result<EscalaDetailDto>.Failure("Já existe escala para este setor neste mês/ano.");
+            }
+        }
+        else if (request.NucleoId is Guid nucleoId)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor neste mês/ano.");
+            if (!actor.GerenciaNucleo(nucleoId)
+                && !(actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasCriar)))
+            {
+                return Result<EscalaDetailDto>.Failure("Sem permissão para criar escala neste núcleo.");
+            }
+
+            if (!await db.Nucleos.AnyAsync(x => x.Id == nucleoId, cancellationToken))
+            {
+                return Result<EscalaDetailDto>.Failure("Núcleo inválido.");
+            }
+
+            if (await db.Escalas.AnyAsync(
+                    x => x.NucleoId == nucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                    cancellationToken))
+            {
+                return Result<EscalaDetailDto>.Failure("Já existe escala para este núcleo neste mês/ano.");
+            }
+        }
+        else
+        {
+            return Result<EscalaDetailDto>.Failure("Informe o setor ou o núcleo da escala.");
         }
 
         Escala escala;
@@ -234,6 +296,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         {
             escala = Escala.Create(
                 request.SetorId,
+                request.NucleoId,
                 request.Ano,
                 request.Mes,
                 request.TipoFuncionamento,
@@ -262,16 +325,21 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure(error);
         }
 
-        if (await db.Escalas.AnyAsync(
-                x => x.Id != id && x.SetorId == escala!.SetorId && x.Ano == request.Ano && x.Mes == request.Mes,
-                cancellationToken))
+        var duplicado = escala!.SetorId is Guid escalaSetorId
+            ? await db.Escalas.AnyAsync(
+                x => x.Id != id && x.SetorId == escalaSetorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                cancellationToken)
+            : await db.Escalas.AnyAsync(
+                x => x.Id != id && x.NucleoId == escala.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                cancellationToken);
+        if (duplicado)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor neste mês/ano.");
+            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor/núcleo neste mês/ano.");
         }
 
         try
         {
-            escala!.Atualizar(request.Ano, request.Mes, request.TipoFuncionamento, request.Observacao, actorLogin);
+            escala.Atualizar(request.Ano, request.Mes, request.TipoFuncionamento, request.Observacao, actorLogin);
         }
         catch (Exception ex)
         {
@@ -292,7 +360,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var escalaInfo = await db.Escalas
             .AsNoTracking()
             .Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.SetorId, x.Status })
+            .Select(x => new { x.Id, x.SetorId, x.NucleoId, x.Status, x.Ano, x.Mes })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (escalaInfo is null)
@@ -300,7 +368,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escalaInfo.SetorId))
+        if (!CanMutate(actor, escalaInfo.SetorId, escalaInfo.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
@@ -329,10 +397,21 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return await GetByIdAsync(id, actorLogin, cancellationToken);
         }
 
+        // Servidor lotado direto no núcleo presta serviço a todos os setores do núcleo —
+        // por isso também é elegível pra escala deste setor, não só pra escala resumida.
+        // Escala de núcleo (sem setor) usa o próprio NucleoId como núcleo efetivo direto.
+        var efetivoNucleoId = escalaInfo.NucleoId ?? await db.Setores
+            .Where(x => x.Id == escalaInfo.SetorId)
+            .Select(x => x.NucleoId)
+            .FirstOrDefaultAsync(cancellationToken);
+
         // Projeção evita tracking de Servidor/Cargo (causa comum de DbUpdateConcurrencyException).
         var servidores = await db.Servidores
             .AsNoTracking()
-            .Where(x => novosIds.Contains(x.Id) && x.SetorId == escalaInfo.SetorId)
+            .Where(x => novosIds.Contains(x.Id)
+                && ((escalaInfo.SetorId != null && x.SetorId == escalaInfo.SetorId)
+                    || (efetivoNucleoId != null
+                        && (x.NucleoId == efetivoNucleoId || (x.SetorId != null && x.Setor!.NucleoId == efetivoNucleoId)))))
             .OrderBy(x => x.Nome)
             .Select(x => new
             {
@@ -347,7 +426,14 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         if (servidores.Count != novosIds.Count)
         {
-            return Result<EscalaDetailDto>.Failure("Há servidores inválidos ou de outro setor.");
+            return Result<EscalaDetailDto>.Failure("Há servidores inválidos ou que não pertencem a este setor/núcleo.");
+        }
+
+        var conflitos = await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
+            db, novosIds, escalaInfo.Ano, escalaInfo.Mes, excluirEscalaId: id, cancellationToken);
+        if (conflitos.Count > 0)
+        {
+            return Result<EscalaDetailDto>.Failure(EscalaConflitoChecker.FormatarMensagem(conflitos));
         }
 
         var maxOrdem = await db.EscalaServidores
@@ -456,6 +542,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 request.DiasTrabalho,
                 request.DiasFolga,
                 request.TipoOcorrenciaFolgaCodigo,
+                request.SequenciaCiclo,
                 request.Observacao,
                 request.PadraoEscalaId,
                 request.DataInicioCiclo,
@@ -606,7 +693,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
+        if (!CanMutate(actor, escala.SetorId, escala.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
@@ -616,17 +703,19 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Somente escalas finalizadas podem ser publicadas.");
         }
 
-        var overlap = await db.Escalas.AnyAsync(
-            x => x.Id != id
-                 && x.SetorId == escala.SetorId
-                 && x.Status == StatusEscala.Publicada
-                 && x.Ano == escala.Ano
-                 && x.Mes == escala.Mes,
-            cancellationToken);
+        var overlap = escala.SetorId is Guid escalaSetorId
+            ? await db.Escalas.AnyAsync(
+                x => x.Id != id && x.SetorId == escalaSetorId && x.Status == StatusEscala.Publicada
+                     && x.Ano == escala.Ano && x.Mes == escala.Mes,
+                cancellationToken)
+            : await db.Escalas.AnyAsync(
+                x => x.Id != id && x.NucleoId == escala.NucleoId && x.Status == StatusEscala.Publicada
+                     && x.Ano == escala.Ano && x.Mes == escala.Mes,
+                cancellationToken);
 
         if (overlap)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala publicada sobreposta neste setor e período.");
+            return Result<EscalaDetailDto>.Failure("Já existe escala publicada sobreposta neste setor/núcleo e período.");
         }
 
         if (request?.ConfirmarConflitos != true)
@@ -661,7 +750,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
+        if (!CanMutate(actor, escala.SetorId, escala.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
@@ -688,7 +777,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
+        if (!CanMutate(actor, escala.SetorId, escala.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
@@ -709,20 +798,35 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     public async Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        var escala = await db.Escalas.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var escala = await db.Escalas
+            .Include(x => x.Setor)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (escala is null)
         {
             return Result.Failure("Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
-        {
-            return Result.Failure("Sem permissão para esta escala.");
-        }
+        // Exclusão exige chefia DE VERDADE (setor direto, ou núcleo que engloba o setor) — não
+        // basta "visão institucional"/abrangência TodosOsSetores de `CanMutate` (essa serve pra
+        // editar conteúdo, não pra apagar a escala de um setor que o ator não chefia). Sem isso,
+        // qualquer perfil com visão global (ex.: Direção IC) conseguia excluir escala de setor
+        // alheio.
+        var isChefia = IsChefiaDireta(actor, escala.SetorId, escala.NucleoId);
+        var isDirecaoIc = escala.Setor is not null && SetorSiglas.IsDirecaoIc(escala.Setor.Sigla);
 
-        if (!IsEditableStatus(escala.Status))
+        if (escala.Status == StatusEscala.Publicada)
         {
-            return Result.Failure("Somente escalas em rascunho ou finalizadas podem ser excluídas.");
+            // Publicada não tem para quem "devolver" quando é a própria Direção IC — por isso só
+            // ela pode excluir uma escala publicada, e só a dela mesma (nunca a de outro setor).
+            if (!isChefia || !isDirecaoIc)
+            {
+                return Result.Failure("Escala publicada só pode ser excluída pela própria Direção IC.");
+            }
+        }
+        else if (!isChefia || !IsEditableStatus(escala.Status))
+        {
+            return Result.Failure(
+                "Somente quem é chefe do setor (ou do núcleo que o engloba) pode excluir, e só enquanto a escala está em rascunho ou finalizada.");
         }
 
         db.Escalas.Remove(escala);
@@ -744,18 +848,19 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var escala = await db.Escalas
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (escala is null)
         {
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Escala não encontrada.");
         }
 
-        if (!CanSolicitarDevolucao(actor, escala.SetorId))
+        if (!CanSolicitarDevolucao(actor, escala.SetorId, escala.NucleoId))
         {
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure("Sem permissão para esta escala.");
         }
 
-        if (SetorSiglas.IsDirecaoIc(escala.Setor.Sigla))
+        if (escala.Setor is not null && SetorSiglas.IsDirecaoIc(escala.Setor.Sigla))
         {
             return Result<SolicitacaoDevolucaoEscalaDto>.Failure(
                 "A escala da Direção do IC não solicita devolução. Use a ação Devolver.");
@@ -797,10 +902,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         return Result<SolicitacaoDevolucaoEscalaDto>.Success(new SolicitacaoDevolucaoEscalaDto(
             solicitacao.Id,
             escala.Id,
-            Escala.FormatIdentificacao(escala.Mes, escala.Ano, escala.Setor.Nome),
+            Escala.FormatIdentificacao(escala.Mes, escala.Ano, escala.Setor?.Nome ?? escala.Nucleo?.Nome ?? string.Empty),
             escala.SetorId,
-            escala.Setor.Nome,
-            escala.Setor.Sigla,
+            escala.Setor?.Nome,
+            escala.Setor?.Sigla,
+            escala.NucleoId,
+            escala.Nucleo?.Nome,
+            escala.Nucleo?.Sigla,
             escala.Ano,
             escala.Mes,
             solicitacao.SolicitanteUsuarioId,
@@ -822,10 +930,17 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var escala = await db.Escalas
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (escala is null)
         {
             return Result<EscalaDetailDto>.Failure("Escala não encontrada.");
+        }
+
+        if (escala.SetorId is null)
+        {
+            return Result<EscalaDetailDto>.Failure(
+                "Escala de núcleo não usa devolução direta — use Solicitar devolução.");
         }
 
         if (!actor.PodeAcessar(PermissionCodes.EscalasDevolver, escala.SetorId))
@@ -833,7 +948,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Sem permissão para devolver esta escala.");
         }
 
-        if (!SetorSiglas.IsDirecaoIc(escala.Setor.Sigla))
+        if (escala.Setor is null || !SetorSiglas.IsDirecaoIc(escala.Setor.Sigla))
         {
             return Result<EscalaDetailDto>.Failure(
                 "A devolução direta só é permitida para a escala da Direção do IC.");
@@ -879,25 +994,30 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var items = await db.SolicitacoesDevolucaoEscala
             .AsNoTracking()
             .Include(x => x.Escala).ThenInclude(x => x.Setor)
+            .Include(x => x.Escala).ThenInclude(x => x.Nucleo)
             .Include(x => x.SolicitanteUsuario).ThenInclude(x => x.Servidor)
             .Where(x => x.Status == StatusSolicitacaoDevolucao.Pendente)
             .OrderBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        // Devoluções institucionais: setores operacionais (não a própria Direção IC).
+        // Devoluções institucionais: setores operacionais (não a própria Direção IC). Escalas
+        // de núcleo passam direto — um núcleo nunca é a Direção do IC.
         var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
         if (direcaoIds.Count > 0)
         {
-            items = items.Where(x => !direcaoIds.Contains(x.Escala.SetorId)).ToList();
+            items = items.Where(x => x.Escala.SetorId == null || !direcaoIds.Contains(x.Escala.SetorId.Value)).ToList();
         }
 
         return items.Select(x => new SolicitacaoDevolucaoEscalaDto(
             x.Id,
             x.EscalaId,
-            Escala.FormatIdentificacao(x.Escala.Mes, x.Escala.Ano, x.Escala.Setor.Nome),
+            Escala.FormatIdentificacao(x.Escala.Mes, x.Escala.Ano, x.Escala.Setor?.Nome ?? x.Escala.Nucleo?.Nome ?? string.Empty),
             x.Escala.SetorId,
-            x.Escala.Setor.Nome,
-            x.Escala.Setor.Sigla,
+            x.Escala.Setor?.Nome,
+            x.Escala.Setor?.Sigla,
+            x.Escala.NucleoId,
+            x.Escala.Nucleo?.Nome,
+            x.Escala.Nucleo?.Sigla,
             x.Escala.Ano,
             x.Escala.Mes,
             x.SolicitanteUsuarioId,
@@ -939,6 +1059,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var solicitacao = await db.SolicitacoesDevolucaoEscala
             .Include(x => x.Escala).ThenInclude(x => x.Setor)
+            .Include(x => x.Escala).ThenInclude(x => x.Nucleo)
             .Include(x => x.SolicitanteUsuario).ThenInclude(x => x.Servidor)
             .FirstOrDefaultAsync(x => x.Id == solicitacaoId, cancellationToken);
 
@@ -975,10 +1096,16 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         return Result<SolicitacaoDevolucaoEscalaDto>.Success(new SolicitacaoDevolucaoEscalaDto(
             solicitacao.Id,
             solicitacao.EscalaId,
-            Escala.FormatIdentificacao(solicitacao.Escala.Mes, solicitacao.Escala.Ano, solicitacao.Escala.Setor.Nome),
+            Escala.FormatIdentificacao(
+                solicitacao.Escala.Mes,
+                solicitacao.Escala.Ano,
+                solicitacao.Escala.Setor?.Nome ?? solicitacao.Escala.Nucleo?.Nome ?? string.Empty),
             solicitacao.Escala.SetorId,
-            solicitacao.Escala.Setor.Nome,
-            solicitacao.Escala.Setor.Sigla,
+            solicitacao.Escala.Setor?.Nome,
+            solicitacao.Escala.Setor?.Sigla,
+            solicitacao.Escala.NucleoId,
+            solicitacao.Escala.Nucleo?.Nome,
+            solicitacao.Escala.Nucleo?.Sigla,
             solicitacao.Escala.Ano,
             solicitacao.Escala.Mes,
             solicitacao.SolicitanteUsuarioId,
@@ -1004,22 +1131,29 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Escala de origem não encontrada.");
         }
 
-        if (!CanMutate(actor, origem.SetorId))
+        if (!CanMutate(actor, origem.SetorId, origem.NucleoId))
         {
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
 
-        if (await db.Escalas.AnyAsync(
-                x => x.SetorId == origem.SetorId && x.Ano == request.Ano && x.Mes == request.Mes,
-                cancellationToken))
+        var jaExisteDestino = origem.SetorId is Guid origemSetorId
+            ? await db.Escalas.AnyAsync(
+                x => x.SetorId == origemSetorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                cancellationToken)
+            : await db.Escalas.AnyAsync(
+                x => x.NucleoId == origem.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                cancellationToken);
+        if (jaExisteDestino)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor no mês/ano de destino.");
+            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor/núcleo no mês/ano de destino.");
         }
 
         Escala nova;
         try
         {
-            nova = Escala.Create(origem.SetorId, request.Ano, request.Mes, origem.TipoFuncionamento, origem.Observacao, actorLogin);
+            nova = Escala.Create(
+                origem.SetorId, origem.NucleoId, request.Ano, request.Mes,
+                origem.TipoFuncionamento, origem.Observacao, actorLogin);
         }
         catch (Exception ex)
         {
@@ -1078,6 +1212,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     jornadaSrc.DiasTrabalho,
                     jornadaSrc.DiasFolga,
                     jornadaSrc.TipoOcorrenciaFolgaCodigo,
+                    jornadaSrc.SequenciaCiclo,
                     jornadaSrc.Observacao,
                     jornadaSrc.PadraoEscalaId,
                     jornadaSrc.DataInicioCiclo,
@@ -1132,6 +1267,17 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         return await GetByIdAsync(nova.Id, actorLogin, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ConflitoServidorDto>> CheckConflitosServidoresAsync(
+        CheckConflitosServidoresRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = (request.ServidorIds ?? []).Distinct().ToList();
+        return await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
+            db, ids, request.Ano, request.Mes,
+            request.ExcluirEscalaId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TipoOcorrenciaDto>> ListTiposOcorrenciaAsync(CancellationToken cancellationToken = default) =>
         await db.TiposOcorrencia
             .AsNoTracking()
@@ -1164,6 +1310,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 x.DiasSemana,
                 x.TipoOcorrenciaTrabalho,
                 x.TipoOcorrenciaFolga,
+                x.SequenciaCiclo,
                 x.HoraInicioPadrao,
                 x.HoraFimPadrao,
                 x.HorasPadrao,
@@ -1173,14 +1320,15 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     }
 
     public async Task<EscalaAnteriorInfoDto?> GetEscalaAnteriorAsync(
-        Guid setorId,
+        Guid? setorId,
+        Guid? nucleoId,
         int ano,
         int mes,
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!CanMutate(actor, setorId))
+        if (!CanMutate(actor, setorId, nucleoId))
         {
             return null;
         }
@@ -1189,9 +1337,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var anterior = await db.Escalas
             .AsNoTracking()
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .Include(x => x.Servidores)
             .FirstOrDefaultAsync(
-                x => x.SetorId == setorId && x.Ano == mesAnterior.Year && x.Mes == mesAnterior.Month,
+                x => (setorId != null ? x.SetorId == setorId : x.NucleoId == nucleoId)
+                     && x.Ano == mesAnterior.Year && x.Mes == mesAnterior.Month,
                 cancellationToken);
 
         if (anterior is null)
@@ -1203,7 +1353,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             anterior.Id,
             anterior.Ano,
             anterior.Mes,
-            Escala.FormatIdentificacao(anterior.Mes, anterior.Ano, anterior.Setor.Nome),
+            Escala.FormatIdentificacao(anterior.Mes, anterior.Ano, anterior.Setor?.Nome ?? anterior.Nucleo?.Nome ?? string.Empty),
             anterior.TipoFuncionamento,
             anterior.Status,
             anterior.Servidores.Count);
@@ -1244,9 +1394,17 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         if (faltantes.Count > 0)
         {
+            var efetivoNucleoId = escala.NucleoId ?? await db.Setores
+                .Where(x => x.Id == escala.SetorId)
+                .Select(x => x.NucleoId)
+                .FirstOrDefaultAsync(cancellationToken);
+
             var novos = await db.Servidores
                 .AsNoTracking()
-                .Where(x => faltantes.Contains(x.Id) && x.SetorId == escala.SetorId)
+                .Where(x => faltantes.Contains(x.Id)
+                    && ((escala.SetorId != null && x.SetorId == escala.SetorId)
+                        || (efetivoNucleoId != null
+                            && (x.NucleoId == efetivoNucleoId || (x.SetorId != null && x.Setor!.NucleoId == efetivoNucleoId)))))
                 .Select(x => new
                 {
                     x.Id,
@@ -1260,7 +1418,14 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
             if (novos.Count != faltantes.Count)
             {
-                return Result<EscalaDetailDto>.Failure("Há servidores inválidos ou de outro setor.");
+                return Result<EscalaDetailDto>.Failure("Há servidores inválidos ou que não pertencem a este setor/núcleo.");
+            }
+
+            var conflitosGerar = await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
+                db, faltantes, escala.Ano, escala.Mes, excluirEscalaId: escala.Id, cancellationToken);
+            if (conflitosGerar.Count > 0)
+            {
+                return Result<EscalaDetailDto>.Failure(EscalaConflitoChecker.FormatarMensagem(conflitosGerar));
             }
 
             var maxOrdem = escala.Servidores.Count == 0 ? 0 : escala.Servidores.Max(x => x.Ordem);
@@ -1278,8 +1443,9 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     novo.CargoCodigo,
                     actorLogin);
 
+                // Só Add no DbSet: `escala` já está rastreada pelo EF, então o fixup automático
+                // já inclui `criado` em escala.Servidores — Add aqui também duplicaria o item.
                 db.EscalaServidores.Add(criado);
-                escala.Servidores.Add(criado);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -1338,6 +1504,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     padrao.DiasTrabalho,
                     padrao.DiasFolga,
                     padrao.TipoOcorrenciaFolga,
+                    padrao.SequenciaCiclo,
                     null,
                     padrao.Id,
                     dataInicioCiclo,
@@ -1348,8 +1515,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 return Result<EscalaDetailDto>.Failure(ex.Message);
             }
 
+            // Só Add no DbSet — ver comentário equivalente acima sobre fixup automático do EF.
             db.EscalaJornadas.Add(jornada);
-            escalaServidor.Jornadas.Add(jornada);
             await db.SaveChangesAsync(cancellationToken);
             await ApplyJornadaAsync(escalaServidor, jornada, actorLogin, cancellationToken);
         }
@@ -1432,8 +1599,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                         null,
                         seiObs,
                         actorLogin);
+                    // Só Add no DbSet — ver comentário equivalente sobre fixup automático do EF.
                     db.EscalaOcorrencias.Add(criada);
-                    escalaServidor.Ocorrencias.Add(criada);
                 }
                 else
                 {
@@ -1809,6 +1976,16 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .Where(x => x.EscalaServidorId == escalaServidor.Id)
             .ToListAsync(cancellationToken);
 
+        // Um ciclo customizado (ex.: PT24_TL12 = "PT,D,D,D,TL12,D") mistura fases de duração
+        // diferente sob um único `jornada.Horas` (pensado pra regime de fase única, tipo
+        // 12X36/24X72) — carimbar esse valor em toda fase de trabalho faz TL12 (12h) herdar as
+        // 24h do "PT" e a carga remota contar em dobro. A duração certa por fase vem do
+        // catálogo por código, mesmo padrão já usado em AplicarAfastamentos (~linha 1545).
+        var tipos = await db.TiposOcorrencia
+            .AsNoTracking()
+            .Where(x => x.Ativo)
+            .ToDictionaryAsync(x => x.Codigo, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
         foreach (var (data, codigo, isTrabalho) in EscalaJornadaExpander.Expand(jornada))
         {
             var current = existing.FirstOrDefault(x => x.Data == data);
@@ -1819,7 +1996,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
             var horaInicio = isTrabalho ? jornada.HoraInicio : null;
             var horaFim = isTrabalho ? jornada.HoraFim : null;
-            var horas = isTrabalho ? jornada.Horas : null;
+            var horas = isTrabalho ? (tipos.GetValueOrDefault(codigo)?.HorasPadrao ?? jornada.Horas) : null;
 
             if (current is null)
             {
@@ -1881,7 +2058,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return (null, "Escala não encontrada.");
         }
 
-        if (!CanMutate(actor, escala.SetorId))
+        if (!CanMutate(actor, escala.SetorId, escala.NucleoId))
         {
             return (null, "Sem permissão para esta escala.");
         }
@@ -1902,6 +2079,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var escala = await db.Escalas
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(x => x.Servidores).ThenInclude(x => x.Jornadas)
             .Include(x => x.Servidores).ThenInclude(x => x.Ocorrencias)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -1911,7 +2089,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return (null, "Escala não encontrada.");
         }
 
-        if (!CanView(actor, escala.SetorId))
+        if (!CanView(actor, escala.SetorId, escala.NucleoId))
         {
             return (null, "Sem permissão para esta escala.");
         }
@@ -1922,7 +2100,9 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     private IQueryable<Escala> LoadDetailQuery() =>
         db.Escalas
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .Include(x => x.Servidores).ThenInclude(x => x.Cargo)
             .Include(x => x.Servidores).ThenInclude(x => x.Jornadas).ThenInclude(x => x.PadraoEscala)
             .Include(x => x.Servidores).ThenInclude(x => x.Ocorrencias).ThenInclude(x => x.TipoOcorrencia);
@@ -1942,14 +2122,32 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .ToHashSet();
     }
 
-    private static bool CanMutate(ActorContext actor, Guid setorId) =>
-        actor.PodeAcessar(PermissionCodes.EscalasEditar, setorId);
+    private static bool CanMutate(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
+        setorId is Guid s
+            ? actor.PodeAcessar(PermissionCodes.EscalasEditar, s) || actor.GerenciaSetorViaNucleo(s)
+            : nucleoId is Guid n
+                && (actor.GerenciaNucleo(n)
+                    || (actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasEditar)));
 
-    private static bool CanSolicitarDevolucao(ActorContext actor, Guid setorId) =>
-        actor.PodeAcessar(PermissionCodes.EscalasSolicitarDevolucao, setorId);
+    private static bool CanSolicitarDevolucao(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
+        setorId is Guid s
+            ? actor.PodeAcessar(PermissionCodes.EscalasSolicitarDevolucao, s)
+            : nucleoId is Guid n && actor.GerenciaNucleo(n);
 
-    private static bool CanView(ActorContext actor, Guid setorId) =>
-        actor.PodeVer(PermissionCodes.EscalasListar, setorId);
+    /// <summary>Chefia de verdade (setor direto ou núcleo que engloba o setor) — ao contrário de
+    /// <see cref="CanMutate"/>, NÃO aceita a abrangência "TodosOsSetores" de uma permissão como
+    /// substituto de chefia. Usado só onde uma "visão institucional" ampla não deve bastar (ex.:
+    /// excluir a escala de um setor que o ator não chefia de fato).</summary>
+    private static bool IsChefiaDireta(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
+        setorId is Guid s
+            ? actor.SetoresGerenciadosIds.Contains(s) || actor.GerenciaSetorViaNucleo(s)
+            : nucleoId is Guid n && actor.GerenciaNucleo(n);
+
+    private static bool CanView(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
+        setorId is Guid s
+            ? actor.PodeVer(PermissionCodes.EscalasListar, s)
+            : CanMutate(actor, setorId, nucleoId)
+                || (nucleoId is Guid n2 && actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasListar));
 
     private static bool IsEditableStatus(StatusEscala status) =>
         status is StatusEscala.Rascunho or StatusEscala.Finalizada;
@@ -2064,6 +2262,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                             j.DiasTrabalho,
                             j.DiasFolga,
                             j.TipoOcorrenciaFolgaCodigo,
+                            j.SequenciaCiclo,
                             j.Observacao))
                         .ToList(),
                     s.Ocorrencias
@@ -2085,10 +2284,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         return new(
             escala.Id,
-            Escala.FormatIdentificacao(escala.Mes, escala.Ano, escala.Setor.Nome),
+            Escala.FormatIdentificacao(escala.Mes, escala.Ano, escala.Setor?.Nome ?? escala.Nucleo?.Nome ?? string.Empty),
             escala.SetorId,
-            escala.Setor.Nome,
-            escala.Setor.Sigla,
+            escala.Setor?.Nome,
+            escala.Setor?.Sigla,
+            escala.NucleoId,
+            escala.Nucleo?.Nome,
+            escala.Nucleo?.Sigla,
             escala.Ano,
             escala.Mes,
             escala.DataInicio,

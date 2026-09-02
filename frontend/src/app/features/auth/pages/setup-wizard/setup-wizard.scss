@@ -1,0 +1,21 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.setup-wizard {
+  width: min(100%, 28rem);
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.setup-wizard h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.setup-wizard p {
+  margin: 0;
+  opacity: 0.85;
+}

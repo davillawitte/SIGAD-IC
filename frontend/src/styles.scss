@@ -123,21 +123,101 @@ app-form-section + app-form-section {
   min-width: min(520px, 92vw);
   max-width: 100%;
   box-sizing: border-box;
-}
-
-.pci-app-dialog__title {
-  margin: 0;
-  font-size: var(--pci-font-size-lg, 1.125rem);
-  font-weight: var(--pci-font-weight-semibold, 600);
-  color: var(--pci-color-text-primary, #101828);
+  text-align: center;
 }
 
 .pci-app-dialog__message {
   margin: 0;
   white-space: pre-wrap;
-  font-size: var(--pci-font-size-sm, 0.875rem);
-  line-height: 1.5;
+  font-size: var(--pci-font-size-md, 1rem);
+  line-height: 1.6;
   color: var(--pci-color-text-secondary, #667085);
+}
+
+/* Caixa de destaque (ex.: "Deseja cadastrar um usuário de acesso para X agora?") — visual de
+ * referência em docs/models images/modal choices.png, sem componente equivalente na lib. */
+.pci-app-dialog__info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--pci-radius-md, 0.5rem);
+  background: #eef4ff;
+  color: var(--pci-color-text-primary, #101828);
+  text-align: left;
+}
+
+.pci-app-dialog__info-box pci-icon {
+  flex-shrink: 0;
+  color: #2563eb;
+}
+
+.pci-app-dialog__info-box p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Corpo do formulário volta ao alinhamento padrão à esquerda — só o cabeçalho/selo/mensagens
+ * curtas de confirmação ficam centralizados. */
+.pci-app-dialog pci-form-card,
+.pci-app-dialog form {
+  text-align: left;
+}
+
+/* Linha antes do rodapé de botões — eco do risco dourado do cabeçalho, mais discreto. */
+.pci-app-dialog pci-form-actions {
+  padding-top: var(--pci-space-4, 1rem);
+  border-top: 1px solid var(--pci-color-border, #e4e7ec);
+}
+
+/* Texto de pci-alert (erro/sucesso) dentro dos modais — o componente vem do design system com
+ * `.pci-alert__message` em --pci-font-size-base (14px), pequeno demais comparado ao resto do
+ * modal. Escopado só a `.pci-app-dialog` pra não afetar pci-alert usado fora de modais.
+ * !important necessário: a regra vem injetada pelo pacote compilado, sem garantia de perder
+ * empate de especificidade/ordem de carregamento pra uma regra global daqui. */
+.pci-app-dialog .pci-alert__message {
+  font-size: var(--pci-font-size-md, 1rem) !important;
+}
+
+/* Link discreto dentro de mensagens de modal (ex.: "clique aqui para visualizar" os conflitos de
+ * publicação) — sem componente de link no design system, botão nativo estilizado como texto. */
+.pci-app-dialog__link {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--pci-color-primary, #1d4ed8);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Lista de conflitos de publicação — sem componente de lista no design system pra esse caso. */
+.pci-app-dialog__conflitos-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.pci-app-dialog__conflitos-list li {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--pci-color-border, #e4e7ec);
+  border-radius: var(--pci-radius-md, 0.375rem);
+}
+
+.pci-app-dialog__conflitos-list li p {
+  margin: 0.25rem 0 0;
+  color: var(--pci-color-text-secondary, #667085);
+}
+
+.pci-app-dialog__conflitos-item--critico {
+  border-color: var(--pci-color-error, #b42318) !important;
+  background: #fef2f2;
 }
 
 /* Células longas: quebra de linha em vez de esticar a tabela horizontalmente */

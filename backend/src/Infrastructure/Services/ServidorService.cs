@@ -25,7 +25,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         }
 
         var items = await query.OrderBy(x => x.Nome).ToListAsync(cancellationToken);
-        return items.Select(Map).ToList();
+        return items.Select(MapLista).ToList();
     }
 
     public async Task<IReadOnlyList<ServidorListItemDto>> ListMeusAsync(
@@ -43,12 +43,23 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Servidores);
         if (setoresVisiveis is not null)
         {
-            if (setoresVisiveis.Count == 0)
+            if (setoresVisiveis.Count == 0 && actor.NucleosGerenciadosIds.Count == 0)
             {
                 return [];
             }
 
-            query = query.Where(x => setoresVisiveis.Contains(x.SetorId));
+            // Quem chefia um núcleo enxerga também os servidores lotados nos setores que o
+            // núcleo engloba (não só os lotados direto no núcleo) — `SetoresDosNucleosGerenciadosIds`
+            // já traz esses setores resolvidos pelo `ActorContextLoader`.
+            var setoresIncluidos = setoresVisiveis
+                .Concat(actor.SetoresDosNucleosGerenciadosIds)
+                .Distinct()
+                .ToList();
+            var nucleoIdsSet = actor.NucleosGerenciadosIds;
+
+            query = query.Where(x =>
+                (x.SetorId != null && setoresIncluidos.Contains(x.SetorId.Value)) ||
+                (x.NucleoId != null && nucleoIdsSet.Contains(x.NucleoId.Value)));
         }
 
         if (semUsuario == true)
@@ -57,10 +68,10 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         }
 
         var items = await query.OrderBy(x => x.Nome).ToListAsync(cancellationToken);
-        return items.Select(Map).ToList();
+        return items.Select(MapLista).ToList();
     }
 
-    public async Task<Result<ServidorListItemDto>> GetByIdAsync(
+    public async Task<Result<ServidorDetalheDto>> GetByIdAsync(
         Guid id,
         string actorLogin,
         CancellationToken cancellationToken = default)
@@ -69,26 +80,26 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         var servidor = await LoadQuery().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (servidor is null)
         {
-            return Result<ServidorListItemDto>.Failure("Servidor não encontrado.");
+            return Result<ServidorDetalheDto>.Failure("Servidor não encontrado.");
         }
 
-        if (!actor.PodeAcessar(PermissionCodes.ServidoresListar, servidor.SetorId))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.ServidoresListar, servidor.SetorId, servidor.NucleoId))
         {
-            return Result<ServidorListItemDto>.Failure("Sem permissão para este servidor.");
+            return Result<ServidorDetalheDto>.Failure("Sem permissão para este servidor.");
         }
 
-        return Result<ServidorListItemDto>.Success(Map(servidor));
+        return Result<ServidorDetalheDto>.Success(MapDetalhe(servidor));
     }
 
-    public async Task<Result<ServidorListItemDto>> CreateAsync(
+    public async Task<Result<ServidorDetalheDto>> CreateAsync(
         CreateServidorRequest request,
         string actorLogin,
         CancellationToken cancellationToken = default)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
-        if (!actor.PodeAcessar(PermissionCodes.ServidoresCriar, request.SetorId))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.ServidoresCriar, request.SetorId, request.NucleoId))
         {
-            return Result<ServidorListItemDto>.Failure("Sem permissão para cadastrar servidor neste setor.");
+            return Result<ServidorDetalheDto>.Failure("Sem permissão para cadastrar servidor nesta lotação.");
         }
 
         var validation = await ValidateAsync(
@@ -100,11 +111,12 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.DataNascimento,
             request.CargoId,
             request.SetorId,
+            request.NucleoId,
             null,
             cancellationToken);
         if (validation is not null)
         {
-            return Result<ServidorListItemDto>.Failure(validation);
+            return Result<ServidorDetalheDto>.Failure(validation);
         }
 
         var status = request.Status ?? StatusServidor.Ativo;
@@ -115,6 +127,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.CargoId,
             request.Email,
             request.SetorId,
+            request.NucleoId,
             request.DataNascimento,
             request.Telefone,
             status,
@@ -125,7 +138,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         return await GetByIdAsync(servidor.Id, actorLogin, cancellationToken);
     }
 
-    public async Task<Result<ServidorListItemDto>> UpdateAsync(
+    public async Task<Result<ServidorDetalheDto>> UpdateAsync(
         Guid id,
         UpdateServidorRequest request,
         string actorLogin,
@@ -135,13 +148,13 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         var servidor = await db.Servidores.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (servidor is null)
         {
-            return Result<ServidorListItemDto>.Failure("Servidor não encontrado.");
+            return Result<ServidorDetalheDto>.Failure("Servidor não encontrado.");
         }
 
-        if (!actor.PodeAcessar(PermissionCodes.ServidoresEditar, servidor.SetorId)
-            || !actor.PodeAcessar(PermissionCodes.ServidoresEditar, request.SetorId))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.ServidoresEditar, servidor.SetorId, servidor.NucleoId)
+            || !PodeAcessarLotacao(actor, PermissionCodes.ServidoresEditar, request.SetorId, request.NucleoId))
         {
-            return Result<ServidorListItemDto>.Failure("Sem permissão para alterar servidor neste setor.");
+            return Result<ServidorDetalheDto>.Failure("Sem permissão para alterar servidor nesta lotação.");
         }
 
         var validation = await ValidateAsync(
@@ -153,16 +166,17 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.DataNascimento,
             request.CargoId,
             request.SetorId,
+            request.NucleoId,
             id,
             cancellationToken);
         if (validation is not null)
         {
-            return Result<ServidorListItemDto>.Failure(validation);
+            return Result<ServidorDetalheDto>.Failure(validation);
         }
 
         if (!Enum.IsDefined(request.Status))
         {
-            return Result<ServidorListItemDto>.Failure("Status inválido.");
+            return Result<ServidorDetalheDto>.Failure("Status inválido.");
         }
 
         servidor.Atualizar(
@@ -172,6 +186,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.CargoId,
             request.Email,
             request.SetorId,
+            request.NucleoId,
             request.DataNascimento,
             request.Telefone,
             actorLogin);
@@ -193,9 +208,9 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             return Result<ServidorExclusaoImpactoDto>.Failure("Servidor não encontrado.");
         }
 
-        if (!actor.PodeAcessar(PermissionCodes.ServidoresExcluir, servidor.SetorId))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.ServidoresExcluir, servidor.SetorId, servidor.NucleoId))
         {
-            return Result<ServidorExclusaoImpactoDto>.Failure("Sem permissão para excluir servidor neste setor.");
+            return Result<ServidorExclusaoImpactoDto>.Failure("Sem permissão para excluir servidor nesta lotação.");
         }
 
         var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
@@ -211,9 +226,9 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             return Result.Failure("Servidor não encontrado.");
         }
 
-        if (!actor.PodeAcessar(PermissionCodes.ServidoresExcluir, servidor.SetorId))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.ServidoresExcluir, servidor.SetorId, servidor.NucleoId))
         {
-            return Result.Failure("Sem permissão para excluir servidor neste setor.");
+            return Result.Failure("Sem permissão para excluir servidor nesta lotação.");
         }
 
         var impacto = await BuildExclusaoImpactoAsync(id, cancellationToken);
@@ -231,6 +246,23 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
 
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);
+
+    /// <summary>
+    /// Servidor lotado num setor segue a checagem de abrangência por setor de sempre;
+    /// servidor lotado direto no núcleo é liberado pra quem chefia aquele núcleo,
+    /// ou pra quem tem visão institucional do módulo — nunca cai no branch permissivo
+    /// de <see cref="ActorContext.PodeAcessar"/> com setorId nulo.
+    /// </summary>
+    private static bool PodeAcessarLotacao(ActorContext actor, string code, Guid? setorId, Guid? nucleoId)
+    {
+        if (nucleoId.HasValue)
+        {
+            return actor.GerenciaNucleo(nucleoId.Value)
+                || (actor.TemVisaoGlobal(PermissionModules.Servidores) && actor.TemPermissao(code));
+        }
+
+        return actor.PodeAcessar(code, setorId);
+    }
 
     private async Task<ServidorExclusaoImpactoDto> BuildExclusaoImpactoAsync(
         Guid id,
@@ -260,10 +292,16 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         string? telefone,
         DateOnly dataNascimento,
         Guid cargoId,
-        Guid setorId,
+        Guid? setorId,
+        Guid? nucleoId,
         Guid? excludingId,
         CancellationToken cancellationToken)
     {
+        if (setorId.HasValue == nucleoId.HasValue)
+        {
+            return "Informe o setor de lotação ou o núcleo de lotação direta, nunca os dois nem nenhum.";
+        }
+
         if (string.IsNullOrWhiteSpace(nome))
         {
             return "Nome é obrigatório.";
@@ -316,9 +354,14 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             return "CPF já cadastrado.";
         }
 
-        if (!await db.Setores.AnyAsync(x => x.Id == setorId, cancellationToken))
+        if (setorId.HasValue && !await db.Setores.AnyAsync(x => x.Id == setorId, cancellationToken))
         {
             return "Setor inválido.";
+        }
+
+        if (nucleoId.HasValue && !await db.Nucleos.AnyAsync(x => x.Id == nucleoId, cancellationToken))
+        {
+            return "Núcleo inválido.";
         }
 
         if (!await db.Cargos.AnyAsync(x => x.Id == cargoId && x.Ativo, cancellationToken))
@@ -334,9 +377,29 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             .AsNoTracking()
             .Include(x => x.Cargo)
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .Include(x => x.Usuario);
 
-    private static ServidorListItemDto Map(Servidor servidor) =>
+    private static ServidorListItemDto MapLista(Servidor servidor) =>
+        new(
+            servidor.Id,
+            servidor.Nome,
+            servidor.Matricula,
+            servidor.CargoId,
+            servidor.Cargo.Nome,
+            servidor.Cargo.Codigo,
+            servidor.Email,
+            servidor.Telefone,
+            servidor.DataNascimento,
+            servidor.SetorId,
+            servidor.Setor?.Nome,
+            servidor.NucleoId,
+            servidor.Nucleo?.Nome,
+            servidor.Usuario is not null,
+            servidor.Usuario?.Ativo ?? false,
+            servidor.Status);
+
+    private static ServidorDetalheDto MapDetalhe(Servidor servidor) =>
         new(
             servidor.Id,
             servidor.Nome,
@@ -349,8 +412,11 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             servidor.Telefone,
             servidor.DataNascimento,
             servidor.SetorId,
-            servidor.Setor.Nome,
+            servidor.Setor?.Nome,
+            servidor.NucleoId,
+            servidor.Nucleo?.Nome,
             servidor.Usuario is not null,
+            servidor.Usuario?.Ativo ?? false,
             servidor.Status);
 
     private static string DigitsOnly(string value) => new(value.Where(char.IsDigit).ToArray());

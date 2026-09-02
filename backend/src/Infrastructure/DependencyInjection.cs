@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasherService, PasswordHasherService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<IUsuarioService, UsuarioService>();
         services.AddScoped<IPerfilService, PerfilService>();
         services.AddScoped<IPermissaoService, PermissaoService>();
@@ -62,7 +63,11 @@ public static class DependencyInjection
         services.AddScoped<IServidorService, ServidorService>();
         services.AddScoped<IEscalaService, EscalaService>();
         services.AddScoped<IEscalaPdfService, EscalaPdfService>();
+        services.AddScoped<IEscalaCsvService, EscalaCsvService>();
+        services.AddScoped<IEscalaResumidaService, EscalaResumidaService>();
+        services.AddScoped<IEscalaResumidaPdfService, EscalaResumidaPdfService>();
         services.AddScoped<IAfastamentoService, AfastamentoService>();
+        services.AddScoped<ICalendarioService, CalendarioService>();
 
         return services;
     }

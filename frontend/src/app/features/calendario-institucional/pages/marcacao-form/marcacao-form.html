@@ -1,0 +1,42 @@
+<pci-form-page
+  [title]="isEdit() ? 'Editar marcação' : 'Nova marcação'"
+  description="Feriado, ponto facultativo ou evento institucional para este ano do calendário."
+  [currentPath]="currentPath()"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Dados">
+      <pci-select
+        [appFormCol]="12"
+        label="Tipo"
+        [required]="true"
+        formControlName="tipo"
+        [options]="tipoOptions"
+        placeholder="Selecione o tipo"
+      />
+
+      <pci-input [appFormCol]="4" label="Data" type="date" formControlName="data" [required]="true" />
+      <pci-input
+        [appFormCol]="4"
+        label="Data fim"
+        type="date"
+        formControlName="dataFim"
+        hint="Opcional — só p/ mais de um dia"
+      />
+      <pci-input [appFormCol]="4" label="Nome" formControlName="nome" [required]="true" />
+
+      @if (mostrarCamposEvento()) {
+        <pci-textarea [appFormCol]="12" label="Descrição" formControlName="descricao" [rows]="4" />
+        <pci-input label="Local" formControlName="local" />
+        <pci-input label="Público-alvo" formControlName="publicoAlvo" />
+      }
+    </app-form-section>
+  </form>
+</pci-form-page>

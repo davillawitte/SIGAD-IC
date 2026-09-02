@@ -115,6 +115,21 @@ public static class PadraoEscalaSeed
             createdBy: "seed"));
 
         AddIfMissing(PadraoEscala.Create(
+            "PT24_TL12",
+            "Plantão 24h + Laudo 12h",
+            TipoFuncionamento.VinteQuatroHoras,
+            TipoJornada.Plantao,
+            RecorrenciaTipo.CicloPersonalizado,
+            tipoOcorrenciaTrabalho: "PT",
+            tipoOcorrenciaFolga: "D",
+            sequenciaCiclo: "PT,D,D,D,TL12,D",
+            horaInicioPadrao: new TimeOnly(7, 0),
+            horaFimPadrao: new TimeOnly(7, 0),
+            horasPadrao: 24,
+            sistema: true,
+            createdBy: "seed"));
+
+        AddIfMissing(PadraoEscala.Create(
             "PERSONALIZADO",
             "Personalizado",
             TipoFuncionamento.VinteQuatroHoras,

@@ -16,9 +16,13 @@ public sealed class ActorContext
     public string Login { get; }
     public bool IsSuperAdmin { get; }
     public IReadOnlyList<Guid> SetoresGerenciadosIds { get; }
+    public IReadOnlyList<Guid> NucleosGerenciadosIds { get; }
+    public IReadOnlyList<Guid> SetoresDosNucleosGerenciadosIds { get; }
     public IReadOnlyList<PerfilConcessao> Perfis { get; }
 
     private readonly HashSet<Guid> _setoresGerenciados;
+    private readonly HashSet<Guid> _nucleosGerenciados;
+    private readonly HashSet<Guid> _setoresDosNucleosGerenciados;
 
     public ActorContext(
         Guid usuarioId,
@@ -26,15 +30,21 @@ public sealed class ActorContext
         string login,
         bool isSuperAdmin,
         IReadOnlyList<Guid> setoresGerenciadosIds,
-        IReadOnlyList<PerfilConcessao> perfis)
+        IReadOnlyList<PerfilConcessao> perfis,
+        IReadOnlyList<Guid>? nucleosGerenciadosIds = null,
+        IReadOnlyList<Guid>? setoresDosNucleosGerenciadosIds = null)
     {
         UsuarioId = usuarioId;
         ServidorId = servidorId;
         Login = login;
         IsSuperAdmin = isSuperAdmin;
         SetoresGerenciadosIds = setoresGerenciadosIds;
+        NucleosGerenciadosIds = nucleosGerenciadosIds ?? [];
+        SetoresDosNucleosGerenciadosIds = setoresDosNucleosGerenciadosIds ?? [];
         Perfis = perfis;
         _setoresGerenciados = setoresGerenciadosIds.ToHashSet();
+        _nucleosGerenciados = (nucleosGerenciadosIds ?? []).ToHashSet();
+        _setoresDosNucleosGerenciados = (setoresDosNucleosGerenciadosIds ?? []).ToHashSet();
     }
 
     public static ActorContext Empty { get; } = new(
@@ -43,7 +53,17 @@ public sealed class ActorContext
         string.Empty,
         false,
         [],
+        [],
+        [],
         []);
+
+    /// <summary>Chefe do núcleo (Nucleo.ChefeServidorId aponta para o servidor deste ator).</summary>
+    public bool GerenciaNucleo(Guid nucleoId) => _nucleosGerenciados.Contains(nucleoId);
+
+    /// <summary>Setor pertence a um núcleo que este ator chefia (mesmo sem chefia direta do
+    /// setor) — usado por módulos que queiram tratar chefia de núcleo como suficiente pra
+    /// mutar qualquer setor do núcleo, sem alterar a semântica geral de <see cref="Abrange"/>.</summary>
+    public bool GerenciaSetorViaNucleo(Guid setorId) => _setoresDosNucleosGerenciados.Contains(setorId);
 
     /// <summary>Gate grosso: união das permissões dos perfis (sem bypass).</summary>
     public bool TemPermissao(string code) =>

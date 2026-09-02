@@ -19,9 +19,15 @@ import {
 import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
-import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
+import {
+  openConfirmDialog,
+  openConflitosDialog,
+  openExportEscalaDialog,
+} from '../../../../shared/dialogs/dialog.helpers';
+import { AdminApiService } from '../../../admin/services/admin-api.service';
 import { ESCALAS_ROUTE_PAGES } from '../../escalas-route-pages';
 import { EscalasApiService } from '../../services/escalas-api.service';
+import { EscalasResumidasApiService } from '../../services/escalas-resumidas-api.service';
 import type { EscalaListItem, SolicitacaoDevolucaoEscala, StatusEscala } from '../../models/escalas.models';
 import { statusEscalaLabel } from '../../models/escalas.models';
 
@@ -29,7 +35,9 @@ type EscalaEscopo = 'setor' | 'institucional';
 
 type EscalaRow = {
   id: string;
-  setorId: string;
+  setorId?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
   periodoReferencia: string;
   setor: string;
   status: string;
@@ -37,6 +45,7 @@ type EscalaRow = {
   publicadaEm: string;
   criadoEm: string;
   criadoPor: string;
+  resumidaId?: string | null;
 };
 
 @Component({
@@ -54,6 +63,8 @@ type EscalaRow = {
 })
 export class EscalaList implements OnInit, OnDestroy {
   private readonly api = inject(EscalasApiService);
+  private readonly resumidaApi = inject(EscalasResumidasApiService);
+  private readonly adminApi = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -101,39 +112,54 @@ export class EscalaList implements OnInit, OnDestroy {
   readonly devolucoes = signal<SolicitacaoDevolucaoEscala[]>([]);
   readonly devolucaoWorking = signal(false);
 
-  readonly filterFields: PciFilterField[] = [
-    {
-      key: 'mes',
-      label: 'Mês',
-      type: 'select',
-      options: [
-        { label: 'Janeiro', value: '1' },
-        { label: 'Fevereiro', value: '2' },
-        { label: 'Março', value: '3' },
-        { label: 'Abril', value: '4' },
-        { label: 'Maio', value: '5' },
-        { label: 'Junho', value: '6' },
-        { label: 'Julho', value: '7' },
-        { label: 'Agosto', value: '8' },
-        { label: 'Setembro', value: '9' },
-        { label: 'Outubro', value: '10' },
-        { label: 'Novembro', value: '11' },
-        { label: 'Dezembro', value: '12' },
-      ],
-    },
-    { key: 'ano', label: 'Ano', type: 'text', placeholder: 'Ex.: 2026' },
-    {
-      key: 'status',
-      label: 'Status',
-      type: 'select',
-      options: [
-        { label: 'Rascunho', value: 'Rascunho' },
-        { label: 'Finalizada', value: 'Finalizada' },
-        { label: 'Publicada', value: 'Publicada' },
-        { label: 'Devolução solicitada', value: 'DevolucaoSolicitada' },
-      ],
-    },
-  ];
+  readonly setorFilterOptions = signal<{ label: string; value: string }[]>([]);
+
+  readonly filterFields = computed<PciFilterField[]>(() => {
+    const fields: PciFilterField[] = [
+      {
+        key: 'mes',
+        label: 'Mês',
+        type: 'select',
+        options: [
+          { label: 'Janeiro', value: '1' },
+          { label: 'Fevereiro', value: '2' },
+          { label: 'Março', value: '3' },
+          { label: 'Abril', value: '4' },
+          { label: 'Maio', value: '5' },
+          { label: 'Junho', value: '6' },
+          { label: 'Julho', value: '7' },
+          { label: 'Agosto', value: '8' },
+          { label: 'Setembro', value: '9' },
+          { label: 'Outubro', value: '10' },
+          { label: 'Novembro', value: '11' },
+          { label: 'Dezembro', value: '12' },
+        ],
+      },
+      { key: 'ano', label: 'Ano', type: 'text', placeholder: 'Ex.: 2026' },
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { label: 'Rascunho', value: 'Rascunho' },
+          { label: 'Finalizada', value: 'Finalizada' },
+          { label: 'Publicada', value: 'Publicada' },
+          { label: 'Devolução solicitada', value: 'DevolucaoSolicitada' },
+        ],
+      },
+    ];
+
+    if (this.isInstitucional()) {
+      fields.push({
+        key: 'setorId',
+        label: 'Setor',
+        type: 'select',
+        options: this.setorFilterOptions(),
+      });
+    }
+
+    return fields;
+  });
 
   readonly columns: PciColumn<EscalaRow>[] = [
     { key: 'periodoReferencia', label: 'Período de Referência', sortable: false },
@@ -157,7 +183,7 @@ export class EscalaList implements OnInit, OnDestroy {
           icon: 'edit',
           placement: 'inline',
           hidden: (row) =>
-            !this.auth.canAccess('escalas.editar', row.setorId) ||
+            !this.auth.canAccessEscala('escalas.editar', row.setorId, row.nucleoId) ||
             (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada'),
         },
         {
@@ -166,15 +192,23 @@ export class EscalaList implements OnInit, OnDestroy {
           icon: 'check',
           placement: 'inline',
           hidden: (row) =>
-            !this.auth.canAccess('escalas.publicar', row.setorId) || row.statusRaw !== 'Finalizada',
+            !this.auth.canAccessEscala('escalas.publicar', row.setorId, row.nucleoId) ||
+            row.statusRaw !== 'Finalizada',
         },
       );
     }
 
     if (this.canExport()) {
       actions.push(
-        { id: 'pdf-h', label: 'PDF horizontal', icon: 'download', placement: 'menu' },
+        { id: 'download', label: 'Baixar (PDF ou CSV)', icon: 'download', placement: 'inline' },
         { id: 'pdf-v', label: 'PDF vertical', icon: 'download', placement: 'menu' },
+        {
+          id: 'pdf-resumida',
+          label: 'PDF da escala resumida',
+          icon: 'download',
+          placement: 'menu',
+          hidden: (row) => !row.resumidaId,
+        },
       );
     }
 
@@ -186,8 +220,10 @@ export class EscalaList implements OnInit, OnDestroy {
         placement: 'menu',
         variant: 'danger',
         hidden: (row) =>
-          !this.auth.canAccess('escalas.excluir', row.setorId) ||
-          (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada'),
+          !this.auth.isChefiaDireta(row.setorId, row.nucleoId) ||
+          (row.statusRaw !== 'Rascunho' &&
+            row.statusRaw !== 'Finalizada' &&
+            !(row.statusRaw === 'Publicada' && row.setorSigla === 'Direção IC')),
       });
     }
 
@@ -200,6 +236,15 @@ export class EscalaList implements OnInit, OnDestroy {
     this.layoutBreadcrumb.setItems(
       this.breadcrumb.buildFromRoutes(this.routePages, this.listBasePath()),
     );
+    if (this.isInstitucional()) {
+      this.adminApi.listSetores().subscribe({
+        next: (setores) =>
+          this.setorFilterOptions.set(
+            setores.map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id })),
+          ),
+        error: () => this.setorFilterOptions.set([]),
+      });
+    }
     this.reload();
     if (this.canDevolver()) {
       this.reloadDevolucoes();
@@ -256,11 +301,14 @@ export class EscalaList implements OnInit, OnDestroy {
       case 'publish':
         this.publicar(row);
         break;
-      case 'pdf-h':
-        this.downloadPdf(id, 'horizontal');
+      case 'download':
+        this.exportarEscala(row);
         break;
       case 'pdf-v':
         this.downloadPdf(id, 'vertical');
+        break;
+      case 'pdf-resumida':
+        if (row.resumidaId) this.downloadResumidaPdf(row.resumidaId);
         break;
       case 'delete':
         this.excluir(row);
@@ -305,8 +353,10 @@ export class EscalaList implements OnInit, OnDestroy {
   }
 
   private excluir(row: EscalaRow): void {
-    if (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada') {
-      const msg = 'Somente escalas em rascunho ou finalizadas podem ser excluídas.';
+    const podeExcluirPublicada = row.statusRaw === 'Publicada' && row.setorSigla === 'Direção IC';
+    if (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada' && !podeExcluirPublicada) {
+      const msg =
+        'Somente escalas em rascunho ou finalizadas podem ser excluídas — publicadas só pela Direção IC.';
       this.error.set(msg);
       this.toast.showError(msg);
       return;
@@ -345,29 +395,52 @@ export class EscalaList implements OnInit, OnDestroy {
       return;
     }
 
-    openConfirmDialog(this.dialog, {
-      title: 'Publicar escala',
-      message: 'Tem certeza que deseja publicar esta escala?',
-      confirmLabel: 'Publicar',
-    })
-      .pipe(filter(Boolean))
-      .subscribe(() => {
-        this.loading.set(true);
-        this.error.set(null);
-        this.api.publicar(row.id).subscribe({
-          next: () => {
-            this.loading.set(false);
-            this.feedback.showSuccess('Escala publicada com sucesso.');
-            this.reload();
+    this.loading.set(true);
+    this.error.set(null);
+    this.api.getConflitos(row.id).subscribe({
+      next: (conflitos) => {
+        this.loading.set(false);
+        if (conflitos.totalCriticos === 0) {
+          this.doPublicar(row.id, false);
+          return;
+        }
+        openConfirmDialog(this.dialog, {
+          title: 'Publicar com conflitos',
+          message: `Esta escala possui ${conflitos.totalCriticos} conflito(s) crítico(s). Deseja publicar mesmo assim?`,
+          confirmLabel: 'Publicar',
+          danger: true,
+          onViewDetails: () => {
+            openConflitosDialog(this.dialog, { itens: conflitos.itens }).subscribe();
           },
-          error: (err: { error?: { message?: string } }) => {
-            const msg = err.error?.message ?? 'Não foi possível publicar a escala.';
-            this.error.set(msg);
-            this.toast.showError(msg);
-            this.loading.set(false);
-          },
-        });
-      });
+        })
+          .pipe(filter(Boolean))
+          .subscribe(() => this.doPublicar(row.id, true));
+      },
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível verificar conflitos da escala.';
+        this.error.set(msg);
+        this.toast.showError(msg);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private doPublicar(id: string, confirmarConflitos: boolean): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.api.publicar(id, confirmarConflitos).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.feedback.showSuccess('Escala publicada com sucesso.');
+        this.reload();
+      },
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível publicar a escala.';
+        this.error.set(msg);
+        this.toast.showError(msg);
+        this.loading.set(false);
+      },
+    });
   }
 
   private downloadPdf(id: string, layout: 'horizontal' | 'vertical'): void {
@@ -383,6 +456,62 @@ export class EscalaList implements OnInit, OnDestroy {
       },
       error: (err: { error?: { message?: string } }) => {
         const msg = err.error?.message ?? 'Não foi possível exportar o PDF.';
+        this.error.set(msg);
+        this.toast.showError(msg);
+      },
+    });
+  }
+
+  private downloadResumidaPdf(resumidaId: string): void {
+    this.resumidaApi.downloadPdf(resumidaId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'escala-resumida.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+        this.feedback.showSuccess('PDF gerado com sucesso.');
+      },
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível exportar o PDF da escala resumida.';
+        this.error.set(msg);
+        this.toast.showError(msg);
+      },
+    });
+  }
+
+  /** Ícone único de "Baixar" — pergunta formato (PDF ou CSV) e, pra CSV, o sub-formato. Só o
+   * CSV "resumido" (auxílio-alimentação) está implementado por enquanto — "completa" ainda é só
+   * a escolha no diálogo, pronta pra quando a geração de fato existir. */
+  private exportarEscala(row: EscalaRow): void {
+    openExportEscalaDialog(this.dialog, {}).subscribe((resultado) => {
+      if (!resultado) return;
+      if (resultado.formato === 'pdf') {
+        this.downloadPdf(row.id, 'horizontal');
+        return;
+      }
+      if (resultado.opcao !== 'resumida') {
+        this.toast.showInfo('Exportação em CSV completa será implementada em breve.', 'Em desenvolvimento');
+        return;
+      }
+      this.downloadCsv(row.id, resultado.opcao);
+    });
+  }
+
+  private downloadCsv(id: string, opcao: 'resumida' | 'completa'): void {
+    this.api.downloadCsv(id, opcao).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `escala-${opcao}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.feedback.showSuccess('CSV gerado com sucesso.');
+      },
+      error: (err: { error?: { message?: string } }) => {
+        const msg = err.error?.message ?? 'Não foi possível exportar o CSV.';
         this.error.set(msg);
         this.toast.showError(msg);
       },
@@ -415,6 +544,7 @@ export class EscalaList implements OnInit, OnDestroy {
         status: (filters['status'] as string) || undefined,
         ano: Number.isFinite(ano) && ano > 0 ? ano : undefined,
         mes: Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined,
+        setorId: (filters['setorId'] as string) || undefined,
         escopo: this.escopo(),
       })
       .subscribe({
@@ -451,8 +581,12 @@ export class EscalaList implements OnInit, OnDestroy {
     return {
       id: item.id,
       setorId: item.setorId,
+      setorSigla: item.setorSigla,
+      nucleoId: item.nucleoId,
       periodoReferencia: `${mesNome}/${item.ano}`,
-      setor: `${item.setorSigla} — ${item.setorNome}`,
+      setor: item.setorId
+        ? `${item.setorSigla} — ${item.setorNome}`
+        : `${item.nucleoSigla} — ${item.nucleoNome} (núcleo)`,
       status: statusEscalaLabel(item.status),
       statusRaw: item.status,
       publicadaEm:
@@ -461,6 +595,7 @@ export class EscalaList implements OnInit, OnDestroy {
           : '—',
       criadoEm: this.fmtDateTime(item.createdAt),
       criadoPor: item.createdBy ?? '—',
+      resumidaId: item.resumidaId ?? null,
     };
   }
 

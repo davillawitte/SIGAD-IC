@@ -1,7 +1,9 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { catchError, map, of } from 'rxjs';
 
 import { AuthService } from './auth.service';
+import { SetupApiService } from './setup-api.service';
 
 export const authGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
@@ -14,19 +16,38 @@ export const authGuard: CanActivateFn = () => {
   return router.createUrlTree(['/login']);
 };
 
+/**
+ * Não autenticado: libera /login, exceto quando ainda falta concluir o setup (redireciona
+ * para /setup). Autenticado: mesma prioridade de sempre (troca de senha obrigatória > home).
+ */
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (!auth.isAuthenticated()) {
-    return true;
+  if (auth.isAuthenticated()) {
+    if (auth.deveAlterarSenha()) {
+      return router.createUrlTree(['/trocar-senha']);
+    }
+
+    return router.createUrlTree(['/']);
   }
 
-  if (auth.deveAlterarSenha()) {
-    return router.createUrlTree(['/trocar-senha']);
-  }
+  const setupApi = inject(SetupApiService);
+  return setupApi.status().pipe(
+    map((status) => (status.needsSetup ? router.createUrlTree(['/setup']) : true)),
+    catchError(() => of(true)),
+  );
+};
 
-  return router.createUrlTree(['/']);
+/** /setup só é acessível enquanto o provisionamento estiver pendente. */
+export const setupGuard: CanActivateFn = () => {
+  const setupApi = inject(SetupApiService);
+  const router = inject(Router);
+
+  return setupApi.status().pipe(
+    map((status) => (status.needsSetup ? true : router.createUrlTree(['/login']))),
+    catchError(() => of(router.createUrlTree(['/login']))),
+  );
 };
 
 export const mustChangePasswordGuard: CanActivateFn = () => {

@@ -1,0 +1,60 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="download" [title]="data.title || 'Exportar escala'" (closed)="cancel()" />
+  <pci-form-card>
+    <pci-stack gap="3" direction="vertical">
+      <pci-stack gap="2" direction="vertical">
+        <!-- Sem componente de radio no design system ainda (só existe markup nativo, usado
+             internamente pelo próprio export-PDF da lib) — <input type="radio"> nativo aqui,
+             seguindo o mesmo acento visual (--pci-color-primary). -->
+        <label class="export-escala-dialog__option">
+          <input
+            type="radio"
+            name="export-escala-formato"
+            [checked]="formato() === 'pdf'"
+            (change)="formato.set('pdf')"
+          />
+          PDF
+        </label>
+        <label class="export-escala-dialog__option">
+          <input
+            type="radio"
+            name="export-escala-formato"
+            [checked]="formato() === 'csv'"
+            (change)="formato.set('csv')"
+          />
+          CSV
+        </label>
+      </pci-stack>
+
+      @if (formato() === 'csv') {
+        <pci-stack gap="2" direction="vertical" class="export-escala-dialog__suboptions">
+          <label class="export-escala-dialog__option">
+            <input
+              type="radio"
+              name="export-escala-csv-opcao"
+              [checked]="csvOpcao() === 'resumida'"
+              (change)="csvOpcao.set('resumida')"
+            />
+            Resumida (auxílio-alimentação)
+          </label>
+          <label class="export-escala-dialog__option">
+            <input
+              type="radio"
+              name="export-escala-csv-opcao"
+              [checked]="csvOpcao() === 'completa'"
+              (change)="csvOpcao.set('completa')"
+            />
+            Completa
+          </label>
+        </pci-stack>
+      }
+    </pci-stack>
+  </pci-form-card>
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+    <pci-button variant="primary" (clicked)="confirm()">
+      <pci-icon slot="icon-left" name="download" size="sm" />
+      Exportar
+    </pci-button>
+  </pci-form-actions>
+</div>

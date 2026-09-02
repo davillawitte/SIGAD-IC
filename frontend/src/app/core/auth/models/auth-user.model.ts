@@ -9,6 +9,17 @@ export interface PerfilAuthDetalhe {
   abrangenciaPorModulo?: Record<string, Abrangencia>;
 }
 
+export type TipoChefia = 'ChefiaImediata' | 'ChefiaSubstituta' | 'Diretor' | 'Subcoordenador';
+
+/** Resumo (id + sigla + tipo) de um setor/núcleo que o usuário chefia — só para exibição
+ * (ex.: "Chefe do X" no menu; no setor Direção IC, `tipoChefia` distingue Diretor(a) de
+ * Subcoordenador(a)). Núcleos sempre vêm com `ChefiaImediata` (chefia única, sem o conceito). */
+export interface ChefiaResumo {
+  id: string;
+  sigla: string;
+  tipoChefia: TipoChefia;
+}
+
 export interface AuthUser {
   id: string;
   login: string;
@@ -20,7 +31,13 @@ export interface AuthUser {
   servidorId: string;
   setorLotacaoId?: string | null;
   setorLotacaoNome?: string | null;
+  nucleoLotacaoId?: string | null;
+  nucleoLotacaoNome?: string | null;
   setoresGerenciadosIds: string[];
+  nucleosGerenciadosIds: string[];
+  setoresDosNucleosGerenciadosIds: string[];
+  setoresGeridos?: ChefiaResumo[];
+  nucleosGeridos?: ChefiaResumo[];
   deveAlterarSenha: boolean;
   meta: string;
 }
@@ -39,7 +56,13 @@ export interface LoginResponse {
     servidorId: string;
     setorLotacaoId?: string | null;
     setorLotacaoNome?: string | null;
+    nucleoLotacaoId?: string | null;
+    nucleoLotacaoNome?: string | null;
     setoresGerenciadosIds: string[];
+    nucleosGerenciadosIds: string[];
+    setoresDosNucleosGerenciadosIds: string[];
+    setoresGeridos?: ChefiaResumo[];
+    nucleosGeridos?: ChefiaResumo[];
     deveAlterarSenha: boolean;
   };
 }

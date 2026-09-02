@@ -21,6 +21,7 @@ public class EscalaJornada : BaseEntity
     public int? DiasTrabalho { get; private set; }
     public int? DiasFolga { get; private set; }
     public string? TipoOcorrenciaFolgaCodigo { get; private set; }
+    public string? SequenciaCiclo { get; private set; }
     public string? Observacao { get; private set; }
 
     public EscalaServidor EscalaServidor { get; private set; } = null!;
@@ -47,6 +48,7 @@ public class EscalaJornada : BaseEntity
         int? diasTrabalho = null,
         int? diasFolga = null,
         string? tipoOcorrenciaFolgaCodigo = null,
+        string? sequenciaCiclo = null,
         string? observacao = null,
         Guid? padraoEscalaId = null,
         DateOnly? dataInicioCiclo = null,
@@ -77,6 +79,7 @@ public class EscalaJornada : BaseEntity
             TipoOcorrenciaFolgaCodigo = string.IsNullOrWhiteSpace(tipoOcorrenciaFolgaCodigo)
                 ? "D"
                 : tipoOcorrenciaFolgaCodigo.Trim().ToUpperInvariant(),
+            SequenciaCiclo = string.IsNullOrWhiteSpace(sequenciaCiclo) ? null : sequenciaCiclo.Trim().ToUpperInvariant(),
             Observacao = string.IsNullOrWhiteSpace(observacao) ? null : observacao.Trim(),
         };
 

@@ -12,13 +12,17 @@ namespace TemplateSistema.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/escalas")]
-public class EscalasController(IEscalaService escalaService, IEscalaPdfService escalaPdfService) : ControllerBase
+public class EscalasController(
+    IEscalaService escalaService,
+    IEscalaPdfService escalaPdfService,
+    IEscalaCsvService escalaCsvService) : ControllerBase
 {
     /// <summary>Gestão do Setor: só escalas dos setores em que o usuário é chefia.</summary>
     [HttpGet("setor")]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public Task<IActionResult> ListSetor(
         [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
         [FromQuery] int? mes,
         [FromQuery] int? ano,
         [FromQuery] StatusEscala? status,
@@ -26,13 +30,14 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal("setor", setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal("setor", setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
 
     /// <summary>Gestão Institucional: escalas de todos os setores, exceto a Direção do IC.</summary>
     [HttpGet("institucionais")]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public Task<IActionResult> ListInstitucionais(
         [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
         [FromQuery] int? mes,
         [FromQuery] int? ano,
         [FromQuery] StatusEscala? status,
@@ -40,12 +45,13 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal("institucional", setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal("institucional", setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
 
     [HttpGet]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public Task<IActionResult> List(
         [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
         [FromQuery] int? mes,
         [FromQuery] int? ano,
         [FromQuery] StatusEscala? status,
@@ -54,11 +60,12 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         [FromQuery] string? search = null,
         [FromQuery] string? escopo = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal(escopo, setorId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal(escopo, setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
 
     private async Task<IActionResult> ListInternal(
         string? escopo,
         Guid? setorId,
+        Guid? nucleoId,
         int? mes,
         int? ano,
         StatusEscala? status,
@@ -71,6 +78,7 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
             new EscalaListQuery
             {
                 SetorId = setorId,
+                NucleoId = nucleoId,
                 Mes = mes,
                 Ano = ano,
                 Status = status,
@@ -114,15 +122,25 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
+    [HttpPost("conflitos-servidores")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> ConflitosServidores(
+        [FromBody] CheckConflitosServidoresRequest request, CancellationToken cancellationToken)
+    {
+        var result = await escalaService.CheckConflitosServidoresAsync(request, User.GetLogin(), cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("anterior")]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public async Task<IActionResult> EscalaAnterior(
-        [FromQuery] Guid setorId,
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
         [FromQuery] int ano,
         [FromQuery] int mes,
         CancellationToken cancellationToken)
     {
-        var result = await escalaService.GetEscalaAnteriorAsync(setorId, ano, mes, User.GetLogin(), cancellationToken);
+        var result = await escalaService.GetEscalaAnteriorAsync(setorId, nucleoId, ano, mes, User.GetLogin(), cancellationToken);
         return Ok(result);
     }
 
@@ -345,5 +363,23 @@ public class EscalasController(IEscalaService escalaService, IEscalaPdfService e
         }
 
         return File(result.Value!.Content, "application/pdf", result.Value.FileName);
+    }
+
+    [HttpGet("{id:guid}/csv")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> Csv(Guid id, [FromQuery] string opcao = "resumida", CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(opcao, "resumida", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Formato de exportação CSV ainda não implementado." });
+        }
+
+        var result = await escalaCsvService.GenerateResumidoAsync(id, User.GetLogin(), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+
+        return File(result.Value!.Content, "text/csv", result.Value.FileName);
     }
 }

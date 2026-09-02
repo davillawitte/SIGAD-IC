@@ -25,7 +25,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<EscalaJornada> EscalaJornadas => Set<EscalaJornada>();
     public DbSet<EscalaOcorrencia> EscalaOcorrencias => Set<EscalaOcorrencia>();
     public DbSet<SolicitacaoDevolucaoEscala> SolicitacoesDevolucaoEscala => Set<SolicitacaoDevolucaoEscala>();
+    public DbSet<EscalaResumida> EscalasResumidas => Set<EscalaResumida>();
+    public DbSet<EscalaResumidaSetor> EscalaResumidaSetores => Set<EscalaResumidaSetor>();
+    public DbSet<EscalaResumidaEquipe> EscalaResumidaEquipes => Set<EscalaResumidaEquipe>();
+    public DbSet<EscalaResumidaRotacaoMembro> EscalaResumidaRotacaoMembros => Set<EscalaResumidaRotacaoMembro>();
+    public DbSet<EscalaResumidaDia> EscalaResumidaDias => Set<EscalaResumidaDia>();
     public DbSet<Afastamento> Afastamentos => Set<Afastamento>();
+    public DbSet<CalendarioAno> CalendariosAno => Set<CalendarioAno>();
+    public DbSet<MarcacaoCalendario> MarcacoesCalendario => Set<MarcacaoCalendario>();
+    public DbSet<SetupToken> SetupTokens => Set<SetupToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

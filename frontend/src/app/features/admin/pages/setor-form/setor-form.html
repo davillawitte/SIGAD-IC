@@ -45,9 +45,7 @@
         </label>
 
         <label class="pci-field">
-          <span class="pci-field__label">
-            Chefia imediata <span class="pci-field__required">*</span>
-          </span>
+          <span class="pci-field__label">Chefia imediata</span>
           <div class="pci-field__control pci-field__control--select">
             <mat-select
               class="pci-field__mat-select"
@@ -56,6 +54,7 @@
               disableRipple
               hideSingleSelectionIndicator
             >
+              <mat-option [value]="''">Nenhum</mat-option>
               @for (option of servidorOptions(); track option.value) {
                 <mat-option [value]="option.value">{{ option.label }}</mat-option>
               }
@@ -82,9 +81,7 @@
         </label>
       } @else {
         <label class="pci-field">
-          <span class="pci-field__label">
-            Diretor <span class="pci-field__required">*</span>
-          </span>
+          <span class="pci-field__label">Diretor</span>
           <div class="pci-field__control pci-field__control--select">
             <mat-select
               class="pci-field__mat-select"
@@ -93,6 +90,7 @@
               disableRipple
               hideSingleSelectionIndicator
             >
+              <mat-option [value]="''">Nenhum</mat-option>
               @for (option of servidorOptions(); track option.value) {
                 <mat-option [value]="option.value">{{ option.label }}</mat-option>
               }

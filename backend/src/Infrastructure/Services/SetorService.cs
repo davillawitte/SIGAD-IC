@@ -37,13 +37,20 @@ public class SetorService(ApplicationDbContext db) : ISetorService
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        if (setorIds.Count == 0)
+        var nucleosGerenciados = await db.Nucleos
+            .AsNoTracking()
+            .Where(x => x.ChefeServidorId == usuario.ServidorId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (setorIds.Count == 0 && nucleosGerenciados.Count == 0)
         {
             return [];
         }
 
         var setores = await LoadQuery()
-            .Where(x => setorIds.Contains(x.Id))
+            .Where(x => setorIds.Contains(x.Id)
+                || (x.NucleoId != null && nucleosGerenciados.Contains(x.NucleoId.Value)))
             .OrderBy(x => x.Nome)
             .ToListAsync(cancellationToken);
         return setores.Select(Map).ToList();
@@ -387,16 +394,9 @@ public class SetorService(ApplicationDbContext db) : ISetorService
             return "Há mais de um servidor para o mesmo tipo de chefia.";
         }
 
-        if (isDirecao)
+        if (isDirecao && chefias.All(x => x.TipoChefia != TipoChefia.Diretor))
         {
-            if (chefias.All(x => x.TipoChefia != TipoChefia.Diretor))
-            {
-                return "Informe o Diretor da Direção do IC.";
-            }
-        }
-        else if (chefias.All(x => x.TipoChefia != TipoChefia.ChefiaImediata))
-        {
-            return "Informe a chefia imediata do setor.";
+            return "Informe o Diretor da Direção do IC.";
         }
 
         var servidorIds = chefias.Select(x => x.ServidorId).Distinct().ToList();

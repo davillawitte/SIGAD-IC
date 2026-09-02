@@ -1,0 +1,112 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="user-plus" title="Novo servidor" (closed)="close()" />
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  @if (created(); as servidor) {
+    <pci-alert
+      variant="success"
+      title="Servidor criado"
+      [message]="'Servidor ' + servidor.nome + ' cadastrado com sucesso.'"
+    />
+
+    <pci-form-actions>
+      <pci-button variant="primary" (clicked)="concluir()">
+        <pci-icon slot="icon-left" name="check" size="sm" />
+        Concluir
+      </pci-button>
+    </pci-form-actions>
+  } @else {
+  <pci-form-card>
+    <form [formGroup]="form">
+      <app-form-section title="Dados pessoais">
+        <pci-input label="Nome" formControlName="nome" [required]="true" />
+        <pci-input
+          label="Matrícula"
+          formControlName="matricula"
+          placeholder="000.000-0"
+          hint="Formato xxx.xxx-x (legado: xx.xxx-x)"
+          [required]="true"
+        />
+        <pci-input
+          label="CPF"
+          formControlName="cpf"
+          placeholder="000.000.000-00"
+          [required]="true"
+        />
+        <pci-datepicker
+          label="Data de nascimento"
+          formControlName="dataNascimento"
+          [required]="true"
+          [max]="maxNascimento"
+        />
+        <pci-input
+          label="E-mail"
+          type="text"
+          formControlName="email"
+          placeholder="nome@pci.rn.gov.br (opcional)"
+        />
+        <pci-input
+          label="Telefone"
+          formControlName="telefone"
+          placeholder="(84) 99999-9999"
+        />
+      </app-form-section>
+
+      <app-form-section title="Lotação">
+        <pci-select
+          label="Cargo"
+          [required]="true"
+          formControlName="cargoId"
+          [options]="cargoOptions()"
+          placeholder="Selecione o cargo"
+        />
+        <pci-select
+          label="Tipo de lotação"
+          [required]="true"
+          formControlName="lotacaoTipo"
+          [options]="lotacaoOptions"
+        />
+        @if (lotacaoTipo() === 'setor') {
+          <pci-select
+            label="Setor"
+            [required]="true"
+            formControlName="setorId"
+            [options]="setorOptions()"
+            placeholder="Selecione o setor"
+          />
+        } @else {
+          <pci-select
+            label="Núcleo"
+            [required]="true"
+            formControlName="nucleoId"
+            [options]="nucleoOptions()"
+            placeholder="Selecione o núcleo"
+            hint="O servidor é lotado diretamente no núcleo."
+          />
+        }
+      </app-form-section>
+
+      <app-form-section title="Status">
+        <pci-select
+          [appFormCol]="12"
+          label="Situação"
+          [required]="true"
+          formControlName="status"
+          [options]="statusOptions"
+        />
+      </app-form-section>
+    </form>
+  </pci-form-card>
+
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+    <pci-button variant="primary" [loading]="saving()" (clicked)="save()">
+      <pci-icon slot="icon-left" name="check" size="sm" />
+      Salvar
+    </pci-button>
+  </pci-form-actions>
+  }
+</div>

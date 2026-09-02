@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TemplateSistema.Application.Common;
@@ -8,16 +7,14 @@ using TemplateSistema.Domain.Enums;
 namespace TemplateSistema.Persistence.Seed;
 
 /// <summary>
-/// Seed de catálogo: permissões, perfis base, cargos, tipos de ocorrência e padrões de escala.
-/// Nunca reescreve configuração feita pelo administrador (permissões custom de perfil, chefias,
-/// lotações). O único dado de instância que cria é o administrador de bootstrap, e só quando o
-/// banco ainda não tem nenhum usuário.
+/// Seed de catálogo: permissões, perfis base, cargos, Setor Direção IC, tipos de ocorrência e
+/// padrões de escala. Nunca reescreve configuração feita pelo administrador (permissões custom
+/// de perfil, chefias, lotações). Não cria usuário nenhum — o primeiro superadministrador é
+/// provisionado pelo wizard <c>/setup</c> (ver <c>SetupService</c>), não pelo seed.
 /// </summary>
 public static class AuthSeed
 {
     public static readonly Guid SetorDiretoriaId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    public static readonly Guid ServidorVitorId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-    public static readonly Guid UsuarioVitorId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     public static readonly Guid PerfilSuperAdminId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     public static readonly Guid PerfilChefeSetorId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     public static readonly Guid PerfilServidorId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
@@ -25,15 +22,12 @@ public static class AuthSeed
 
     public static readonly Guid CargoPeritoCriminalId = CreateDeterministicGuid($"cargo:{CargoCodes.PeritoCriminal}");
 
-    public const string SuperUserLogin = "vitorlopes";
-    public const string SuperUserPassword = "Vitor@123";
-
     public static async Task SeedAsync(ApplicationDbContext context, ILogger logger, CancellationToken cancellationToken = default)
     {
         await SeedPermissoesAsync(context, cancellationToken);
         var perfisCriados = await SeedPerfisAsync(context, cancellationToken);
         await SeedCargosAsync(context, cancellationToken);
-        await SeedBootstrapAdminAsync(context, cancellationToken);
+        await SeedSetorDirecaoIcAsync(context, cancellationToken);
         await EnsureSuperAdminComChefiaDirecaoTemPerfilOperacionalAsync(context, cancellationToken);
         await TipoOcorrenciaSeed.SeedAsync(context, cancellationToken);
         await PadraoEscalaSeed.SeedAsync(context, cancellationToken);
@@ -141,6 +135,7 @@ public static class AuthSeed
                     target.Id,
                     servidor.Email,
                     servidor.SetorId,
+                    servidor.NucleoId,
                     servidor.DataNascimento,
                     servidor.Telefone,
                     "seed");
@@ -346,87 +341,24 @@ public static class AuthSeed
     }
 
     /// <summary>
-    /// Só cria o bootstrap admin se o banco ainda não tiver nenhum usuário.
-    /// Não reescreve chefias nem lotação em bancos já em uso.
+    /// Setor Direção IC é catálogo estrutural, não credencial — existe independente de haver
+    /// usuário algum. O superadministrador (Servidor + Usuario + chefia de Diretor aqui) é
+    /// provisionado depois, pelo wizard <c>/setup</c>.
     /// </summary>
-    private static async Task SeedBootstrapAdminAsync(ApplicationDbContext context, CancellationToken cancellationToken)
+    private static async Task SeedSetorDirecaoIcAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
-        if (await context.Usuarios.AnyAsync(cancellationToken))
+        if (await context.Setores.AnyAsync(x => x.Id == SetorDiretoriaId, cancellationToken))
         {
             return;
         }
 
-        if (!await context.Setores.AnyAsync(x => x.Id == SetorDiretoriaId, cancellationToken))
-        {
-            context.Setores.Add(Setor.Create(
-                SetorSiglas.DirecaoIcNome,
-                SetorSiglas.DirecaoIc,
-                nucleoId: null,
-                resumo: "Direção geral do Instituto de Criminalística",
-                createdBy: "seed",
-                id: SetorDiretoriaId));
-            await context.SaveChangesAsync(cancellationToken);
-        }
-
-        if (!await context.Servidores.AnyAsync(x => x.Id == ServidorVitorId, cancellationToken))
-        {
-            var cargoPc = await context.Cargos
-                .FirstAsync(x => x.Codigo == CargoCodes.PeritoCriminal, cancellationToken);
-
-            context.Servidores.Add(Servidor.Create(
-                nome: "Vitor Lopes",
-                matricula: "000.001-0",
-                cpf: "00000000000",
-                cargoId: cargoPc.Id,
-                email: "vitorlopes@pci.rn.gov.br",
-                setorId: SetorDiretoriaId,
-                dataNascimento: new DateOnly(1990, 1, 1),
-                telefone: null,
-                createdBy: "seed",
-                id: ServidorVitorId));
-            await context.SaveChangesAsync(cancellationToken);
-        }
-
-        if (!await context.SetorChefias.AnyAsync(
-                x => x.SetorId == SetorDiretoriaId && x.ServidorId == ServidorVitorId,
-                cancellationToken))
-        {
-            context.SetorChefias.Add(SetorChefia.Create(SetorDiretoriaId, ServidorVitorId, TipoChefia.Diretor));
-        }
-
-        var hasher = new PasswordHasher<object>();
-        var hash = hasher.HashPassword(new object(), SuperUserPassword);
-
-        var superAdminId = await context.Perfis
-            .Where(x => x.Id == PerfilSuperAdminId || x.Codigo == PerfilCodes.SuperAdministrador)
-            .Select(x => x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (superAdminId == Guid.Empty)
-        {
-            return;
-        }
-
-        var usuario = Usuario.Create(
-            ServidorVitorId,
-            SuperUserLogin,
-            hash,
+        context.Setores.Add(Setor.Create(
+            SetorSiglas.DirecaoIcNome,
+            SetorSiglas.DirecaoIc,
+            nucleoId: null,
+            resumo: "Direção geral do Instituto de Criminalística",
             createdBy: "seed",
-            id: UsuarioVitorId,
-            deveAlterarSenha: false);
-
-        // SuperAdmin sozinho só administra o sistema; operação vem de outro perfil.
-        var perfilIds = new List<Guid> { superAdminId };
-        var direcaoIcId = await context.Perfis
-            .Where(x => x.Id == PerfilDirecaoIcId || x.Codigo == PerfilCodes.DirecaoIc)
-            .Select(x => x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (direcaoIcId != Guid.Empty)
-        {
-            perfilIds.Add(direcaoIcId);
-        }
-
-        usuario.DefinirPerfis(perfilIds, "seed");
-        context.Usuarios.Add(usuario);
+            id: SetorDiretoriaId));
         await context.SaveChangesAsync(cancellationToken);
     }
 

@@ -27,6 +27,36 @@ public class NucleoService(ApplicationDbContext db) : INucleoService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<NucleoListItemDto>> ListMeusAsync(
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = actorLogin.Trim().ToLowerInvariant();
+        var usuario = await db.Usuarios
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Login == normalized, cancellationToken);
+
+        if (usuario is null)
+        {
+            return [];
+        }
+
+        return await db.Nucleos
+            .AsNoTracking()
+            .Where(x => x.ChefeServidorId == usuario.ServidorId)
+            .Include(x => x.ChefeServidor)
+            .Include(x => x.Setores)
+            .OrderBy(x => x.Nome)
+            .Select(x => new NucleoListItemDto(
+                x.Id,
+                x.Nome,
+                x.Sigla,
+                x.ChefeServidorId,
+                x.ChefeServidor != null ? x.ChefeServidor.Nome : null,
+                x.Setores.Count))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Result<NucleoDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var nucleo = await db.Nucleos

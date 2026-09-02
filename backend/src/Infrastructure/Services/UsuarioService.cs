@@ -103,11 +103,11 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             return Result<UsuarioComSenhaDto>.Failure("Um ou mais perfis são inválidos.");
         }
 
-        var senhaTemporaria = SenhaTemporaria.Gerar(servidor.Nome, servidor.Cpf);
+        var senhaInicial = login;
         var usuario = Usuario.Create(
             request.ServidorId,
             login,
-            passwordHasher.Hash(senhaTemporaria),
+            passwordHasher.Hash(senhaInicial),
             actorLogin,
             deveAlterarSenha: true);
 
@@ -116,7 +116,7 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
         await db.SaveChangesAsync(cancellationToken);
 
         var created = await LoadAsync(usuario.Id, cancellationToken);
-        return Result<UsuarioComSenhaDto>.Success(MapComSenha(created!, senhaTemporaria));
+        return Result<UsuarioComSenhaDto>.Success(MapComSenha(created!, senhaInicial));
     }
 
     public async Task<Result<UsuarioDetailDto>> UpdateAsync(
@@ -179,7 +179,7 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             return Result<ResetSenhaResultDto>.Failure("Usuário não encontrado.");
         }
 
-        var senhaTemporaria = SenhaTemporaria.Gerar(usuario.Servidor.Nome, usuario.Servidor.Cpf);
+        var senhaTemporaria = SenhaTemporaria.Gerar();
         usuario.AlterarSenha(passwordHasher.Hash(senhaTemporaria), exigirTrocaNoProximoLogin: true, actorLogin);
         await db.SaveChangesAsync(cancellationToken);
 

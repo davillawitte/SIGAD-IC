@@ -15,6 +15,7 @@ public class EscalaJornadaConfiguration : IEntityTypeConfiguration<EscalaJornada
         builder.Property(x => x.RecorrenciaTipo).HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.Property(x => x.TipoOcorrenciaCodigo).HasMaxLength(10).IsRequired();
         builder.Property(x => x.TipoOcorrenciaFolgaCodigo).HasMaxLength(10);
+        builder.Property(x => x.SequenciaCiclo).HasMaxLength(200);
         builder.Property(x => x.DiasSemana).HasMaxLength(40);
         builder.Property(x => x.Horas).HasPrecision(5, 2);
         builder.Property(x => x.Observacao).HasMaxLength(500);

@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import type {
   CopiarEscalaPayload,
+  ConflitoServidor,
   CreateEscalaJornadaPayload,
   CreateEscalaPayload,
   EscalaAnteriorInfo,
@@ -31,6 +32,7 @@ export class EscalasApiService {
 
   list(params: {
     setorId?: string;
+    nucleoId?: string;
     mes?: number;
     ano?: number;
     status?: string;
@@ -77,11 +79,25 @@ export class EscalasApiService {
     return this.http.get<EscalaConflitos>(`${this.base}/api/escalas/${id}/conflitos`);
   }
 
-  getEscalaAnterior(setorId: string, ano: number, mes: number): Observable<EscalaAnteriorInfo | null> {
-    const params = new HttpParams()
-      .set('setorId', setorId)
-      .set('ano', String(ano))
-      .set('mes', String(mes));
+  checkConflitosServidores(payload: {
+    ano: number;
+    mes: number;
+    servidorIds: string[];
+    excluirEscalaId?: string;
+  }): Observable<ConflitoServidor[]> {
+    return this.http.post<ConflitoServidor[]>(`${this.base}/api/escalas/conflitos-servidores`, payload);
+  }
+
+  getEscalaAnterior(
+    setorIdOuNucleoId: { setorId: string } | { nucleoId: string },
+    ano: number,
+    mes: number,
+  ): Observable<EscalaAnteriorInfo | null> {
+    let params = new HttpParams().set('ano', String(ano)).set('mes', String(mes));
+    params =
+      'setorId' in setorIdOuNucleoId
+        ? params.set('setorId', setorIdOuNucleoId.setorId)
+        : params.set('nucleoId', setorIdOuNucleoId.nucleoId);
     return this.http.get<EscalaAnteriorInfo | null>(`${this.base}/api/escalas/anterior`, { params });
   }
 
@@ -218,5 +234,13 @@ export class EscalasApiService {
 
   downloadPdf(id: string, layout: 'horizontal' | 'vertical'): Observable<Blob> {
     return this.http.get(this.pdfUrl(id, layout), { responseType: 'blob' });
+  }
+
+  csvUrl(id: string, opcao: 'resumida' | 'completa'): string {
+    return `${this.base}/api/escalas/${id}/csv?opcao=${opcao}`;
+  }
+
+  downloadCsv(id: string, opcao: 'resumida' | 'completa'): Observable<Blob> {
+    return this.http.get(this.csvUrl(id, opcao), { responseType: 'blob' });
   }
 }

@@ -59,12 +59,28 @@ public static class ActorContextLoader
             .Distinct()
             .ToListAsync(cancellationToken);
 
+        var nucleosGerenciados = await db.Nucleos
+            .AsNoTracking()
+            .Where(x => x.ChefeServidorId == usuario.ServidorId)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var setoresDosNucleosGerenciados = nucleosGerenciados.Count == 0
+            ? []
+            : await db.Setores
+                .AsNoTracking()
+                .Where(x => x.NucleoId != null && nucleosGerenciados.Contains(x.NucleoId.Value))
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+
         return new ActorContext(
             usuario.Id,
             usuario.ServidorId,
             usuario.Login,
             isSuper,
             setoresGerenciados,
-            concessoes);
+            concessoes,
+            nucleosGerenciados,
+            setoresDosNucleosGerenciados);
     }
 }

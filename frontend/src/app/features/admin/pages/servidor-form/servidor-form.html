@@ -65,23 +65,39 @@
             </mat-select>
           </div>
         </label>
-        <label class="pci-field">
-          <span class="pci-field__label">Setor <span class="pci-field__required">*</span></span>
-          <div class="pci-field__control pci-field__control--select">
-            <mat-select
-              class="pci-field__mat-select"
-              formControlName="setorId"
-              panelClass="pci-select-panel"
-              [compareWith]="compareGuid"
-              disableRipple
-              hideSingleSelectionIndicator
-            >
-              @for (option of setorOptions(); track option.value) {
-                <mat-option [value]="option.value">{{ option.label }}</mat-option>
-              }
-            </mat-select>
-          </div>
-        </label>
+        <pci-select
+          label="Tipo de lotação"
+          [required]="true"
+          formControlName="lotacaoTipo"
+          [options]="lotacaoOptions"
+        />
+        @if (lotacaoTipo() === 'setor') {
+          <label class="pci-field">
+            <span class="pci-field__label">Setor <span class="pci-field__required">*</span></span>
+            <div class="pci-field__control pci-field__control--select">
+              <mat-select
+                class="pci-field__mat-select"
+                formControlName="setorId"
+                panelClass="pci-select-panel"
+                [compareWith]="compareGuid"
+                disableRipple
+                hideSingleSelectionIndicator
+              >
+                @for (option of setorOptions(); track option.value) {
+                  <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                }
+              </mat-select>
+            </div>
+          </label>
+        } @else {
+          <pci-select
+            label="Núcleo"
+            [required]="true"
+            formControlName="nucleoId"
+            [options]="nucleoOptions()"
+            hint="O servidor é lotado diretamente no núcleo."
+          />
+        }
       </app-form-section>
 
       <app-form-section title="Status">

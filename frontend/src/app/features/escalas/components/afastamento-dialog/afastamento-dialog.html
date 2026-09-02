@@ -1,10 +1,20 @@
 <div class="pci-app-dialog">
-  <h2 class="pci-app-dialog__title">Adicionar afastamento</h2>
+  <app-dialog-header icon="calendar" title="Adicionar afastamento" (closed)="close()" />
 
   @if (error()) {
     <pci-alert variant="error" title="Erro" [message]="error()!" />
   }
 
+  @if (created()) {
+    <pci-alert variant="success" title="Afastamento cadastrado" message="Afastamento salvo com sucesso." />
+
+    <pci-form-actions>
+      <pci-button variant="primary" (clicked)="concluir()">
+        <pci-icon slot="icon-left" name="check" size="sm" />
+        Concluir
+      </pci-button>
+    </pci-form-actions>
+  } @else {
   <pci-form-card>
     <form [formGroup]="form">
       <app-form-section title="Dados">
@@ -55,6 +65,10 @@
 
   <pci-form-actions>
     <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
-    <pci-button variant="primary" [loading]="saving()" (clicked)="save()">Salvar</pci-button>
+    <pci-button variant="primary" [loading]="saving()" (clicked)="save()">
+      <pci-icon slot="icon-left" name="check" size="sm" />
+      Salvar
+    </pci-button>
   </pci-form-actions>
+  }
 </div>

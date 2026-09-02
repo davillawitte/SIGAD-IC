@@ -83,9 +83,9 @@ public class AuthService(
             return Result.Failure("Senha atual inválida.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.NovaSenha) || request.NovaSenha.Length < 8)
+        if (!PasswordPolicy.IsValid(request.NovaSenha, out var erroSenha))
         {
-            return Result.Failure("A nova senha deve ter ao menos 8 caracteres.");
+            return Result.Failure(erroSenha!);
         }
 
         if (string.Equals(request.SenhaAtual, request.NovaSenha, StringComparison.Ordinal))
@@ -104,6 +104,8 @@ public class AuthService(
         await db.Usuarios
             .Include(x => x.Servidor)
                 .ThenInclude(x => x.Setor)
+            .Include(x => x.Servidor)
+                .ThenInclude(x => x.Nucleo)
             .Include(x => x.UsuarioPerfis)
                 .ThenInclude(x => x.Perfil)
                     .ThenInclude(x => x.PerfilPermissoes)
@@ -162,12 +164,29 @@ public class AuthService(
             .OrderBy(x => x.Codigo)
             .ToList();
 
-        var setoresGerenciados = await db.SetorChefias
+        var setoresChefiados = await db.SetorChefias
             .AsNoTracking()
             .Where(x => x.ServidorId == usuario.ServidorId)
-            .Select(x => x.SetorId)
+            .Select(x => new { x.SetorId, x.Setor.Sigla, x.TipoChefia })
             .Distinct()
             .ToListAsync(cancellationToken);
+
+        var nucleosChefiados = await db.Nucleos
+            .AsNoTracking()
+            .Where(x => x.ChefeServidorId == usuario.ServidorId)
+            .Select(x => new { x.Id, x.Sigla })
+            .ToListAsync(cancellationToken);
+
+        var setoresGerenciados = setoresChefiados.Select(x => x.SetorId).ToList();
+        var nucleosGerenciados = nucleosChefiados.Select(x => x.Id).ToList();
+
+        var setoresDosNucleosGerenciados = nucleosGerenciados.Count == 0
+            ? []
+            : await db.Setores
+                .AsNoTracking()
+                .Where(x => x.NucleoId != null && nucleosGerenciados.Contains(x.NucleoId.Value))
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
 
         var authUser = new UsuarioAuthDto(
             usuario.Id,
@@ -179,9 +198,15 @@ public class AuthService(
             usuario.ServidorId,
             usuario.Servidor.SetorId,
             usuario.Servidor.Setor?.Nome,
+            usuario.Servidor.NucleoId,
+            usuario.Servidor.Nucleo?.Nome,
             setoresGerenciados,
+            nucleosGerenciados,
+            setoresDosNucleosGerenciados,
             usuario.DeveAlterarSenha,
-            perfisDetalhe);
+            perfisDetalhe,
+            setoresChefiados.Select(x => new ChefiaResumoDto(x.SetorId, x.Sigla, x.TipoChefia)).ToList(),
+            nucleosChefiados.Select(x => new ChefiaResumoDto(x.Id, x.Sigla, TipoChefia.ChefiaImediata)).ToList());
 
         var (token, expires) = jwtTokenService.CreateToken(authUser);
         if (registrarLogin)

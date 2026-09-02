@@ -147,6 +147,7 @@ public static class PermissionModules
     public const string Servidores = "servidores";
     public const string Escalas = "escalas";
     public const string Afastamentos = "afastamentos";
+    public const string Calendario = "calendario";
 
     /// <summary>Módulos cuja abrangência não faz sentido: são globais por natureza.</summary>
     public static readonly IReadOnlySet<string> SemAbrangencia =
@@ -156,6 +157,7 @@ public static class PermissionModules
             Perfis,
             Permissoes,
             Cargos,
+            Calendario,
         };
 
     public static readonly IReadOnlyList<string> All =
@@ -166,6 +168,7 @@ public static class PermissionModules
         Setores,
         Nucleos,
         Cargos,
+        Calendario,
         Usuarios,
         Perfis,
         Permissoes,
@@ -219,6 +222,12 @@ public static class PermissionCodes
     public const string AfastamentosEditar = "afastamentos.editar";
     public const string AfastamentosExcluir = "afastamentos.excluir";
 
+    public const string CalendarioListar = "calendario.listar";
+    public const string CalendarioGerar = "calendario.gerar";
+    public const string CalendarioPublicar = "calendario.publicar";
+    public const string CalendarioGerenciarMarcacoes = "calendario.gerenciar_marcacoes";
+    public const string CalendarioExcluir = "calendario.excluir";
+
     public static readonly IReadOnlyList<(string Codigo, string Nome, string Modulo, string Area, string Descricao)> Catalog =
     [
         (UsuariosListar, "Listar usuários", "usuarios", PermissionAreas.AdministracaoDoSistema, "Visualizar usuários do sistema"),
@@ -257,6 +266,11 @@ public static class PermissionCodes
         (AfastamentosCriar, "Criar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Cadastrar afastamentos"),
         (AfastamentosEditar, "Editar afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Alterar afastamentos"),
         (AfastamentosExcluir, "Excluir afastamentos", "afastamentos", PermissionAreas.GestaoDoSetor, "Remover afastamentos"),
+        (CalendarioListar, "Listar calendário institucional", "calendario", PermissionAreas.GestaoInstitucional, "Visualizar anos, feriados, pontos facultativos e eventos"),
+        (CalendarioGerar, "Gerar ano do calendário", "calendario", PermissionAreas.GestaoInstitucional, "Gerar um novo ano com feriados fixos e móveis calculados automaticamente"),
+        (CalendarioPublicar, "Publicar calendário", "calendario", PermissionAreas.GestaoInstitucional, "Publicar o calendário de um ano"),
+        (CalendarioGerenciarMarcacoes, "Gerenciar marcações do calendário", "calendario", PermissionAreas.GestaoInstitucional, "Adicionar, editar e excluir feriados, pontos facultativos e eventos institucionais"),
+        (CalendarioExcluir, "Excluir calendário", "calendario", PermissionAreas.GestaoInstitucional, "Excluir o calendário de um ano inteiro, enquanto ainda em rascunho"),
     ];
 
     private static readonly IReadOnlyDictionary<string, string> ModulePorCodigo =
@@ -329,6 +343,7 @@ public static class CargoCodes
     public const string Estagiario = "EST";
     public const string Terceirizado = "TER";
     public const string ServidorExterno = "EXT";
+    public const string Enquadrado = "ENQ";
 
     public static readonly IReadOnlyList<(string Codigo, string Nome)> Catalog =
     [
@@ -339,6 +354,7 @@ public static class CargoCodes
         (Estagiario, "Estagiário"),
         (Terceirizado, "Terceirizado"),
         (ServidorExterno, "Servidor Externo"),
+        (Enquadrado, "Enquadrado"),
     ];
 
     /// <summary>Códigos longos legados da seed antiga → sigla atual.</summary>

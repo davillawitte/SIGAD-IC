@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TemplateSistema.Api.Extensions;
 using TemplateSistema.Application.Abstractions;
 using TemplateSistema.Application.Auth;
@@ -16,6 +17,7 @@ public class AuthController(
 {
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var validation = await loginValidator.ValidateAsync(request, cancellationToken);

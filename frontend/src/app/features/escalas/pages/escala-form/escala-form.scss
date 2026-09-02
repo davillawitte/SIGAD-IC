@@ -7,9 +7,13 @@
 
 /* ---------- Step indicator (PciStepper) ---------- */
 
+.wizard-stepper-card {
+  display: block;
+}
+
 .wizard-stepper {
   background: transparent;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
 }
 
 :host ::ng-deep .wizard-stepper .pci-stepper__body {
@@ -22,6 +26,15 @@
 /* ---------- Generic panel ---------- */
 
 .wizard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Os cards do passo 1 (Período / Copiar escala / Escala resumida) vivem dentro de um único
+ * <form> — o gap do .wizard-panel só separa os filhos diretos dele, então sem isso os cards
+ * ficam colados. */
+.wizard-step1-form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -40,7 +53,47 @@
   opacity: 0.75;
 }
 
+/* Card em volta das barras de navegação (Voltar/Continuar/Salvar) — repetida em todos os
+ * passos e no painel de escala resumida, pra ficar visualmente consistente com os cards do
+ * passo 2. */
+.wizard-nav-card {
+  display: block;
+}
+
+/* Título + descrição dentro de um pci-card-content — substitui o title/description que o
+ * antigo <app-form-section> (fieldset/legend) dava de graça. */
+pci-card-content > h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+pci-card-content > p {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--pci-color-text-secondary, #475467);
+}
+
 /* ---------- Step 2: regimes / servidores ---------- */
+
+.wizard-step2__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.wizard-step2 {
+  display: grid;
+  grid-template-columns: 24rem 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .wizard-step2 {
+    grid-template-columns: 1fr;
+  }
+}
 
 .wizard-checkbox-row {
   display: flex;
@@ -48,44 +101,173 @@
   gap: 1rem;
 }
 
-.wizard-servidor-list {
+/* ---------- Painel "Como funciona?" ---------- */
+
+.wizard-info-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+}
+
+.wizard-info-panel > pci-card {
+  display: block;
+
+  p {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    color: var(--pci-color-text-secondary, #475467);
+  }
+}
+
+.wizard-info-panel__meta {
   display: flex;
   flex-direction: column;
+  gap: 0.35rem;
+  background: var(--pci-color-surface-secondary, #f2f4f7);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin: 0 0 0.75rem;
+
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  dt {
+    font-size: 0.8rem;
+    color: var(--pci-color-text-secondary, #475467);
+  }
+
+  dd {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--pci-color-text, #344054);
+    text-align: right;
+  }
+}
+
+.wizard-info-panel__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+
+  strong {
+    display: block;
+    font-size: 0.85rem;
+  }
+
+  p {
+    margin: 0.1rem 0 0;
+    font-size: 0.8rem;
+  }
+}
+
+.wizard-info-panel__important {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--pci-color-accent-soft, #fdf1d6);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+
+  p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--pci-color-text, #344054);
+  }
+}
+
+/* ---------- Lista de servidores (cards) ---------- */
+
+.wizard-servidor-card-wrap {
+  display: block;
+}
+
+.wizard-servidor-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.wizard-servidor-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.wizard-servidor-row {
+.wizard-servidor-section__title {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* Grid (não flex) de propósito: com flex, a largura de cada coluna dependia do conteúdo
+ * anterior (nome curto empurrava os selects pra esquerda, nome longo pra direita, ver
+ * feedback do usuário). Colunas fixas/proporcionais mantêm os selects alinhados verticalmente
+ * entre todas as linhas, independente do tamanho do nome — os `@else` vazios no template
+ * garantem que toda linha sempre tenha as mesmas 6 colunas, mesmo quando um campo não se
+ * aplica àquele servidor. */
+.wizard-servidor-card {
+  display: grid;
+  grid-template-columns: auto auto 17rem 1fr 1fr auto;
+  align-items: center;
+  gap: 1.5rem;
   border: 1px solid var(--pci-color-border, #e4e7ec);
   border-radius: 0.5rem;
-  padding: 0.6rem 0.75rem;
+  padding: 1rem 1.25rem;
 }
 
-.wizard-servidor-regimes {
+.wizard-servidor-card__info {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  padding-left: 1.5rem;
+  flex-direction: column;
+  min-width: 0;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    font-size: 0.8rem;
+    color: var(--pci-color-text-secondary, #475467);
+  }
 }
 
-.wizard-servidor-tarde {
+.wizard-servidor-card__field {
+  min-width: 0;
+}
+
+.wizard-servidor-card__toggle-spacer {
+  width: 1px;
+}
+
+.wizard-servidor-card__extra {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  padding-left: 1.5rem;
+  padding: 0.5rem 0.75rem 0.75rem 3.5rem;
 }
 
 .wizard-servidor-tarde__label {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--pci-color-text-secondary, #475467);
-}
-
-.wizard-inicio-ciclo {
-  max-width: 16rem;
-  margin-left: 1.5rem;
 }
 
 /* ---------- Step 3: afastamentos / home office ---------- */

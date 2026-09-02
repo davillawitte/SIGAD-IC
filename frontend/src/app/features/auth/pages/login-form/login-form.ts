@@ -11,6 +11,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
   selector: 'app-login-form',
   imports: [PciLoginPageComponent],
   templateUrl: './login-form.html',
+  styleUrl: './login-form.scss',
 })
 export class LoginForm {
   private readonly auth = inject(AuthService);
@@ -18,6 +19,7 @@ export class LoginForm {
 
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly currentYear = new Date().getFullYear();
 
   onSubmit(credentials: PciLoginCredentials): void {
     this.loading.set(true);

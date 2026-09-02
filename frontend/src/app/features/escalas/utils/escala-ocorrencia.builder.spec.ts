@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PadraoEscala } from '../models/escalas.models';
-import { buildOcorrenciasForServidor, normalizeDay } from './escala-ocorrencia.builder';
+import {
+  buildOcorrenciasForServidor,
+  buildOcorrenciasFromCicloDerivado,
+  normalizeDay,
+  posicaoNaData,
+  primeiraDataParaPosicao,
+} from './escala-ocorrencia.builder';
 
 const padrao12x36: PadraoEscala = {
   id: 'p12',
@@ -31,6 +37,17 @@ const padrao24x72: PadraoEscala = {
   tipoOcorrenciaTrabalho: 'PT',
   horasPadrao: 24,
   horaFimPadrao: '07:00',
+};
+
+const padraoPT24TL12: PadraoEscala = {
+  ...padrao24x72,
+  id: 'ppt24tl12',
+  codigo: 'PT24_TL12',
+  nome: 'Plantão 24h + Laudo 12h',
+  recorrenciaTipo: 'CicloPersonalizado',
+  diasTrabalho: null,
+  diasFolga: null,
+  sequenciaCiclo: 'PT,D,D,D,TL12,D',
 };
 
 const padraoExp: PadraoEscala = {
@@ -134,5 +151,69 @@ describe('escala-ocorrencia.builder', () => {
     });
 
     expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['D', 'PD', 'D', 'PD']);
+  });
+
+  it('PT24_TL12 expande as 6 fases da sequência (PT, folga x3, TL12, folga) e repete no 7º dia', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana,
+      regimesSelected: ['PT24_TL12'],
+      padroesByCodigo: new Map([['PT24_TL12', padraoPT24TL12]]),
+      servidorInicioCiclo: new Map([['a', '2026-07-06']]),
+    });
+
+    expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual([
+      'PT',
+      'D',
+      'D',
+      'D',
+      'TL12',
+      'D',
+      'PT',
+    ]);
+  });
+});
+
+// Espelha os casos de `EscalaResumidaRotacaoExpanderTests.cs` — mesma fórmula de módulo
+// negativo-seguro, pra garantir que as duas implementações (frontend e backend) não driftem.
+describe('posicaoNaData / primeiraDataParaPosicao', () => {
+  it('avança uma posição do pool por dia a partir da âncora', () => {
+    const ancora = '2026-08-01';
+    const dias = ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06'];
+
+    expect(dias.map((d) => posicaoNaData(d, ancora, 3))).toEqual([0, 1, 2, 0, 1, 2]);
+  });
+
+  it('datas antes da âncora mantêm a fase correta sem índice negativo', () => {
+    const ancora = '2026-08-15';
+    const dias = ['2026-08-13', '2026-08-14', '2026-08-15'];
+
+    expect(dias.map((d) => posicaoNaData(d, ancora, 2))).toEqual([0, 1, 0]);
+  });
+
+  it('âncora de mês anterior continua o ciclo em fase no mês seguinte', () => {
+    const ancora = '2026-07-30';
+    const dias = ['2026-08-01', '2026-08-02', '2026-08-03'];
+
+    expect(dias.map((d) => posicaoNaData(d, ancora, 3))).toEqual([2, 0, 1]);
+  });
+
+  it('primeiraDataParaPosicao acha a próxima data cuja posição bate com a alvo', () => {
+    // Âncora de julho, pool de 3; a partir de 01/08 (posição 2), a posição 0 só cai em 02/08.
+    expect(primeiraDataParaPosicao('2026-08-01', '2026-07-30', 3, 0)).toBe('2026-08-02');
+    expect(primeiraDataParaPosicao('2026-08-01', '2026-07-30', 3, 2)).toBe('2026-08-01');
+  });
+});
+
+describe('buildOcorrenciasFromCicloDerivado', () => {
+  it('trabalha na posição 0 do ciclo pessoal e folga nas demais', () => {
+    const result = buildOcorrenciasFromCicloDerivado({
+      days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04'],
+      ancora: '2026-08-01',
+      tamanhoPool: 4,
+    });
+
+    expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['PT', 'D', 'D', 'D']);
+    expect(result[0].horas).toBe(24);
   });
 });

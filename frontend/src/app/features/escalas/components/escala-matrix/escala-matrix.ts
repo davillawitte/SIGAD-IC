@@ -41,6 +41,7 @@ const LEGEND = [
   { codigo: 'M', nome: 'Manhã 6h' },
   { codigo: 'T', nome: 'Tarde 6h' },
   { codigo: 'TL6', nome: 'Teletrabalho 6h' },
+  { codigo: 'TL12', nome: 'Teletrabalho 12h (laudo)' },
   { codigo: 'PD', nome: 'Plantão Diurno 12h' },
   { codigo: 'PN', nome: 'Plantão Noturno 12h' },
   { codigo: 'PT', nome: 'Plantão 24h' },
@@ -194,7 +195,7 @@ export class EscalaMatrix {
   readonly titulo = computed(() => {
     const e = this.escala();
     const mes = (MES_ABREV[e.mes] ?? String(e.mes)).toUpperCase();
-    return `ESCALA DE ${mes}/${e.ano} - ${e.setorNome}`.toUpperCase();
+    return `ESCALA DE ${mes}/${e.ano} - ${e.setorNome ?? e.nucleoNome ?? ''}`.toUpperCase();
   });
 
   isWeekend = isWeekend;

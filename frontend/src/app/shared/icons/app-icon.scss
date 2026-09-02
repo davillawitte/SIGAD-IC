@@ -1,0 +1,34 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+  line-height: 0;
+}
+
+:host(.app-icon--xs) {
+  width: 14px;
+  height: 14px;
+}
+
+:host(.app-icon--sm) {
+  width: 16px;
+  height: 16px;
+}
+
+:host(.app-icon--md) {
+  width: 20px;
+  height: 20px;
+}
+
+:host(.app-icon--lg) {
+  width: 24px;
+  height: 24px;
+}
+
+svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

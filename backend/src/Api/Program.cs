@@ -1,15 +1,18 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using TemplateSistema.Api.Authorization;
 using TemplateSistema.Application;
 using TemplateSistema.Infrastructure;
+using TemplateSistema.Infrastructure.Cli;
 using TemplateSistema.Persistence;
 
 Log.Logger = new LoggerConfiguration()
@@ -122,16 +125,47 @@ try
         });
     });
 
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+    });
+
     var app = builder.Build();
 
     // Precisa ser o primeiro middleware: rate limit / auth usam o IP e o scheme reais.
     app.UseForwardedHeaders();
+    app.UseRateLimiter();
 
-    if (app.Environment.IsDevelopment()
+    var isDatabaseBackedEnvironment = app.Environment.IsDevelopment()
         || app.Environment.IsEnvironment("Docker")
-        || app.Environment.IsProduction())
+        || app.Environment.IsProduction();
+
+    if (isDatabaseBackedEnvironment)
     {
         await DatabaseInitializer.MigrateAsync(app.Services);
+    }
+
+    // docker compose run --rm api <comando> — nunca inicia o Kestrel, só roda o comando e sai.
+    if (args.Length > 0 && args[0] is "new-setup-token" or "reset-admin-password")
+    {
+        app.Logger.LogInformation("Running CLI command: {Command}", args[0]);
+        Environment.ExitCode = await SetupCliCommands.RunAsync(args, app.Services);
+        return;
+    }
+
+    // "Testing" (WebApplicationFactory de testes de API) não roda migration, então também
+    // não pode consultar tabelas que talvez não existam.
+    if (isDatabaseBackedEnvironment)
+    {
+        await SetupTokenBootstrap.EnsureTokenAsync(app.Services, app.Logger);
     }
 
     app.UseSerilogRequestLogging();

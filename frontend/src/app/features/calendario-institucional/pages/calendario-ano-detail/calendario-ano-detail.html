@@ -1,0 +1,76 @@
+<div class="calendario-detail">
+  @if (calendario(); as c) {
+    <pci-page-header [title]="'Calendário ' + c.ano" description="Feriados, pontos facultativos e eventos institucionais.">
+      <pci-stack slot="actions" gap="2" direction="horizontal">
+        @if (canEditarAno()) {
+          <pci-button variant="ghost" icon="edit" (clicked)="editarAno()">Editar</pci-button>
+        }
+        @if (canGerenciar()) {
+          <pci-button variant="secondary" icon="plus" (clicked)="novaMarcacao()">Adicionar marcação</pci-button>
+        }
+        @if (canPublicar() && c.status === 'Rascunho') {
+          <pci-button variant="primary" [loading]="working()" (clicked)="publicar()">Publicar</pci-button>
+        }
+        @if (canExcluirAno() && c.status === 'Rascunho') {
+          <pci-button variant="ghost" icon="trash" [loading]="working()" (clicked)="excluirAno()">Excluir calendário</pci-button>
+        }
+      </pci-stack>
+    </pci-page-header>
+
+    @if (error()) {
+      <pci-alert variant="error" title="Erro" [message]="error()!" />
+    }
+
+    <p class="calendario-detail__resumo">
+      <pci-badge [variant]="statusVariant(c.status)">{{ statusLabel(c.status) }}</pci-badge>
+      @if (c.publicadoEm) {
+        <span class="calendario-detail__dot" aria-hidden="true">·</span>
+        <span>Publicado em: {{ fmtData(c.publicadoEm) }}@if (c.publicadoPor) { por {{ c.publicadoPor }} }</span>
+      }
+    </p>
+
+    @if (c.observacao) {
+      <p class="calendario-detail__observacao">{{ c.observacao }}</p>
+    }
+
+    <pci-tabs [selectedIndex]="viewTabIndex()" (selectedIndexChange)="onViewTabIndexChange($event)">
+      <pci-tab label="Listagem"></pci-tab>
+      <pci-tab label="Calendário"></pci-tab>
+    </pci-tabs>
+
+    @if (viewTab() === 'listagem') {
+      <pci-data-table
+        [embedded]="true"
+        [showToolbar]="false"
+        [showQuickSearch]="false"
+        [columns]="columns"
+        [rows]="c.marcacoes"
+        [total]="c.marcacoes.length"
+        [pageSize]="c.marcacoes.length || 1"
+        [rowActions]="rowActions"
+        [showRowActions]="canGerenciar()"
+        (rowAction)="onRowAction($event)"
+      >
+        <ng-template pciTableCell="tipo" let-row>
+          <pci-badge [variant]="tipoVariant(row.tipo)">{{ tipoLabel(row.tipo) }}</pci-badge>
+        </ng-template>
+        <ng-template pciTableCell="origem" let-row>
+          <pci-badge variant="secondary">{{ origemLabel(row.origem) }}</pci-badge>
+        </ng-template>
+      </pci-data-table>
+    } @else {
+      <pci-calendar
+        [viewDate]="calendarViewDate()"
+        [events]="calendarEvents()"
+        [instituteLabel]="'Calendário ' + c.ano"
+        subtitle="Feriados, pontos facultativos e eventos institucionais"
+        (viewDateChange)="calendarViewDate.set($event)"
+        (eventClick)="onCalendarEventClick($event)"
+      />
+    }
+  } @else if (loading()) {
+    <p>Carregando…</p>
+  } @else if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+</div>

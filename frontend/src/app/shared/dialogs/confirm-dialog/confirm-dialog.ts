@@ -4,8 +4,11 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import {
   PciButtonComponent,
   PciFormActionsComponent,
-  PciFormCardComponent,
+  PciIconComponent,
 } from '@davillawitte/pci-design-system';
+import type { PciIconName } from '@davillawitte/pci-design-system';
+
+import { AppDialogHeaderComponent } from '../dialog-header/dialog-header';
 
 export interface ConfirmDialogData {
   title: string;
@@ -13,6 +16,14 @@ export interface ConfirmDialogData {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  /** Ícone do selo — por padrão `alert` (danger) ou `help-circle`; sobrescrever pra casos
+   * específicos (ex.: `user-plus` em "Cadastrar usuário?"). */
+  icon?: PciIconName;
+  /** Rótulo + ação de um link opcional abaixo da mensagem (ex.: "Clique aqui para visualizar" um
+   * detalhamento em outro modal) — sem componente de link no design system, ver
+   * `.pci-app-dialog__link` em styles.scss. */
+  viewDetailsLabel?: string;
+  onViewDetails?: () => void;
 }
 
 @Component({
@@ -21,8 +32,9 @@ export interface ConfirmDialogData {
     CommonModule,
     MatDialogModule,
     PciButtonComponent,
-    PciFormCardComponent,
     PciFormActionsComponent,
+    PciIconComponent,
+    AppDialogHeaderComponent,
   ],
   templateUrl: './confirm-dialog.html',
 })

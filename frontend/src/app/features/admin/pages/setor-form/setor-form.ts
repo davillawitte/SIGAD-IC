@@ -80,7 +80,7 @@ export class SetorForm implements OnInit {
     sigla: ['', Validators.required],
     resumo: [''],
     nucleoId: [''],
-    chefiaPrimariaId: ['', Validators.required],
+    chefiaPrimariaId: [''],
     chefiaSecundariaId: [''],
   });
 
@@ -101,7 +101,7 @@ export class SetorForm implements OnInit {
   readonly pageDescription = computed(() =>
     this.isDirecaoIc()
       ? 'Direção do Instituto de Criminalística da PCI/RN'
-      : 'Todo setor deve pertencer a um núcleo e ter chefia imediata.',
+      : 'Todo setor deve pertencer a um núcleo. A chefia pode ser definida depois.',
   );
 
   readonly nucleoOptions = computed<PciSelectOption[]>(() =>
@@ -136,6 +136,7 @@ export class SetorForm implements OnInit {
     this.form.controls.sigla.valueChanges.subscribe((sigla) => {
       if (!this.isEdit() && isDirecaoSigla(sigla || '')) {
         this.applyDirecaoDefaults();
+        this.updateChefiaPrimariaValidator();
       }
     });
 
@@ -143,6 +144,7 @@ export class SetorForm implements OnInit {
       this.api.getSetor(this.editId).subscribe({
         next: (setor) => {
           this.loadedIsDirecao.set(setor.isDirecaoIc);
+          this.updateChefiaPrimariaValidator();
           const primaria = this.findChefia(
             setor.chefias,
             setor.isDirecaoIc ? 'Diretor' : 'ChefiaImediata',
@@ -213,6 +215,7 @@ export class SetorForm implements OnInit {
                 this.saving.set(false);
                 return of(null);
               }
+              this.saving.set(true);
               const payload = {
                 ...common,
                 confirmarRemocaoChefiasEmOutrosSetores: conflitos.length > 0,
@@ -241,6 +244,7 @@ export class SetorForm implements OnInit {
     if (!conflitos.length) {
       return of(true);
     }
+    this.saving.set(false);
     const parts = conflitos.map((c) => {
       const tipo = this.labelTipoChefia(c.tipoChefia);
       return `${c.servidorNome} (${tipo} em ${c.setorNome})`;
@@ -274,6 +278,13 @@ export class SetorForm implements OnInit {
     void this.router.navigateByUrl('/estrutura-organizacional');
   }
 
+  /** Chefia imediata/Diretor são sempre opcionais — podem ser atribuídas depois. */
+  private updateChefiaPrimariaValidator(): void {
+    const control = this.form.controls.chefiaPrimariaId;
+    control.clearValidators();
+    control.updateValueAndValidity({ emitEvent: false });
+  }
+
   private applyDirecaoDefaults(): void {
     this.form.controls.nome.setValue(DIRECAO_IC_NOME);
     this.form.controls.sigla.setValue(DIRECAO_IC_SIGLA);
@@ -294,11 +305,6 @@ export class SetorForm implements OnInit {
     primariaId: string,
     secundariaId: string,
   ): SetorChefiaInput[] | null {
-    if (!primariaId) {
-      this.error.set(isDirecao ? 'Informe o Diretor.' : 'Informe a chefia imediata.');
-      return null;
-    }
-
     if (secundariaId && secundariaId === primariaId) {
       this.error.set('O segundo papel de chefia deve ser um servidor diferente.');
       return null;
@@ -306,7 +312,10 @@ export class SetorForm implements OnInit {
 
     const primariaTipo: TipoChefia = isDirecao ? 'Diretor' : 'ChefiaImediata';
     const secundariaTipo: TipoChefia = isDirecao ? 'Subcoordenador' : 'ChefiaSubstituta';
-    const chefias: SetorChefiaInput[] = [{ tipoChefia: primariaTipo, servidorId: primariaId }];
+    const chefias: SetorChefiaInput[] = [];
+    if (primariaId) {
+      chefias.push({ tipoChefia: primariaTipo, servidorId: primariaId });
+    }
     if (secundariaId) {
       chefias.push({ tipoChefia: secundariaTipo, servidorId: secundariaId });
     }

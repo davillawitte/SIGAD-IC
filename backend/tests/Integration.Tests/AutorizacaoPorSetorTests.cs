@@ -271,7 +271,7 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
         var setorNpId = (await service.GetByIdAsync(ctx.EscalaNpId, Super)).Value!.SetorId;
 
         var negado = await service.CreateAsync(
-            new CreateEscalaRequest(setorNpId, Ano, 9, TipoFuncionamento.Expediente, null),
+            new CreateEscalaRequest(setorNpId, null, Ano, 9, TipoFuncionamento.Expediente, null),
             ChefeNb);
 
         negado.Succeeded.ShouldBeFalse();

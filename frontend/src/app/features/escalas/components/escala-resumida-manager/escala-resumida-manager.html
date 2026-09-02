@@ -1,0 +1,200 @@
+@if (error()) {
+  <pci-alert variant="error" title="Erro" [message]="error()!" />
+}
+
+@if (escala(); as e) {
+  @if (isRascunhoOuFinalizada()) {
+    @if (podeGerenciarSetores()) {
+      <div class="setores-row">
+        <pci-card class="setores-row__setores">
+          <pci-card-content>
+            <h3>Setores do núcleo</h3>
+            <p>Marque os setores que participam desta escala resumida.</p>
+            <div class="pci-form-group">
+              <div [appFormCol]="12" class="wizard-checkbox-row">
+                @for (setor of setorOptions(); track setor.id) {
+                  <pci-checkbox
+                    [label]="setor.sigla + ' — ' + setor.nome"
+                    [checked]="isSetorSelected(setor.id)"
+                    (changed)="toggleSetor(setor.id)"
+                  />
+                }
+              </div>
+            </div>
+          </pci-card-content>
+        </pci-card>
+
+        <pci-card class="setores-row__agentes">
+          <pci-card-content>
+            <h3>Agentes</h3>
+            <p>Servidores lotados direto no núcleo.</p>
+            <pci-checkbox
+              label="Agentes"
+              [checked]="isSetorSelected(null)"
+              (changed)="toggleSetor(null)"
+            />
+          </pci-card-content>
+        </pci-card>
+      </div>
+    }
+
+    @if (e.setores.length > 0) {
+      <pci-card>
+        <pci-card-content>
+          <h3>Equipes e rodízios</h3>
+          <p>Defina as equipes que irão compor a escala e a ordem de rodízio dos servidores.</p>
+          <div class="pci-form-group">
+            <div [appFormCol]="12">
+              <pci-tabs [selectedIndex]="clampedSetorTabIndex()" (selectedIndexChange)="onSetorTabChange($event)">
+                @for (setor of e.setores; track setor.id) {
+                  <pci-tab [label]="setorGrupoLabel(setor)"></pci-tab>
+                }
+              </pci-tabs>
+            </div>
+
+            @if (activeSetor(); as setor) {
+              <div [appFormCol]="12" class="setor-tab-panel">
+                @for (equipe of setor.equipes; track equipe.id) {
+                  <div class="equipe-card">
+                    <div class="equipe-card__header">
+                      <div class="equipe-card__info">
+                        <strong>{{ equipe.nome }}</strong>
+                        <span class="equipe-card__meta">
+                          {{ equipe.rotacao.length }} posição(ões)
+                          @if (equipe.dataInicioCiclo) {
+                            · Início do ciclo em {{ fmt(equipe.dataInicioCiclo) }}
+                          }
+                        </span>
+                      </div>
+                      <pci-stack gap="2" direction="horizontal">
+                        <pci-button variant="secondary" size="sm" icon="edit" (clicked)="abrirRotacao(equipe)">
+                          {{ equipe.rotacao.length ? 'Editar rodízio' : 'Configurar rodízio' }}
+                        </pci-button>
+                        <pci-button variant="danger" size="sm" icon="trash" (clicked)="removerEquipe(equipe.id)">
+                          Remover equipe
+                        </pci-button>
+                      </pci-stack>
+                    </div>
+
+                    @if (isRotacaoAberta(equipe.id)) {
+                      <div class="rotacao-editor">
+                        <pci-datepicker
+                          label="Data de início do ciclo"
+                          [required]="true"
+                          [formControl]="rotacaoDraft(equipe.id)!.dataInicioCiclo"
+                        />
+                        @for (pos of rotacaoDraft(equipe.id)!.membros; track $index) {
+                          <div class="rotacao-editor__row">
+                            <pci-icon name="grip-vertical" size="sm" class="rotacao-editor__grip" />
+                            <span class="rotacao-editor__posicao">Posição {{ $index }}</span>
+                            <pci-select
+                              class="rotacao-editor__select"
+                              label="Servidor"
+                              [formControl]="pos.principal"
+                              [options]="elegiveisOptions()"
+                            />
+                            @if (isAgentesSetor(setor)) {
+                              @if (temSegundaPosicaoAberta(equipe.id, $index)) {
+                                <pci-select
+                                  class="rotacao-editor__select"
+                                  label="Reforço (opcional)"
+                                  [formControl]="pos.segunda"
+                                  [options]="elegiveisOptionsSemDo()"
+                                />
+                                <pci-icon-button
+                                  icon="x"
+                                  variant="outline"
+                                  tone="danger"
+                                  size="sm"
+                                  ariaLabel="Remover reforço"
+                                  (clicked)="removerSegundaPosicao(equipe.id, $index)"
+                                />
+                              } @else {
+                                <pci-button
+                                  variant="ghost"
+                                  size="sm"
+                                  icon="plus"
+                                  (clicked)="abrirSegundaPosicao(equipe.id, $index)"
+                                >
+                                  Reforço
+                                </pci-button>
+                              }
+                            }
+                            <pci-icon name="user" size="sm" class="rotacao-editor__user-icon" />
+                            <pci-icon-button
+                              icon="trash"
+                              variant="outline"
+                              tone="danger"
+                              size="sm"
+                              ariaLabel="Remover posição"
+                              (clicked)="removePosicao(equipe.id, $index)"
+                            />
+                          </div>
+                        }
+                        <pci-button variant="ghost" size="sm" icon="plus" (clicked)="addPosicao(equipe.id)">
+                          Adicionar posição
+                        </pci-button>
+                      </div>
+                    }
+                  </div>
+                }
+
+                <div class="equipe-actions-bar">
+                  <pci-button
+                    variant="secondary"
+                    size="md"
+                    icon="plus"
+                    [fullWidth]="true"
+                    [loading]="working()"
+                    (clicked)="adicionarEquipe(setor.id)"
+                  >
+                    Adicionar equipe
+                  </pci-button>
+                  <pci-button
+                    variant="ghost"
+                    size="md"
+                    [disabled]="!temRotacaoAbertaNoSetorAtivo()"
+                    (clicked)="cancelarRotacoesDoSetorAtivo()"
+                  >
+                    Cancelar
+                  </pci-button>
+                  <pci-button
+                    variant="primary"
+                    size="md"
+                    [disabled]="!temRotacaoAbertaNoSetorAtivo()"
+                    [loading]="working()"
+                    (clicked)="salvarRotacoesDoSetorAtivo()"
+                  >
+                    Salvar rodízios
+                  </pci-button>
+                </div>
+              </div>
+            }
+          </div>
+        </pci-card-content>
+      </pci-card>
+    }
+  }
+
+  <pci-card>
+    <pci-card-content>
+      <h3>Escala Resumida</h3>
+      <div class="pci-form-group">
+        <div [appFormCol]="12">
+          <app-escala-resumida-grid
+            [escala]="e"
+            [editable]="isRascunhoOuFinalizada()"
+            [elegiveis]="elegiveis()"
+            (cellSave)="onCellSave($event)"
+            (cellRevert)="onCellRevert($event)"
+          />
+        </div>
+        <div [appFormCol]="12">
+          <pci-stack gap="3" direction="horizontal">
+            <pci-button variant="secondary" (clicked)="downloadPdf()">Exportar PDF</pci-button>
+          </pci-stack>
+        </div>
+      </div>
+    </pci-card-content>
+  </pci-card>
+}

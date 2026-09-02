@@ -1,0 +1,26 @@
+<pci-form-page
+  title="Novo calendário"
+  description="Gera automaticamente os feriados fixos e móveis do ano selecionado. Pontos facultativos e eventos institucionais são cadastrados depois."
+  [currentPath]="currentPath"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form">
+    <app-form-section title="Dados">
+      <pci-select
+        [appFormCol]="12"
+        label="Ano"
+        [required]="true"
+        formControlName="ano"
+        [options]="anoOptions()"
+        placeholder="Selecione o ano"
+      />
+    </app-form-section>
+  </form>
+</pci-form-page>

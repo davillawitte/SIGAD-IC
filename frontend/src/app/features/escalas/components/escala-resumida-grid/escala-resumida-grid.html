@@ -1,0 +1,88 @@
+<div class="escala-doc" [class.escala-doc--editable]="editable()">
+  <div class="escala-doc__scroll">
+    <table class="escala-doc__table">
+      <thead>
+        <tr>
+          <th rowspan="2" class="escala-doc__sticky">Dia</th>
+          @for (setor of setoresComEquipes(); track setor.id) {
+            <th [attr.colspan]="setor.equipes.length" class="escala-doc__setor-header">
+              {{ setor.setorId ? (setor.setorSigla + ' — ' + setor.setorNome) : 'Agentes' }}
+            </th>
+          }
+        </tr>
+        <tr>
+          @for (setor of setoresComEquipes(); track setor.id) {
+            @for (equipe of setor.equipes; track equipe.id) {
+              <th>{{ equipe.nome }}</th>
+            }
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (day of days(); track day) {
+          <tr>
+            <td class="escala-doc__sticky" [class.is-weekend]="isWeekend(day)">{{ dayLabel(day) }}</td>
+            @for (setor of setoresComEquipes(); track setor.id) {
+              @for (equipe of setor.equipes; track equipe.id) {
+                <td
+                  [class.is-weekend]="isWeekend(day)"
+                  [class.is-do]="isDo(equipe, day)"
+                  [class.is-manual]="isManual(equipe, day)"
+                >
+                  @if (editable()) {
+                    <div class="escala-doc__cell-selects">
+                      <div class="escala-doc__cell-selects__row">
+                        <select class="escala-doc__cell-select" [formControl]="cellControl(equipe, day)">
+                          @for (opt of cellOptions(setor, equipe); track opt.value) {
+                            <option [value]="opt.value">{{ opt.label }}</option>
+                          }
+                        </select>
+                        @if (isManual(equipe, day)) {
+                          <button
+                            type="button"
+                            class="escala-doc__reverter-regra"
+                            title="Esta célula tem um ajuste manual e não muda mais sozinha com o rodízio — clique para descartar o ajuste e voltar a calcular automaticamente"
+                            (click)="reverterParaRegra(equipe, day)"
+                          >↺</button>
+                        }
+                      </div>
+                      @if (isAgentesSetor(setor) && cellControl(equipe, day).value && !isDo(equipe, day)) {
+                        @if (temSegundaPessoa(equipe, day)) {
+                          <div class="escala-doc__cell-selects__row">
+                            <select
+                              class="escala-doc__cell-select escala-doc__cell-select--segunda"
+                              [formControl]="cellControl2(equipe, day)"
+                            >
+                              @for (opt of segundaPessoaOptions(equipe, day); track opt.value) {
+                                <option [value]="opt.value">{{ opt.label }}</option>
+                              }
+                            </select>
+                            <button
+                              type="button"
+                              class="escala-doc__segunda-pessoa-remover"
+                              title="Remover segunda pessoa"
+                              (click)="removerSegundaPessoa(equipe, day)"
+                            >×</button>
+                          </div>
+                        } @else {
+                          <button
+                            type="button"
+                            class="escala-doc__segunda-pessoa-add"
+                            title="Adicionar segunda pessoa neste dia"
+                            (click)="abrirSegundaPessoa(equipe, day)"
+                          >+ reforço</button>
+                        }
+                      }
+                    </div>
+                  } @else {
+                    {{ rotulo(equipe, day) || '—' }}
+                  }
+                </td>
+              }
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

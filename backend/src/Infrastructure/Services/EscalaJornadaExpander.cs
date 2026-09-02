@@ -18,6 +18,7 @@ public static class EscalaJornadaExpander
             RecorrenciaTipo.DiasSemana => ExpandDiasSemana(jornada),
             RecorrenciaTipo.ACadaXDias => ExpandACadaX(jornada),
             RecorrenciaTipo.CicloPlantao => ExpandCiclo(jornada, folgaCodigo),
+            RecorrenciaTipo.CicloPersonalizado => ExpandPersonalizado(jornada, folgaCodigo),
             _ => [],
         };
     }
@@ -79,6 +80,35 @@ public static class EscalaJornadaExpander
             }
         }
     }
+
+    /// <summary>Ciclo com mais de 2 fases (ex.: 24h trabalho, 72h folga, 12h laudo, 36h folga):
+    /// avança um código de <c>SequenciaCiclo</c> por dia, ancorado em <c>DataInicioCiclo</c> —
+    /// mesma técnica de fase do <see cref="ExpandCiclo"/>, só que sobre uma sequência explícita
+    /// em vez de alternar entre 2 códigos fixos.</summary>
+    private static IEnumerable<(DateOnly, string, bool)> ExpandPersonalizado(EscalaJornada jornada, string folgaCodigo)
+    {
+        var sequencia = ParseSequenciaCiclo(jornada.SequenciaCiclo);
+        if (sequencia.Count == 0)
+        {
+            yield break;
+        }
+
+        var ancora = jornada.DataInicioCiclo ?? jornada.DataInicio;
+        var tamanho = sequencia.Count;
+
+        for (var d = jornada.DataInicio; d <= jornada.DataFim; d = d.AddDays(1))
+        {
+            var diasDesdeAncora = d.DayNumber - ancora.DayNumber;
+            var pos = ((diasDesdeAncora % tamanho) + tamanho) % tamanho;
+            var codigo = sequencia[pos];
+            yield return (d, codigo, !string.Equals(codigo, folgaCodigo, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private static List<string> ParseSequenciaCiclo(string? sequenciaCiclo) =>
+        string.IsNullOrWhiteSpace(sequenciaCiclo)
+            ? []
+            : sequenciaCiclo.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
     private static HashSet<int> ParseDiasSemana(string? diasSemana)
     {

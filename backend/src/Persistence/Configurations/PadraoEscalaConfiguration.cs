@@ -19,6 +19,7 @@ public class PadraoEscalaConfiguration : IEntityTypeConfiguration<PadraoEscala>
         builder.Property(x => x.DiasSemana).HasMaxLength(40);
         builder.Property(x => x.TipoOcorrenciaTrabalho).HasMaxLength(10).IsRequired();
         builder.Property(x => x.TipoOcorrenciaFolga).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.SequenciaCiclo).HasMaxLength(200);
         builder.Property(x => x.HorasPadrao).HasPrecision(5, 2);
         builder.Property(x => x.CreatedBy).HasMaxLength(100);
         builder.Property(x => x.UpdatedBy).HasMaxLength(100);

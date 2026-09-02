@@ -1,0 +1,17 @@
+@if (closable) {
+  <button
+    type="button"
+    class="app-dialog-header__close"
+    (click)="closed.emit()"
+    aria-label="Fechar"
+  >
+    <pci-icon name="x" size="sm" />
+  </button>
+}
+
+<div class="app-dialog-header__badge">
+  <pci-icon [name]="icon" size="lg" />
+</div>
+
+<h2 class="app-dialog-header__title">{{ title }}</h2>
+<div class="app-dialog-header__underline"></div>

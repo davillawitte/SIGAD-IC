@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -9,14 +10,17 @@ import {
   PciCheckboxComponent,
   PciFeedbackModalService,
   PciFormPageComponent,
+  PciIconComponent,
   PciInputComponent,
   PciSelectionListComponent,
   PciStackComponent,
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption, PciSelectionListItem } from '@davillawitte/pci-design-system';
+import { filter } from 'rxjs/operators';
 
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
+import { ServidorDialog } from '../../components/servidor-dialog/servidor-dialog';
 import type { PerfilListItem, ServidorListItem } from '../../models/admin.models';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
 
@@ -25,11 +29,13 @@ import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    MatDialogModule,
     MatSelectModule,
     PciAlertComponent,
     PciButtonComponent,
     PciCheckboxComponent,
     PciFormPageComponent,
+    PciIconComponent,
     PciInputComponent,
     PciSelectionListComponent,
     PciStackComponent,
@@ -45,6 +51,7 @@ export class UsuarioForm implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly feedback = inject(PciFeedbackModalService);
+  private readonly dialog = inject(MatDialog);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
   readonly isEdit = signal(false);
@@ -170,6 +177,19 @@ export class UsuarioForm implements OnInit {
 
   cancel(): void {
     void this.router.navigateByUrl('/usuarios');
+  }
+
+  /** Cadastra o servidor sem sair da tela — o dialog devolve o item criado (ou `false` se
+   * cancelado), então o select recarrega com ele já selecionado sem nova chamada à API. */
+  abrirNovoServidor(): void {
+    this.dialog
+      .open(ServidorDialog, { width: '720px', maxWidth: '95vw', panelClass: 'pci-app-dialog-panel' })
+      .afterClosed()
+      .pipe(filter((result): result is ServidorListItem => result !== false))
+      .subscribe((created) => {
+        this.servidores.update((list) => [...list, created]);
+        this.form.controls.servidorId.setValue(created.id);
+      });
   }
 
   private loadLookups(): void {

@@ -11,7 +11,8 @@ export type RecorrenciaTipo =
   | 'TodosOsDias'
   | 'DiasSemana'
   | 'ACadaXDias'
-  | 'CicloPlantao';
+  | 'CicloPlantao'
+  | 'CicloPersonalizado';
 export type OrigemOcorrencia = 'Regra' | 'Manual';
 export type CategoriaOcorrencia = 'Trabalho' | 'Folga' | 'Afastamento' | 'Outro';
 export type StatusSolicitacaoDevolucao = 'Pendente' | 'Aprovada' | 'Recusada';
@@ -19,9 +20,12 @@ export type StatusSolicitacaoDevolucao = 'Pendente' | 'Aprovada' | 'Recusada';
 export interface EscalaListItem {
   id: string;
   identificacao: string;
-  setorId: string;
-  setorNome: string;
-  setorSigla: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  nucleoSigla?: string | null;
   ano: number;
   mes: number;
   dataInicio: string;
@@ -32,6 +36,7 @@ export interface EscalaListItem {
   publicadaPor?: string | null;
   createdAt: string;
   createdBy?: string | null;
+  resumidaId?: string | null;
 }
 
 export interface EscalaOcorrencia {
@@ -65,6 +70,7 @@ export interface EscalaJornada {
   diasTrabalho?: number | null;
   diasFolga?: number | null;
   tipoOcorrenciaFolgaCodigo?: string | null;
+  sequenciaCiclo?: string | null;
   observacao?: string | null;
 }
 
@@ -86,9 +92,12 @@ export interface EscalaServidor {
 export interface EscalaDetail {
   id: string;
   identificacao: string;
-  setorId: string;
-  setorNome: string;
-  setorSigla: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  nucleoSigla?: string | null;
   ano: number;
   mes: number;
   dataInicio: string;
@@ -142,6 +151,7 @@ export interface PadraoEscala {
   diasSemana?: string | null;
   tipoOcorrenciaTrabalho: string;
   tipoOcorrenciaFolga: string;
+  sequenciaCiclo?: string | null;
   horaInicioPadrao?: string | null;
   horaFimPadrao?: string | null;
   horasPadrao?: number | null;
@@ -186,8 +196,17 @@ export interface EscalaConflitos {
   totalCriticos: number;
 }
 
+/** Servidor já escalado em outro lugar no mesmo período — `origem` identifica onde (setor,
+ * núcleo, ou rodízio de escala resumida). */
+export interface ConflitoServidor {
+  servidorId: string;
+  servidorNome: string;
+  origem: string;
+}
+
 export interface CreateEscalaPayload {
-  setorId: string;
+  setorId?: string | null;
+  nucleoId?: string | null;
   ano: number;
   mes: number;
   tipoFuncionamento: TipoFuncionamento;
@@ -215,6 +234,7 @@ export interface CreateEscalaJornadaPayload {
   diasTrabalho?: number | null;
   diasFolga?: number | null;
   tipoOcorrenciaFolgaCodigo?: string | null;
+  sequenciaCiclo?: string | null;
   observacao?: string | null;
   padraoEscalaId?: string | null;
   dataInicioCiclo?: string | null;
@@ -279,9 +299,12 @@ export interface SolicitacaoDevolucaoEscala {
   id: string;
   escalaId: string;
   escalaIdentificacao: string;
-  setorId: string;
-  setorNome: string;
-  setorSigla: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  nucleoSigla?: string | null;
   ano: number;
   mes: number;
   solicitanteUsuarioId: string;

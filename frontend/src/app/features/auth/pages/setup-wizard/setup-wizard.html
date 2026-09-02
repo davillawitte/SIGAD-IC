@@ -1,0 +1,65 @@
+<pci-auth-layout>
+  <div class="setup-wizard">
+    <h1>Provisionamento do sistema</h1>
+    <p>Configure o primeiro superadministrador do SIGAD-IC.</p>
+
+    @if (error()) {
+      <pci-alert variant="error" title="Atenção" [message]="error()!" />
+    }
+
+    <pci-stepper [linear]="true" [selectedIndex]="stepperIndex()">
+      <pci-step label="Token" [completed]="step() > 1"></pci-step>
+      <pci-step label="Dados" [completed]="step() > 2"></pci-step>
+      <pci-step label="Senha" [completed]="false"></pci-step>
+    </pci-stepper>
+
+    @if (step() === 1) {
+      <form [formGroup]="tokenForm">
+        <pci-stack gap="3" [fullWidth]="true">
+          <pci-input
+            label="Token de provisionamento"
+            formControlName="token"
+            hint="Veja o valor no log da API (docker compose logs api)"
+            [required]="true"
+          />
+          <pci-button variant="primary" (clicked)="avancarToken()">Continuar</pci-button>
+        </pci-stack>
+      </form>
+    }
+
+    @if (step() === 2) {
+      <form [formGroup]="dadosForm">
+        <pci-stack gap="3" [fullWidth]="true">
+          <pci-input label="Nome completo" formControlName="nome" [required]="true" />
+          <pci-input label="CPF" formControlName="cpf" [required]="true" />
+          <pci-input label="Matrícula" formControlName="matricula" placeholder="xxx.xxx-x" [required]="true" />
+          <pci-input label="E-mail" type="email" formControlName="email" />
+          <pci-input label="Data de nascimento" type="date" formControlName="dataNascimento" [required]="true" />
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
+            <pci-button variant="primary" (clicked)="avancarDados()">Continuar</pci-button>
+          </pci-stack>
+        </pci-stack>
+      </form>
+    }
+
+    @if (step() === 3) {
+      <form [formGroup]="senhaForm">
+        <pci-stack gap="3" [fullWidth]="true">
+          <pci-input
+            label="Senha"
+            type="password"
+            formControlName="senha"
+            hint="Mínimo de 8 caracteres"
+            [required]="true"
+          />
+          <pci-input label="Confirmar senha" type="password" formControlName="confirmarSenha" [required]="true" />
+          <pci-stack gap="2" direction="horizontal">
+            <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
+            <pci-button variant="primary" [loading]="saving()" (clicked)="concluir()">Concluir</pci-button>
+          </pci-stack>
+        </pci-stack>
+      </form>
+    }
+  </div>
+</pci-auth-layout>

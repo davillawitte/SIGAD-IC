@@ -1,0 +1,26 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="alert" title="Conflitos da escala" (closed)="fechar()" />
+  <p class="pci-app-dialog__message">
+    Estes são os pontos encontrados na conferência da escala — os marcados como críticos impedem
+    a publicação automática, mas podem ser confirmados manualmente.
+  </p>
+
+  <ul class="pci-app-dialog__conflitos-list">
+    @for (item of data.itens; track $index) {
+      <li [class.pci-app-dialog__conflitos-item--critico]="item.critico">
+        <strong>{{ item.critico ? 'Crítico' : 'Aviso' }}</strong>
+        @if (item.servidorNome) {
+          — {{ item.servidorNome }}
+        }
+        @if (item.data) {
+          — {{ item.data }}
+        }
+        <p>{{ item.mensagem }}</p>
+      </li>
+    }
+  </ul>
+
+  <pci-form-actions>
+    <pci-button variant="primary" (clicked)="fechar()">Fechar</pci-button>
+  </pci-form-actions>
+</div>

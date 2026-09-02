@@ -3,19 +3,22 @@
   min-height: 100vh;
 }
 
-.trocar-senha {
-  width: min(100%, 26rem);
-  margin: 0 auto;
-  display: grid;
-  gap: 1rem;
+/* Detecta autopreenchimento do navegador (gerenciador de senhas) no <input> nativo dentro de
+ * cada pci-input — o browser escreve direto no DOM sem disparar o evento `input` que o Angular
+ * escuta, então o FormControl fica desatualizado (campo parece preenchido mas acusa
+ * "Campo obrigatório."). Truque padrão: :-webkit-autofill dispara uma animação que o JS escuta
+ * (ver TrocarSenhaForm.onAutofillAnimationStart). ::ng-deep é necessário pra alcançar o <input>
+ * nativo dentro do pci-input, que este repo não controla — ver docs/design-system-pendencias.md. */
+:host ::ng-deep input:-webkit-autofill {
+  animation-name: pciAutofillDetect;
+  animation-duration: 1ms;
 }
 
-.trocar-senha h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.trocar-senha p {
-  margin: 0;
-  opacity: 0.85;
+@keyframes pciAutofillDetect {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
 }
