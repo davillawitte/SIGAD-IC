@@ -303,6 +303,7 @@ public static class SetorSiglas
 {
     public const string DirecaoIc = "Direção IC";
     public const string DirecaoIcNome = "Direção do Instituto de Criminalística";
+    public const string InstitutoNome = "Instituto de Criminalística";
 
     public static bool IsDirecaoIc(string? sigla)
     {

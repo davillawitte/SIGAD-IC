@@ -55,9 +55,11 @@ public class EscalaResumidaPdfService(
         return Result<(byte[], string)>.Success((bytes, fileName));
     }
 
-    /// <summary>Chefia imediata do setor (ou Diretor, se o setor for a Direção IC) — ou o chefe
-    /// do núcleo, quando a escala resumida é de núcleo. `null` se não houver chefia cadastrada.</summary>
-    private async Task<(string Nome, string Matricula)?> ResolveChefeAsync(
+    /// <summary>Chefia do setor — Diretor OU Subcoordenador se for a Direção IC (têm os mesmos
+    /// poderes no sistema, qualquer um dos dois assina), chefia imediata nos demais setores —
+    /// ou o chefe do núcleo, quando a escala resumida é de núcleo. `null` se não houver chefia
+    /// cadastrada.</summary>
+    private async Task<(string Nome, string Matricula, TipoChefia Tipo)?> ResolveChefeAsync(
         Guid? setorId, Guid? nucleoId, CancellationToken cancellationToken)
     {
         if (setorId is Guid s)
@@ -66,13 +68,25 @@ public class EscalaResumidaPdfService(
                 .Where(x => x.Id == s)
                 .Select(x => x.Sigla)
                 .FirstOrDefaultAsync(cancellationToken);
-            var tipo = SetorSiglas.IsDirecaoIc(sigla) ? TipoChefia.Diretor : TipoChefia.ChefiaImediata;
+
+            if (SetorSiglas.IsDirecaoIc(sigla))
+            {
+                var chefiaDirecao = await db.SetorChefias
+                    .Where(x => x.SetorId == s
+                        && (x.TipoChefia == TipoChefia.Diretor || x.TipoChefia == TipoChefia.Subcoordenador))
+                    .OrderBy(x => x.TipoChefia)
+                    .Select(x => new { x.Servidor.Nome, x.Servidor.Matricula, x.TipoChefia })
+                    .FirstOrDefaultAsync(cancellationToken);
+                return chefiaDirecao is null
+                    ? null
+                    : (chefiaDirecao.Nome, chefiaDirecao.Matricula, chefiaDirecao.TipoChefia);
+            }
 
             var chefia = await db.SetorChefias
-                .Where(x => x.SetorId == s && x.TipoChefia == tipo)
+                .Where(x => x.SetorId == s && x.TipoChefia == TipoChefia.ChefiaImediata)
                 .Select(x => new { x.Servidor.Nome, x.Servidor.Matricula })
                 .FirstOrDefaultAsync(cancellationToken);
-            return chefia is null ? null : (chefia.Nome, chefia.Matricula);
+            return chefia is null ? null : (chefia.Nome, chefia.Matricula, TipoChefia.ChefiaImediata);
         }
 
         if (nucleoId is Guid n)
@@ -81,22 +95,33 @@ public class EscalaResumidaPdfService(
                 .Where(x => x.Id == n && x.ChefeServidorId != null)
                 .Select(x => new { x.ChefeServidor!.Nome, x.ChefeServidor.Matricula })
                 .FirstOrDefaultAsync(cancellationToken);
-            return chefe is null ? null : (chefe.Nome, chefe.Matricula);
+            return chefe is null ? null : (chefe.Nome, chefe.Matricula, TipoChefia.ChefiaImediata);
         }
 
         return null;
     }
 
     private static void ComposeSignature(
-        ColumnDescriptor col, (string Nome, string Matricula)? chefe, string unidadeLabel)
+        ColumnDescriptor col, (string Nome, string Matricula, TipoChefia Tipo)? chefe, string unidadeLabel)
     {
         col.Item().PaddingTop(16).AlignCenter().Column(sig =>
         {
             sig.Item().AlignCenter().Text(
                 chefe is null ? "—" : $"{chefe.Value.Nome} - {chefe.Value.Matricula}").FontSize(9);
-            sig.Item().AlignCenter().Text($"Chefe do {unidadeLabel}").FontSize(8);
+            sig.Item().AlignCenter().Text(TituloChefia(chefe, unidadeLabel)).FontSize(8);
         });
     }
+
+    /// <summary>Diretor/Subcoordenador assinam como cargo institucional ("Diretor do Instituto
+    /// de Criminalística"), não como "Chefe do {nome do setor Direção IC}" — os demais setores e
+    /// núcleos continuam com o rótulo genérico de chefia.</summary>
+    private static string TituloChefia((string Nome, string Matricula, TipoChefia Tipo)? chefe, string unidadeLabel) =>
+        chefe?.Tipo switch
+        {
+            TipoChefia.Diretor => $"Diretor do {SetorSiglas.InstitutoNome}",
+            TipoChefia.Subcoordenador => $"Subcoordenador do {SetorSiglas.InstitutoNome}",
+            _ => $"Chefe do {unidadeLabel}",
+        };
 
     private byte[]? LoadImageBytes(string fileName)
     {
@@ -122,7 +147,7 @@ public class EscalaResumidaPdfService(
         EscalaResumidaDetailDto escala,
         byte[]? brasaoPci,
         byte[]? brasaoRn,
-        (string Nome, string Matricula)? chefe)
+        (string Nome, string Matricula, TipoChefia Tipo)? chefe)
     {
         var days = Enumerable
             .Range(0, escala.DataFim.DayNumber - escala.DataInicio.DayNumber + 1)

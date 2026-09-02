@@ -20,8 +20,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
 
+
+# fontconfig + DejaVu: sem eles o SkiaSharp (usado pelo QuestPDF pra gerar os PDFs de escala)
+# cai num fallback de fonte incompleto nesta imagem Debian mínima — sintoma visto em produção:
+# sequências como "ti" somem do texto ("Instituto" virava "Instuto", "Criminalística" virava
+# "Criminalísca"), porque o fallback não resolve corretamente esses glifos/ligaduras.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl fontconfig fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 ENV ASPNETCORE_URLS=http://+:8080
