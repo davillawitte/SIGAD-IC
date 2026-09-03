@@ -19,30 +19,55 @@
           <input
             type="radio"
             name="export-escala-formato"
-            [checked]="formato() === 'csv'"
-            (change)="formato.set('csv')"
+            [checked]="formato() === 'excel'"
+            (change)="formato.set('excel')"
           />
-          CSV
+          Excel
         </label>
       </pci-stack>
 
-      @if (formato() === 'csv') {
+      @if (formato() === 'pdf') {
         <pci-stack gap="2" direction="vertical" class="export-escala-dialog__suboptions">
           <label class="export-escala-dialog__option">
             <input
               type="radio"
-              name="export-escala-csv-opcao"
-              [checked]="csvOpcao() === 'resumida'"
-              (change)="csvOpcao.set('resumida')"
+              name="export-escala-pdf-tipo"
+              [checked]="pdfTipo() === 'definitiva'"
+              (change)="pdfTipo.set('definitiva')"
+            />
+            Escala definitiva
+          </label>
+          <label class="export-escala-dialog__option">
+            <input
+              type="radio"
+              name="export-escala-pdf-tipo"
+              [disabled]="!data.temEscalaResumida"
+              [checked]="pdfTipo() === 'resumida'"
+              (change)="pdfTipo.set('resumida')"
+            />
+            Escala resumida
+          </label>
+          @if (!data.temEscalaResumida) {
+            <p class="export-escala-dialog__hint">Esta escala não tem escala resumida vinculada.</p>
+          }
+        </pci-stack>
+      } @else {
+        <pci-stack gap="2" direction="vertical" class="export-escala-dialog__suboptions">
+          <label class="export-escala-dialog__option">
+            <input
+              type="radio"
+              name="export-escala-excel-opcao"
+              [checked]="excelOpcao() === 'resumida'"
+              (change)="excelOpcao.set('resumida')"
             />
             Resumida (auxílio-alimentação)
           </label>
           <label class="export-escala-dialog__option">
             <input
               type="radio"
-              name="export-escala-csv-opcao"
-              [checked]="csvOpcao() === 'completa'"
-              (change)="csvOpcao.set('completa')"
+              name="export-escala-excel-opcao"
+              [checked]="excelOpcao() === 'completa'"
+              (change)="excelOpcao.set('completa')"
             />
             Completa
           </label>

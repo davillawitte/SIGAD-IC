@@ -6,10 +6,25 @@
 
   input[type='radio'] {
     accent-color: var(--pci-color-primary);
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+
+  &:has(input:disabled) {
+    color: var(--pci-color-text-secondary, #475467);
+    cursor: not-allowed;
   }
 }
 
 .export-escala-dialog__suboptions {
   padding-left: 1.5rem;
   border-left: 2px solid var(--pci-color-border, #d0d5dd);
+}
+
+.export-escala-dialog__hint {
+  margin: 0;
+  font-size: var(--pci-font-size-sm, 0.875rem);
+  color: var(--pci-color-text-secondary, #475467);
 }

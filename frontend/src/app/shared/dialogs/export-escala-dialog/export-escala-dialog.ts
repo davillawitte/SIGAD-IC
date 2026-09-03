@@ -11,16 +11,23 @@ import {
 
 import { AppDialogHeaderComponent } from '../dialog-header/dialog-header';
 
-export type ExportEscalaCsvOpcao = 'resumida' | 'completa';
+export type ExportEscalaExcelOpcao = 'resumida' | 'completa';
+export type ExportEscalaPdfTipo = 'definitiva' | 'resumida';
 
 /** Um ícone só de "Baixar" pra não repetir o mesmo ícone de download em duas ações inline — o
- * diálogo pergunta o formato (PDF ou CSV) e, se CSV, o sub-formato (resumida ou completa). */
+ * diálogo pergunta o formato (PDF ou Excel) e, dentro de cada um, um sub-formato: PDF pergunta
+ * escala definitiva ou escala resumida (mapa de plantão físico por equipe/local — só disponível
+ * quando a escala tem uma escala resumida vinculada); Excel pergunta resumida (auxílio-
+ * alimentação) ou completa. */
 export type ExportEscalaResultado =
-  | { formato: 'pdf' }
-  | { formato: 'csv'; opcao: ExportEscalaCsvOpcao };
+  | { formato: 'pdf'; pdfTipo: ExportEscalaPdfTipo }
+  | { formato: 'excel'; opcao: ExportEscalaExcelOpcao };
 
 export interface ExportEscalaDialogData {
   title?: string;
+  /** Se a escala desta linha tem uma escala resumida vinculada — desabilita a opção "Escala
+   * resumida" do PDF quando não tem. */
+  temEscalaResumida?: boolean;
 }
 
 @Component({
@@ -42,12 +49,15 @@ export class ExportEscalaDialog {
   readonly data = inject<ExportEscalaDialogData>(MAT_DIALOG_DATA);
   private readonly ref = inject(MatDialogRef<ExportEscalaDialog, ExportEscalaResultado | null>);
 
-  readonly formato = signal<'pdf' | 'csv'>('pdf');
-  readonly csvOpcao = signal<ExportEscalaCsvOpcao>('resumida');
+  readonly formato = signal<'pdf' | 'excel'>('pdf');
+  readonly pdfTipo = signal<ExportEscalaPdfTipo>('definitiva');
+  readonly excelOpcao = signal<ExportEscalaExcelOpcao>('resumida');
 
   confirm(): void {
     this.ref.close(
-      this.formato() === 'pdf' ? { formato: 'pdf' } : { formato: 'csv', opcao: this.csvOpcao() },
+      this.formato() === 'pdf'
+        ? { formato: 'pdf', pdfTipo: this.pdfTipo() }
+        : { formato: 'excel', opcao: this.excelOpcao() },
     );
   }
 

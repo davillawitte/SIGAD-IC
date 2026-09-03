@@ -1381,8 +1381,11 @@ export class EscalaForm implements OnInit {
     const inicioEscala = normalizeDay(resumida.dataInicio);
     const poolServidores = new Set(this.servidoresSetor().map((s) => s.id));
     const ciclos = new Map(this.servidorCicloResumida());
+    const iniciosCiclo = new Map(this.servidorInicioCiclo());
     const ids = new Set(this.selectedServidorIds());
+    const idsComCicloPersonalizado: string[] = [];
     let novos = 0;
+    let algumMembroEncontrado = false;
 
     for (const setor of setores) {
       for (const equipe of setor.equipes) {
@@ -1395,7 +1398,24 @@ export class EscalaForm implements OnInit {
           const ancoraServidor = primeiraDataParaPosicao(inicioEscala, ancoraEquipe, tamanhoPool, membro.posicao);
           if (!ancoraServidor) continue;
 
-          ciclos.set(membro.servidorId, { ancora: ancoraServidor, tamanhoPool });
+          algumMembroEncontrado = true;
+
+          // Servidor com regime explícito escolhido no passo 2 que exige ciclo personalizado
+          // (ex.: PT24_TL12, com TL12 na sequência) não pode ser gerado pelo caminho simples
+          // PT/D da resumida (`buildJornadasResumida$` não suporta `SequenciaCiclo`/TL12) —
+          // segue pelo caminho normal do regime (`buildGerarItens`, que já suporta), só
+          // herdando a âncora da resumida como início de ciclo (mesmo raciocínio já aplicado em
+          // `ensureRegimeControls` quando o usuário troca de regime depois de já estar na
+          // resumida — aqui é a ordem inversa: regime escolhido ANTES do passo da resumida).
+          const codigoRegime = this.servidorRegimeCodigo(membro.servidorId);
+          const padraoRegime = codigoRegime ? this.padroesByCodigo().get(codigoRegime) : undefined;
+          if (padraoRegime?.recorrenciaTipo === 'CicloPersonalizado') {
+            iniciosCiclo.set(membro.servidorId, ancoraServidor);
+            idsComCicloPersonalizado.push(membro.servidorId);
+          } else {
+            ciclos.set(membro.servidorId, { ancora: ancoraServidor, tamanhoPool });
+          }
+
           if (!ids.has(membro.servidorId)) {
             ids.add(membro.servidorId);
             novos++;
@@ -1404,12 +1424,20 @@ export class EscalaForm implements OnInit {
       }
     }
 
-    if (ciclos.size === 0) return;
+    if (!algumMembroEncontrado) return;
 
     this.servidorCicloResumida.set(ciclos);
+    this.servidorInicioCiclo.set(iniciosCiclo);
     this.selectedServidorIds.set(ids);
     this.ensureRegimeControls();
     this.ensureInicioCicloControls();
+    // `ensureInicioCicloControls` só cria o controle se ele ainda não existir — se o usuário já
+    // tinha revisitado o passo 2 antes de configurar a resumida, o controle já existe (vazio) e
+    // precisa ser atualizado manualmente com a âncora recém-preenchida (mesmo padrão de
+    // `ensureRegimeControls`).
+    for (const id of idsComCicloPersonalizado) {
+      this.inicioCicloForm.get(id)?.setValue(iniciosCiclo.get(id) ?? '', { emitEvent: false });
+    }
     this.markDirty();
     if (novos > 0) {
       this.toast.showSuccess(

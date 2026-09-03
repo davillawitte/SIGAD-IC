@@ -20,24 +20,28 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         var q = db.Afastamentos
             .AsNoTracking()
             .Include(x => x.Servidor).ThenInclude(x => x.Setor)
+            .Include(x => x.Servidor).ThenInclude(x => x.Nucleo)
             .AsQueryable();
 
         var escopo = (query.Escopo ?? string.Empty).Trim().ToLowerInvariant();
         if (escopo is "setor" or "meus")
         {
             // Chefe de núcleo também enxerga afastamentos dos servidores lotados nos setores
-            // que aquele núcleo engloba (não só dos setores geridos diretamente) — mesmo
-            // padrão de `ServidorService.ListMeusAsync`.
-            var meus = actor.SetoresGerenciadosIds
+            // que aquele núcleo engloba (não só dos setores geridos diretamente), e dos
+            // servidores lotados direto no próprio núcleo que chefia.
+            var meusSetores = actor.SetoresGerenciadosIds
                 .Concat(actor.SetoresDosNucleosGerenciadosIds)
                 .Distinct()
                 .ToList();
-            if (meus.Count == 0)
+            var meusNucleos = actor.NucleosGerenciadosIds;
+            if (meusSetores.Count == 0 && meusNucleos.Count == 0)
             {
                 return [];
             }
 
-            q = q.Where(x => x.Servidor.SetorId != null && meus.Contains(x.Servidor.SetorId.Value));
+            q = q.Where(x =>
+                (x.Servidor.SetorId != null && meusSetores.Contains(x.Servidor.SetorId.Value))
+                || (x.Servidor.NucleoId != null && meusNucleos.Contains(x.Servidor.NucleoId.Value)));
         }
         else if (escopo is "institucional" or "outros")
         {
@@ -46,13 +50,11 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
                 return [];
             }
 
-            // Institucional: todos os setores, exceto a Direção do IC. Servidor lotado
-            // direto no núcleo ainda não tem afastamento nesta tela (fora de escopo).
-            q = q.Where(x => x.Servidor.SetorId != null);
+            // Institucional: todos os setores e núcleos, exceto a Direção do IC.
             var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
             if (direcaoIds.Count > 0)
             {
-                q = q.Where(x => !direcaoIds.Contains(x.Servidor.SetorId!.Value));
+                q = q.Where(x => x.Servidor.SetorId == null || !direcaoIds.Contains(x.Servidor.SetorId.Value));
             }
         }
         else
@@ -64,7 +66,10 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
                     .Concat(actor.SetoresDosNucleosGerenciadosIds)
                     .Distinct()
                     .ToList();
-                q = q.Where(x => x.Servidor.SetorId != null && setoresIncluidos.Contains(x.Servidor.SetorId.Value));
+                var nucleosIncluidos = actor.NucleosGerenciadosIds;
+                q = q.Where(x =>
+                    (x.Servidor.SetorId != null && setoresIncluidos.Contains(x.Servidor.SetorId.Value))
+                    || (x.Servidor.NucleoId != null && nucleosIncluidos.Contains(x.Servidor.NucleoId.Value)));
             }
         }
 
@@ -124,6 +129,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         var entity = await db.Afastamentos
             .AsNoTracking()
             .Include(x => x.Servidor).ThenInclude(x => x.Setor)
+            .Include(x => x.Servidor).ThenInclude(x => x.Nucleo)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (entity is null)
@@ -131,7 +137,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Afastamento não encontrado.");
         }
 
-        if (entity.Servidor.SetorId is not { } afastamentoSetorId || !CanView(actor, afastamentoSetorId))
+        if (!CanView(actor, entity.Servidor.SetorId, entity.Servidor.NucleoId))
         {
             return Result<AfastamentoDto>.Failure("Sem permissão para este afastamento.");
         }
@@ -156,6 +162,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var servidor = await db.Servidores
             .Include(x => x.Setor)
+            .Include(x => x.Nucleo)
             .FirstOrDefaultAsync(x => x.Id == request.ServidorId, cancellationToken);
 
         if (servidor is null)
@@ -163,17 +170,10 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Servidor não encontrado.");
         }
 
-        if (servidor.SetorId is null)
+        if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosCriar, servidor.SetorId, servidor.NucleoId))
         {
             return Result<AfastamentoDto>.Failure(
-                "Servidor lotado diretamente no núcleo ainda não tem afastamento por esta tela.");
-        }
-
-        if (!actor.PodeAcessar(PermissionCodes.AfastamentosCriar, servidor.SetorId)
-            && !actor.GerenciaSetorViaNucleo(servidor.SetorId.Value))
-        {
-            return Result<AfastamentoDto>.Failure(
-                "Só é possível cadastrar afastamento para servidores do setor em que você é chefe.");
+                "Só é possível cadastrar afastamento para servidores do setor ou núcleo em que você é chefe.");
         }
 
         Afastamento entity;
@@ -214,11 +214,9 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Afastamento não encontrado.");
         }
 
-        if (entity.Servidor.SetorId is not { } setorIdEditar
-            || (!actor.PodeAcessar(PermissionCodes.AfastamentosEditar, setorIdEditar)
-                && !actor.GerenciaSetorViaNucleo(setorIdEditar)))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosEditar, entity.Servidor.SetorId, entity.Servidor.NucleoId))
         {
-            return Result<AfastamentoDto>.Failure("Sem permissão para alterar afastamento neste setor.");
+            return Result<AfastamentoDto>.Failure("Sem permissão para alterar afastamento desta lotação.");
         }
 
         try
@@ -252,11 +250,9 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result.Failure("Afastamento não encontrado.");
         }
 
-        if (entity.Servidor.SetorId is not { } setorIdExcluir
-            || (!actor.PodeAcessar(PermissionCodes.AfastamentosExcluir, setorIdExcluir)
-                && !actor.GerenciaSetorViaNucleo(setorIdExcluir)))
+        if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosExcluir, entity.Servidor.SetorId, entity.Servidor.NucleoId))
         {
-            return Result.Failure("Sem permissão para excluir afastamento neste setor.");
+            return Result.Failure("Sem permissão para excluir afastamento desta lotação.");
         }
 
         db.Afastamentos.Remove(entity);
@@ -270,10 +266,12 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             x.ServidorId,
             x.Servidor.Nome,
             x.Servidor.Matricula,
-            // Afastamento só é criado para servidor lotado em setor (ver CreateAsync).
-            x.Servidor.SetorId!.Value,
-            x.Servidor.Setor!.Nome,
-            x.Servidor.Setor.Sigla,
+            x.Servidor.SetorId,
+            x.Servidor.Setor?.Nome,
+            x.Servidor.Setor?.Sigla,
+            x.Servidor.NucleoId,
+            x.Servidor.Nucleo?.Nome,
+            x.Servidor.Nucleo?.Sigla,
             x.DataInicio,
             x.DataFim,
             x.TipoOcorrenciaCodigo,
@@ -297,6 +295,29 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             .ToHashSet();
     }
 
-    private static bool CanView(ActorContext actor, Guid setorId) =>
-        actor.PodeVer(PermissionCodes.AfastamentosListar, setorId) || actor.GerenciaSetorViaNucleo(setorId);
+    /// <summary>Servidor lotado direto no núcleo: quem chefia aquele núcleo, ou tem visão
+    /// institucional do módulo. Servidor lotado em setor: mesma regra de sempre (abrangência da
+    /// permissão, ou chefia de núcleo que engloba o setor).</summary>
+    private static bool PodeAcessarLotacao(ActorContext actor, string code, Guid? setorId, Guid? nucleoId)
+    {
+        if (nucleoId.HasValue)
+        {
+            return actor.GerenciaNucleo(nucleoId.Value)
+                || (actor.TemVisaoGlobal(PermissionModules.Afastamentos) && actor.TemPermissao(code));
+        }
+
+        return setorId.HasValue
+            && (actor.PodeAcessar(code, setorId) || actor.GerenciaSetorViaNucleo(setorId.Value));
+    }
+
+    private static bool CanView(ActorContext actor, Guid? setorId, Guid? nucleoId)
+    {
+        if (nucleoId.HasValue)
+        {
+            return actor.GerenciaNucleo(nucleoId.Value) || actor.TemVisaoGlobal(PermissionModules.Afastamentos);
+        }
+
+        return setorId.HasValue
+            && (actor.PodeVer(PermissionCodes.AfastamentosListar, setorId.Value) || actor.GerenciaSetorViaNucleo(setorId.Value));
+    }
 }

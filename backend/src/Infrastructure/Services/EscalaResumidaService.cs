@@ -758,7 +758,6 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                 var equipeNova = EscalaResumidaEquipe.Create(setorNovo.Id, equipeOrigem.Nome, equipeOrigem.Ordem, actorLogin);
                 db.EscalaResumidaEquipes.Add(equipeNova);
 
-                var poolNovo = new List<EscalaResumidaRotacaoMembro>();
                 foreach (var membroOrigem in equipeOrigem.Rotacao.OrderBy(x => x.Posicao))
                 {
                     var membroNovo = EscalaResumidaRotacaoMembro.Create(
@@ -766,11 +765,13 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                     // Só Add no DbSet — ver comentário equivalente em ConfigurarRotacaoAsync
                     // (fixup automático do EF já popula equipeNova.Rotacao).
                     db.EscalaResumidaRotacaoMembros.Add(membroNovo);
-                    poolNovo.Add(membroNovo);
                 }
 
-                var novaAncora = ReancorarRodizio(equipeOrigem, poolNovo, origem.DataInicio, origem.DataFim);
-                if (novaAncora is DateOnly ancora)
+                // Mantém a mesma âncora do mês de origem — o rodízio é calculado por contagem de
+                // dias corrida (ver EscalaResumidaRotacaoExpander.ExpandSetor), não por mês, então
+                // preservar a âncora já continua a sequência em fase automaticamente entre os
+                // meses, sem precisar reancorar a partir de nenhum dia específico.
+                if (equipeOrigem.DataInicioCiclo is DateOnly ancora)
                 {
                     equipeNova.DefinirAncora(ancora, actorLogin);
                 }
@@ -945,49 +946,6 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                     EscalaResumidaDia.CriarPorRegra(equipeId, data, servidorId, nome, servidorId2, nome2, rotacaoMembroId, actorLogin));
             }
         }
-    }
-
-    /// <summary>
-    /// Acha o ponto de ancoragem do novo mês a partir dos últimos 4 dias reais do mês de
-    /// origem: procura, do mais recente pro mais antigo, um dia "limpo" (sem texto livre —
-    /// origem de regra ou override manual de identidade única) cujo servidor bate com alguma
-    /// posição do pool clonado. Achando, a nova âncora é aquele dia menos a posição encontrada,
-    /// o que faz o rodízio continuar em fase a partir dali. Não achando em nenhum dos 4,
-    /// mantém a âncora antiga (mesmo fallback do <see cref="EscalaJornada"/>).
-    /// </summary>
-    private static DateOnly? ReancorarRodizio(
-        EscalaResumidaEquipe equipeOrigem,
-        IReadOnlyList<EscalaResumidaRotacaoMembro> poolNovo,
-        DateOnly origemInicio,
-        DateOnly origemFim)
-    {
-        if (equipeOrigem.DataInicioCiclo is not DateOnly ancoraAntiga || poolNovo.Count == 0)
-        {
-            return equipeOrigem.DataInicioCiclo;
-        }
-
-        for (var i = 0; i < 4; i++)
-        {
-            var dia = origemFim.AddDays(-i);
-            if (dia < origemInicio)
-            {
-                break;
-            }
-
-            var diaOrigem = equipeOrigem.Dias.FirstOrDefault(x => x.Data == dia);
-            if (diaOrigem is null || diaOrigem.TextoLivre is not null)
-            {
-                continue;
-            }
-
-            var match = poolNovo.FirstOrDefault(x => x.ServidorId == diaOrigem.ServidorId);
-            if (match is not null)
-            {
-                return dia.AddDays(-match.Posicao);
-            }
-        }
-
-        return ancoraAntiga;
     }
 
     private async Task<(EscalaResumida? Escala, ActorContext Actor, string? Error)> LoadEditableAsync(

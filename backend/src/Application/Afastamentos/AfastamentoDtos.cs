@@ -1,13 +1,19 @@
 namespace TemplateSistema.Application.Afastamentos;
 
+/// <summary>Servidor lotado em setor traz <c>SetorId</c>/<c>SetorNome</c>/<c>SetorSigla</c>;
+/// lotado direto no núcleo traz <c>NucleoId</c>/<c>NucleoNome</c>/<c>NucleoSigla</c> — nunca os
+/// dois, igual à lotação de <c>Servidor</c>.</summary>
 public record AfastamentoDto(
     Guid Id,
     Guid ServidorId,
     string ServidorNome,
     string Matricula,
-    Guid SetorId,
-    string SetorNome,
-    string SetorSigla,
+    Guid? SetorId,
+    string? SetorNome,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoNome,
+    string? NucleoSigla,
     DateOnly DataInicio,
     DateOnly DataFim,
     string TipoOcorrenciaCodigo,

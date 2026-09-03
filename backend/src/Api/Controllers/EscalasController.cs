@@ -380,6 +380,9 @@ public class EscalasController(
             return BadRequest(new { message = result.Error });
         }
 
-        return File(result.Value!.Content, "text/csv", result.Value.FileName);
+        return File(
+            result.Value!.Content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            result.Value.FileName);
     }
 }

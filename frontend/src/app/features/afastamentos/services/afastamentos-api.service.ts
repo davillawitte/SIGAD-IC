@@ -4,14 +4,19 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 
+/** Servidor lotado em setor traz setorId/setorNome/setorSigla; lotado direto no núcleo traz
+ * nucleoId/nucleoNome/nucleoSigla — nunca os dois. */
 export interface AfastamentoItem {
   id: string;
   servidorId: string;
   servidorNome: string;
   matricula: string;
-  setorId: string;
-  setorNome: string;
-  setorSigla: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  nucleoSigla?: string | null;
   dataInicio: string;
   dataFim: string;
   tipoOcorrenciaCodigo: string;

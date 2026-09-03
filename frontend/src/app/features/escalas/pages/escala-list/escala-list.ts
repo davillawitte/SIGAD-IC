@@ -200,15 +200,8 @@ export class EscalaList implements OnInit, OnDestroy {
 
     if (this.canExport()) {
       actions.push(
-        { id: 'download', label: 'Baixar (PDF ou CSV)', icon: 'download', placement: 'inline' },
+        { id: 'download', label: 'Baixar (PDF ou Excel)', icon: 'download', placement: 'inline' },
         { id: 'pdf-v', label: 'PDF vertical', icon: 'download', placement: 'menu' },
-        {
-          id: 'pdf-resumida',
-          label: 'PDF da escala resumida',
-          icon: 'download',
-          placement: 'menu',
-          hidden: (row) => !row.resumidaId,
-        },
       );
     }
 
@@ -306,9 +299,6 @@ export class EscalaList implements OnInit, OnDestroy {
         break;
       case 'pdf-v':
         this.downloadPdf(id, 'vertical');
-        break;
-      case 'pdf-resumida':
-        if (row.resumidaId) this.downloadResumidaPdf(row.resumidaId);
         break;
       case 'delete':
         this.excluir(row);
@@ -481,37 +471,42 @@ export class EscalaList implements OnInit, OnDestroy {
     });
   }
 
-  /** Ícone único de "Baixar" — pergunta formato (PDF ou CSV) e, pra CSV, o sub-formato. Só o
-   * CSV "resumido" (auxílio-alimentação) está implementado por enquanto — "completa" ainda é só
-   * a escolha no diálogo, pronta pra quando a geração de fato existir. */
+  /** Ícone único de "Baixar" — pergunta formato (PDF ou Excel) e, dentro de cada um, o sub-
+   * formato: PDF pergunta definitiva ou resumida (mapa de plantão físico, só quando a escala tem
+   * uma escala resumida vinculada); Excel pergunta resumida (auxílio-alimentação, implementado) ou
+   * completa (ainda não implementada, só a escolha no diálogo). */
   private exportarEscala(row: EscalaRow): void {
-    openExportEscalaDialog(this.dialog, {}).subscribe((resultado) => {
+    openExportEscalaDialog(this.dialog, { temEscalaResumida: !!row.resumidaId }).subscribe((resultado) => {
       if (!resultado) return;
       if (resultado.formato === 'pdf') {
+        if (resultado.pdfTipo === 'resumida') {
+          if (row.resumidaId) this.downloadResumidaPdf(row.resumidaId);
+          return;
+        }
         this.downloadPdf(row.id, 'horizontal');
         return;
       }
       if (resultado.opcao !== 'resumida') {
-        this.toast.showInfo('Exportação em CSV completa será implementada em breve.', 'Em desenvolvimento');
+        this.toast.showInfo('Exportação em Excel completa será implementada em breve.', 'Em desenvolvimento');
         return;
       }
-      this.downloadCsv(row.id, resultado.opcao);
+      this.downloadExcel(row.id, resultado.opcao);
     });
   }
 
-  private downloadCsv(id: string, opcao: 'resumida' | 'completa'): void {
+  private downloadExcel(id: string, opcao: 'resumida' | 'completa'): void {
     this.api.downloadCsv(id, opcao).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `escala-${opcao}.csv`;
+        a.download = `escala-${opcao}.xlsx`;
         a.click();
         URL.revokeObjectURL(url);
-        this.feedback.showSuccess('CSV gerado com sucesso.');
+        this.feedback.showSuccess('Excel gerado com sucesso.');
       },
       error: (err: { error?: { message?: string } }) => {
-        const msg = err.error?.message ?? 'Não foi possível exportar o CSV.';
+        const msg = err.error?.message ?? 'Não foi possível exportar o Excel.';
         this.error.set(msg);
         this.toast.showError(msg);
       },

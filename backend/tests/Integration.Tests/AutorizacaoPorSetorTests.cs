@@ -373,7 +373,7 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
             ChefeNb);
 
         negado.Succeeded.ShouldBeFalse();
-        negado.Error.ShouldBe("Só é possível cadastrar afastamento para servidores do setor em que você é chefe.");
+        negado.Error.ShouldBe("Só é possível cadastrar afastamento para servidores do setor ou núcleo em que você é chefe.");
     }
 
     [Fact]
@@ -392,6 +392,6 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
             Diretor);
 
         resultado.Succeeded.ShouldBeFalse();
-        resultado.Error.ShouldBe("Só é possível cadastrar afastamento para servidores do setor em que você é chefe.");
+        resultado.Error.ShouldBe("Só é possível cadastrar afastamento para servidores do setor ou núcleo em que você é chefe.");
     }
 }

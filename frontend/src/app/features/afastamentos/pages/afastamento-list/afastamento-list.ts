@@ -28,7 +28,8 @@ type AfastamentoRow = {
   id: string;
   servidor: string;
   matricula: string;
-  setorId: string;
+  setorId?: string | null;
+  nucleoId?: string | null;
   setor: string;
   periodo: string;
   tipo: string;
@@ -116,7 +117,8 @@ export class AfastamentoList implements OnInit {
         label: 'Editar',
         icon: 'edit',
         placement: 'inline',
-        disabled: (row) => !this.auth.canAccess('afastamentos.editar', row.setorId),
+        disabled: (row) =>
+          !this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', row.setorId, row.nucleoId),
       });
     }
     if (this.auth.hasPermission('afastamentos.excluir')) {
@@ -125,7 +127,8 @@ export class AfastamentoList implements OnInit {
         label: 'Excluir',
         icon: 'trash',
         placement: 'inline',
-        disabled: (row) => !this.auth.canAccess('afastamentos.excluir', row.setorId),
+        disabled: (row) =>
+          !this.auth.canAccessLotacao('afastamentos.excluir', 'afastamentos', row.setorId, row.nucleoId),
       });
     }
     return actions;
@@ -161,11 +164,14 @@ export class AfastamentoList implements OnInit {
     if (this.isInstitucional()) {
       return;
     }
+    const { setorId, nucleoId } = event.row;
     if (
-      (event.action === 'edit' && !this.auth.canAccess('afastamentos.editar', event.row.setorId)) ||
-      (event.action === 'delete' && !this.auth.canAccess('afastamentos.excluir', event.row.setorId))
+      (event.action === 'edit' &&
+        !this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', setorId, nucleoId)) ||
+      (event.action === 'delete' &&
+        !this.auth.canAccessLotacao('afastamentos.excluir', 'afastamentos', setorId, nucleoId))
     ) {
-      this.error.set('Sem permissão para alterar afastamentos de outro setor.');
+      this.error.set('Sem permissão para alterar afastamentos de outra lotação.');
       return;
     }
     if (event.action === 'edit') {
@@ -223,7 +229,12 @@ export class AfastamentoList implements OnInit {
             servidor: a.servidorNome,
             matricula: a.matricula,
             setorId: a.setorId,
-            setor: `${a.setorSigla} — ${a.setorNome}`,
+            nucleoId: a.nucleoId,
+            setor: a.setorId
+              ? `${a.setorSigla} — ${a.setorNome}`
+              : a.nucleoId
+                ? `${a.nucleoSigla} — ${a.nucleoNome} (núcleo)`
+                : '—',
             periodo: `${this.fmt(a.dataInicio)} a ${this.fmt(a.dataFim)}`,
             tipo: `${a.tipoOcorrenciaCodigo} — ${a.tipoOcorrenciaNome}`,
             sei: a.sei || '—',

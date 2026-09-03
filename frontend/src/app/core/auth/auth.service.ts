@@ -131,11 +131,22 @@ export class AuthService {
    * quando o recurso realmente é de núcleo e o ator o gerencia (ou tem visão global).
    */
   canAccessEscala(permissao: string, setorId?: string | null, nucleoId?: string | null): boolean {
+    return this.canAccessLotacao(permissao, 'escalas', setorId, nucleoId);
+  }
+
+  /** Mesma variante setor-ou-núcleo de `canAccessEscala`, generalizada pro módulo informado —
+   * usada por recursos setor-ou-núcleo além de escala (ex.: afastamento). */
+  canAccessLotacao(
+    permissao: string,
+    modulo: string,
+    setorId?: string | null,
+    nucleoId?: string | null,
+  ): boolean {
     if (setorId) {
       return this.canAccess(permissao, setorId);
     }
     if (nucleoId) {
-      return this.isChefeNucleo(nucleoId) || (this.hasVisaoGlobal('escalas') && this.hasPermission(permissao));
+      return this.isChefeNucleo(nucleoId) || (this.hasVisaoGlobal(modulo) && this.hasPermission(permissao));
     }
     return false;
   }

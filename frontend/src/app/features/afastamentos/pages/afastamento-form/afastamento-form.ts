@@ -45,8 +45,8 @@ export class AfastamentoForm implements OnInit {
   readonly servidorOptions = signal<PciSelectOption[]>([]);
   readonly currentPath = signal('/afastamentos/novo');
 
-  /** setorId por servidor, para validar escopo do chefe no save. */
-  private readonly servidorSetorById = new Map<string, string>();
+  /** setorId ou nucleoId por servidor (lotação), pra validar escopo do chefe no save. */
+  private readonly servidorLotacaoById = new Map<string, { setorId?: string | null; nucleoId?: string | null }>();
 
   readonly tipoOptions: PciSelectOption[] = [
     { label: 'FR — Férias', value: 'FR' },
@@ -73,33 +73,31 @@ export class AfastamentoForm implements OnInit {
 
     this.adminApi.listMeusServidores().subscribe({
       next: (servidores) => {
-        const doSetor = servidores.filter(
-          (s) => !!s.setorId && this.auth.canAccess('afastamentos.criar', s.setorId),
+        const elegiveis = servidores.filter((s) =>
+          this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', s.setorId, s.nucleoId),
         );
 
-        this.servidorSetorById.clear();
-        for (const s of doSetor) {
-          if (s.setorId) {
-            this.servidorSetorById.set(s.id, s.setorId);
-          }
+        this.servidorLotacaoById.clear();
+        for (const s of elegiveis) {
+          this.servidorLotacaoById.set(s.id, { setorId: s.setorId, nucleoId: s.nucleoId });
         }
 
         this.servidorOptions.set(
-          doSetor.map((s) => ({
+          elegiveis.map((s) => ({
             label: `${s.nome} — ${s.matricula}`,
             value: s.id,
           })),
         );
       },
-      error: () => this.error.set('Não foi possível carregar os servidores do seu setor.'),
+      error: () => this.error.set('Não foi possível carregar os servidores do seu setor/núcleo.'),
     });
 
     if (this.editId) {
       this.form.controls.servidorId.disable();
       this.api.get(this.editId).subscribe({
         next: (item) => {
-          if (!this.auth.canAccess('afastamentos.editar', item.setorId)) {
-            this.error.set('Sem permissão para alterar afastamento neste setor.');
+          if (!this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', item.setorId, item.nucleoId)) {
+            this.error.set('Sem permissão para alterar afastamento desta lotação.');
             this.form.disable();
             return;
           }
@@ -126,9 +124,12 @@ export class AfastamentoForm implements OnInit {
 
     const value = this.form.getRawValue();
     if (!this.isEdit()) {
-      const setorId = this.servidorSetorById.get(value.servidorId);
-      if (!setorId || !this.auth.canAccess('afastamentos.criar', setorId)) {
-        this.error.set('Só é possível cadastrar afastamento para servidores do seu setor.');
+      const lotacao = this.servidorLotacaoById.get(value.servidorId);
+      if (
+        !lotacao ||
+        !this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', lotacao.setorId, lotacao.nucleoId)
+      ) {
+        this.error.set('Só é possível cadastrar afastamento para servidores do seu setor ou núcleo.');
         return;
       }
     }
