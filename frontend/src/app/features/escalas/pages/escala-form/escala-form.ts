@@ -50,6 +50,7 @@ import type {
   GerarEscalaItemPayload,
   PadraoEscala,
   TipoFuncionamento,
+  TipoOcorrencia,
 } from '../../models/escalas.models';
 import { statusEscalaLabel } from '../../models/escalas.models';
 import {
@@ -329,6 +330,17 @@ export class EscalaForm implements OnInit {
 
   readonly padroes = signal<PadraoEscala[]>([]);
   readonly padroesByCodigo = computed(() => new Map(this.padroes().map((p) => [p.codigo, p])));
+  readonly tiposOcorrencia = signal<TipoOcorrencia[]>([]);
+  /** Duração padrão por código — usada pra dar a hora certa a cada fase de um ciclo
+   * personalizado (ex.: TL12 vale 12h, não as 24h do PT do mesmo ciclo). */
+  readonly horasPorCodigo = computed(
+    () =>
+      new Map(
+        this.tiposOcorrencia()
+          .filter((t) => t.horasPadrao != null)
+          .map((t) => [t.codigo.toUpperCase(), Number(t.horasPadrao)]),
+      ),
+  );
   readonly servidoresSetor = signal<ServidorListItem[]>([]);
   private lastAppliedRegimesFingerprint = '';
   readonly selectedServidorIds = signal<Set<string>>(new Set());
@@ -676,18 +688,6 @@ export class EscalaForm implements OnInit {
     this.markDirty();
   }
 
-  private regenerateAllPlantaoOcorrencias(): void {
-    const e = this.escala();
-    if (!e) return;
-    const days = daysInRange(e.dataInicio, e.dataFim);
-    const servidores = e.servidores.map((s) => ({
-      ...s,
-      ocorrencias: this.buildOcorrenciasForServidor(s.servidorId, days),
-    }));
-    this.escala.set({ ...e, servidores });
-    this.recalcCargas();
-  }
-
   @HostListener('window:beforeunload', ['$event'])
   onBeforeUnload(event: BeforeUnloadEvent): void {
     if (this.dirty()) {
@@ -929,9 +929,11 @@ export class EscalaForm implements OnInit {
       done(false);
       return;
     }
+    // Só escala PUBLICADA ocupa o período — rascunho/finalizada do mesmo setor+mês pode
+    // coexistir (mesma regra do backend em `EscalaService.CreateAsync`).
     const params = this.isNucleoOption(setorId)
-      ? { nucleoId: this.extractNucleoId(setorId), ano, mes, page: 1, pageSize: 1 }
-      : { setorId, ano, mes, page: 1, pageSize: 1 };
+      ? { nucleoId: this.extractNucleoId(setorId), ano, mes, status: 'Publicada', page: 1, pageSize: 1 }
+      : { setorId, ano, mes, status: 'Publicada', page: 1, pageSize: 1 };
     this.api.list(params).subscribe({
       next: (result) => {
         const exists = (result.totalItems ?? result.items?.length ?? 0) > 0;
@@ -1053,10 +1055,12 @@ export class EscalaForm implements OnInit {
     const ehNucleo = this.escalaDeNucleo();
     forkJoin({
       padroes: this.api.listPadroes(),
+      tipos: this.api.listTiposOcorrencia(),
       servidores: this.adminApi.listMeusServidores(false),
     }).subscribe({
-      next: ({ padroes, servidores }) => {
+      next: ({ padroes, tipos, servidores }) => {
         this.padroes.set(padroes);
+        this.tiposOcorrencia.set(tipos);
 
         let pool: ServidorListItem[];
         let padrao: ServidorListItem[];
@@ -1496,11 +1500,13 @@ export class EscalaForm implements OnInit {
       });
     } else if (current && mustRegenerate) {
       this.syncInicioCicloFromControls();
-      this.regenerateAllPlantaoOcorrencias();
-      const e = this.escala();
-      if (e && e.tipoFuncionamento !== tipo) {
-        this.escala.set({ ...e, tipoFuncionamento: tipo });
-      }
+      // Reconstrói a partir da seleção, não só regenera as ocorrências de quem já estava no
+      // draft: sem isso, servidor desmarcado no passo 2 continuava no draft (e voltava no
+      // `addServidores`/`syncServidores` ao salvar), só saindo de fato via "Remover selecionados".
+      this.rebuildDraftFromSelection(current, {
+        keepOcorrencias: false,
+        tipoFuncionamento: tipo,
+      });
     } else if (!current) {
       this.buildLocalDraft();
     } else {
@@ -1646,6 +1652,7 @@ export class EscalaForm implements OnInit {
       regimesSelected: codigo ? [codigo] : [],
       padroesByCodigo: this.padroesByCodigo(),
       servidorInicioCiclo: this.servidorInicioCiclo(),
+      horasPorCodigo: this.horasPorCodigo(),
     });
   }
 

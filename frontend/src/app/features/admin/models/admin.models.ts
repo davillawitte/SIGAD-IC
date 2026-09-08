@@ -115,7 +115,7 @@ export interface PermissaoItem {
   ativo: boolean;
 }
 
-export type StatusServidor = 'Ativo' | 'Afastado' | 'Cedido';
+export type StatusServidor = 'Ativo' | 'Afastado' | 'Cedido' | 'Aposentado';
 
 export interface ServidorListItem {
   id: string;
@@ -125,6 +125,8 @@ export interface ServidorListItem {
   cargoId: string;
   cargo: string;
   cargoCodigo: string;
+  /** Preenchido só quando cargoCodigo é o de "Outros" — descrição livre do cargo real. */
+  cargoOutroTexto?: string | null;
   email?: string | null;
   telefone?: string | null;
   dataNascimento: string;
@@ -151,6 +153,7 @@ export interface CreateServidorPayload {
   dataNascimento: string;
   telefone?: string | null;
   status?: StatusServidor | null;
+  cargoOutroTexto?: string | null;
 }
 
 export interface UpdateServidorPayload {
@@ -164,6 +167,7 @@ export interface UpdateServidorPayload {
   dataNascimento: string;
   telefone?: string | null;
   status: StatusServidor;
+  cargoOutroTexto?: string | null;
 }
 
 export type TipoChefia =

@@ -259,11 +259,15 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 return Result<EscalaDetailDto>.Failure("Setor inválido.");
             }
 
+            // Só escala PUBLICADA ocupa o período: rascunhos/finalizadas do mesmo setor+mês podem
+            // coexistir (é normal montar mais de uma versão antes de publicar a que vale).
             if (await db.Escalas.AnyAsync(
-                    x => x.SetorId == setorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                    x => x.SetorId == setorId && x.Ano == request.Ano && x.Mes == request.Mes
+                         && x.Status == StatusEscala.Publicada,
                     cancellationToken))
             {
-                return Result<EscalaDetailDto>.Failure("Já existe escala para este setor neste mês/ano.");
+                return Result<EscalaDetailDto>.Failure(
+                    "Já existe escala publicada para este setor neste mês/ano.");
             }
         }
         else if (request.NucleoId is Guid nucleoId)
@@ -280,10 +284,12 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             }
 
             if (await db.Escalas.AnyAsync(
-                    x => x.NucleoId == nucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                    x => x.NucleoId == nucleoId && x.Ano == request.Ano && x.Mes == request.Mes
+                         && x.Status == StatusEscala.Publicada,
                     cancellationToken))
             {
-                return Result<EscalaDetailDto>.Failure("Já existe escala para este núcleo neste mês/ano.");
+                return Result<EscalaDetailDto>.Failure(
+                    "Já existe escala publicada para este núcleo neste mês/ano.");
             }
         }
         else
@@ -327,14 +333,17 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var duplicado = escala!.SetorId is Guid escalaSetorId
             ? await db.Escalas.AnyAsync(
-                x => x.Id != id && x.SetorId == escalaSetorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                x => x.Id != id && x.SetorId == escalaSetorId && x.Ano == request.Ano && x.Mes == request.Mes
+                     && x.Status == StatusEscala.Publicada,
                 cancellationToken)
             : await db.Escalas.AnyAsync(
-                x => x.Id != id && x.NucleoId == escala.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                x => x.Id != id && x.NucleoId == escala.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes
+                     && x.Status == StatusEscala.Publicada,
                 cancellationToken);
         if (duplicado)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor/núcleo neste mês/ano.");
+            return Result<EscalaDetailDto>.Failure(
+                "Já existe escala publicada para este setor/núcleo neste mês/ano.");
         }
 
         try
@@ -1138,14 +1147,17 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var jaExisteDestino = origem.SetorId is Guid origemSetorId
             ? await db.Escalas.AnyAsync(
-                x => x.SetorId == origemSetorId && x.Ano == request.Ano && x.Mes == request.Mes,
+                x => x.SetorId == origemSetorId && x.Ano == request.Ano && x.Mes == request.Mes
+                     && x.Status == StatusEscala.Publicada,
                 cancellationToken)
             : await db.Escalas.AnyAsync(
-                x => x.NucleoId == origem.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes,
+                x => x.NucleoId == origem.NucleoId && x.Ano == request.Ano && x.Mes == request.Mes
+                     && x.Status == StatusEscala.Publicada,
                 cancellationToken);
         if (jaExisteDestino)
         {
-            return Result<EscalaDetailDto>.Failure("Já existe escala para este setor/núcleo no mês/ano de destino.");
+            return Result<EscalaDetailDto>.Failure(
+                "Já existe escala publicada para este setor/núcleo no mês/ano de destino.");
         }
 
         Escala nova;

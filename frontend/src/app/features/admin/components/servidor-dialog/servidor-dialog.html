@@ -63,6 +63,14 @@
           [options]="cargoOptions()"
           placeholder="Selecione o cargo"
         />
+        @if (isCargoOutros()) {
+          <pci-input
+            label="Especifique o cargo"
+            formControlName="cargoOutroTexto"
+            placeholder="Descreva o cargo do servidor"
+            [required]="true"
+          />
+        }
         <pci-select
           label="Tipo de lotação"
           [required]="true"

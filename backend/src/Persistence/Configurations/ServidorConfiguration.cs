@@ -16,6 +16,7 @@ public class ServidorConfiguration : IEntityTypeConfiguration<Servidor>
         builder.Property(x => x.Nome).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Matricula).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Cpf).HasMaxLength(11).IsRequired();
+        builder.Property(x => x.CargoOutroTexto).HasMaxLength(200);
         builder.Property(x => x.Email).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Telefone).HasMaxLength(30);
         builder.Property(x => x.DataNascimento).HasColumnType("date").IsRequired();

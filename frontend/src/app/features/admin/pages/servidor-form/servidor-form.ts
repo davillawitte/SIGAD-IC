@@ -47,13 +47,19 @@ import {
   maskCpf,
   maskMatricula,
   maskTelefone,
+  maskUpper,
 } from '../../../../shared/input-masks';
 
 const STATUS_OPTIONS: { label: string; value: StatusServidor }[] = [
   { label: 'Ativo', value: 'Ativo' },
   { label: 'Afastado', value: 'Afastado' },
   { label: 'Cedido', value: 'Cedido' },
+  { label: 'Aposentado', value: 'Aposentado' },
 ];
+
+/** Código do cargo "Outros" no catálogo — espelha `CargoCodes.Outros` no backend. Selecionar
+ * esse cargo abre um campo de texto livre pra descrever o cargo real do servidor. */
+const CARGO_CODIGO_OUTROS = 'OUTROS';
 
 type LotacaoTipo = 'setor' | 'nucleo';
 
@@ -149,6 +155,7 @@ export class ServidorForm implements OnInit, OnDestroy {
     email: ['', emailFormatValidator],
     telefone: ['', telefoneValidator],
     cargoId: ['', Validators.required],
+    cargoOutroTexto: [''],
     lotacaoTipo: ['setor' as LotacaoTipo, Validators.required],
     setorId: ['', Validators.required],
     nucleoId: [''],
@@ -156,10 +163,18 @@ export class ServidorForm implements OnInit, OnDestroy {
   });
 
   readonly lotacaoTipo = signal<LotacaoTipo>('setor');
+  /** Cargo selecionado tem código "Outros" — controla a exibição do campo de texto livre. */
+  readonly isCargoOutros = signal(false);
 
-  readonly cargoOptions = computed<PciSelectOption[]>(() =>
-    this.cargos().map((c) => ({ label: c.nome, value: c.id })),
-  );
+  /** Ordem alfabética pelo nome, com "Outros" sempre por último — independe da ordem em que a
+   * API devolve o catálogo. */
+  readonly cargoOptions = computed<PciSelectOption[]>(() => {
+    const outros = this.cargos().filter((c) => c.codigo === CARGO_CODIGO_OUTROS);
+    const resto = this.cargos()
+      .filter((c) => c.codigo !== CARGO_CODIGO_OUTROS)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return [...resto, ...outros].map((c) => ({ label: c.nome, value: c.id }));
+  });
 
   readonly nucleoOptions = computed<PciSelectOption[]>(() =>
     this.nucleos().map((n) => ({ label: `${n.sigla} — ${n.nome}`, value: n.id })),
@@ -179,10 +194,12 @@ export class ServidorForm implements OnInit, OnDestroy {
     this.isEdit.set(!!this.editId);
     this.currentPath.set(this.editId ? '/servidores/editar/:id' : '/servidores/novo');
 
+    this.bindMask('nome', maskUpper);
     this.bindMask('matricula', maskMatricula);
     this.bindMask('cpf', maskCpf);
     this.bindMask('telefone', maskTelefone);
     this.bindLotacaoTipo();
+    this.bindCargoId();
 
     if (this.editId) {
       this.loading.set(true);
@@ -238,6 +255,29 @@ export class ServidorForm implements OnInit, OnDestroy {
     );
   }
 
+  /** Alterna obrigatoriedade do campo de texto livre conforme o cargo selecionado ser "Outros"
+   * ou não — mesmo idioma reativo de `bindLotacaoTipo`. */
+  private bindCargoId(): void {
+    const outroTextoControl = this.form.controls.cargoOutroTexto;
+    this.subs.add(
+      this.form.controls.cargoId.valueChanges.subscribe((cargoId) => {
+        this.applyCargoOutroValidacao(cargoId, outroTextoControl);
+      }),
+    );
+  }
+
+  private applyCargoOutroValidacao(cargoId: string, control: AbstractControl): void {
+    const isOutros = this.cargos().find((c) => c.id === cargoId)?.codigo === CARGO_CODIGO_OUTROS;
+    this.isCargoOutros.set(isOutros);
+    if (isOutros) {
+      control.setValidators(Validators.required);
+    } else {
+      control.clearValidators();
+      control.setValue('', { emitEvent: false });
+    }
+    control.updateValueAndValidity({ emitEvent: false });
+  }
+
   ngOnDestroy(): void {
     this.subs.unsubscribe();
   }
@@ -268,6 +308,7 @@ export class ServidorForm implements OnInit, OnDestroy {
       telefone: value.telefone.trim() || null,
       dataNascimento,
       cargoId: value.cargoId,
+      cargoOutroTexto: this.isCargoOutros() ? value.cargoOutroTexto.trim() || null : null,
       setorId: value.lotacaoTipo === 'setor' ? value.setorId : null,
       nucleoId: value.lotacaoTipo === 'nucleo' ? value.nucleoId : null,
       status: value.status,
@@ -356,6 +397,7 @@ export class ServidorForm implements OnInit, OnDestroy {
         email: servidor.email ?? '',
         telefone: servidor.telefone ? maskTelefone(servidor.telefone) : '',
         cargoId: servidor.cargoId,
+        cargoOutroTexto: servidor.cargoOutroTexto ?? '',
         lotacaoTipo,
         setorId: servidor.setorId ?? '',
         nucleoId: servidor.nucleoId ?? '',
@@ -365,12 +407,13 @@ export class ServidorForm implements OnInit, OnDestroy {
     );
     this.form.controls.setorId.updateValueAndValidity({ emitEvent: false });
     this.form.controls.nucleoId.updateValueAndValidity({ emitEvent: false });
+    this.applyCargoOutroValidacao(servidor.cargoId, this.form.controls.cargoOutroTexto);
     // Força CVAs (pci-input / pci-datepicker) a sincronizar após render.
     this.form.setValue(this.form.getRawValue(), { emitEvent: false });
   }
 
   private bindMask(
-    controlName: 'matricula' | 'cpf' | 'telefone',
+    controlName: 'nome' | 'matricula' | 'cpf' | 'telefone',
     maskFn: (v: string) => string,
   ): void {
     const control = this.form.controls[controlName];

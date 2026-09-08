@@ -8,6 +8,11 @@ export interface BuildOcorrenciasInput {
   regimesSelected: RegimeCodigo[];
   padroesByCodigo: Map<string, PadraoEscala>;
   servidorInicioCiclo: Map<string, string>;
+  /** Duração padrão de cada código de ocorrência (catálogo `TipoOcorrencia`). Necessário pros
+   * ciclos personalizados, que misturam fases de duração diferente sob um único
+   * `padrao.horasPadrao` — espelha o mesmo lookup que `EscalaService.ApplyJornadaAsync` faz no
+   * backend. */
+  horasPorCodigo?: Map<string, number>;
 }
 
 /** Normaliza YYYY-MM-DD (aceita ISO com horário). */
@@ -95,7 +100,8 @@ export function buildOcorrenciasFromCicloDerivado(input: BuildOcorrenciasFromCic
  * diferente do backend que não emite ocorrência nesses dias.
  */
 export function buildOcorrenciasForServidor(input: BuildOcorrenciasInput): EscalaOcorrencia[] {
-  const { servidorId, days, regimesSelected, padroesByCodigo, servidorInicioCiclo } = input;
+  const { servidorId, days, regimesSelected, padroesByCodigo, servidorInicioCiclo, horasPorCodigo } =
+    input;
 
   // Multi-regime: escala em branco — só seleção de servidores.
   if (regimesSelected.length !== 1) {
@@ -119,7 +125,7 @@ export function buildOcorrenciasForServidor(input: BuildOcorrenciasInput): Escal
   }
 
   if (padrao.recorrenciaTipo === 'CicloPersonalizado') {
-    return buildCicloPersonalizado(padrao, days, servidorId, servidorInicioCiclo);
+    return buildCicloPersonalizado(padrao, days, servidorId, servidorInicioCiclo, horasPorCodigo);
   }
 
   const work = Math.max(1, padrao.diasTrabalho ?? 1);
@@ -154,6 +160,7 @@ function buildCicloPersonalizado(
   days: string[],
   servidorId: string,
   servidorInicioCiclo: Map<string, string>,
+  horasPorCodigo?: Map<string, number>,
 ): EscalaOcorrencia[] {
   const sequencia = (padrao.sequenciaCiclo ?? '')
     .split(',')
@@ -175,6 +182,10 @@ function buildCicloPersonalizado(
     if (codigo === offCode) {
       return oc(day, codigo);
     }
-    return oc(day, codigo, padrao.horasPadrao, padrao.horaInicioPadrao, padrao.horaFimPadrao);
+    // Cada fase tem sua própria duração (ex.: PT24_TL12 = "PT,D,D,D,TL12,D" — PT vale 24h e
+    // TL12 vale 12h): usar `padrao.horasPadrao` em todas fazia o TL12 herdar as 24h do PT e a
+    // carga remóta contar em dobro.
+    const horas = horasPorCodigo?.get(codigo.toUpperCase()) ?? padrao.horasPadrao;
+    return oc(day, codigo, horas, padrao.horaInicioPadrao, padrao.horaFimPadrao);
   });
 }

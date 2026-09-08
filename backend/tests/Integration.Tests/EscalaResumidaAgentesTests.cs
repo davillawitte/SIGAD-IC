@@ -159,14 +159,14 @@ public class EscalaResumidaAgentesTests(PostgresFixture fixture) : IntegrationTe
         var equipe = final.Setores[0].Equipes[0];
         equipe.Rotacao.ShouldHaveSingleItem();
         equipe.Rotacao[0].ServidorId2.ShouldBe(agente2Id);
-        equipe.Rotacao[0].ServidorNome2.ShouldBe("Agente Reforço");
+        equipe.Rotacao[0].ServidorNome2.ShouldBe("AGENTE REFORÇO");
 
         var dia1 = equipe.Dias.Single(d => d.Data == ancora);
-        dia1.ServidorNome.ShouldBe("Agente Principal");
+        dia1.ServidorNome.ShouldBe("AGENTE PRINCIPAL");
         dia1.ServidorId2.ShouldBe(agente2Id);
-        dia1.ServidorNome2.ShouldBe("Agente Reforço");
+        dia1.ServidorNome2.ShouldBe("AGENTE REFORÇO");
         dia1.IsFolga2.ShouldBeFalse();
-        dia1.Rotulo.ShouldBe("Agente Principal + Agente Reforço");
+        dia1.Rotulo.ShouldBe("AGENTE PRINCIPAL + AGENTE REFORÇO");
     }
 
     [Fact]
@@ -209,6 +209,6 @@ public class EscalaResumidaAgentesTests(PostgresFixture fixture) : IntegrationTe
         var dia = resultado.Value!.Setores[0].Equipes[0].Dias.Single(d => d.Data == data);
         dia.ServidorId2.ShouldBeNull();
         dia.IsFolga2.ShouldBeTrue();
-        dia.Rotulo.ShouldBe("Agente Único + DO");
+        dia.Rotulo.ShouldBe("AGENTE ÚNICO + DO");
     }
 }

@@ -29,6 +29,7 @@ export function mapServidorListItem(raw: unknown): ServidorListItem {
     cargoId: normalizeGuid(pick(r, 'cargoId', 'CargoId')),
     cargo: String(pick(r, 'cargo', 'Cargo') ?? ''),
     cargoCodigo: String(pick(r, 'cargoCodigo', 'CargoCodigo') ?? ''),
+    cargoOutroTexto: (pick<string | null>(r, 'cargoOutroTexto', 'CargoOutroTexto') ?? null) || null,
     email: email ?? '',
     telefone: (pick<string | null>(r, 'telefone', 'Telefone') ?? null) || null,
     dataNascimento,

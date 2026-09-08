@@ -14,6 +14,9 @@ public class Servidor : BaseEntity
     public string Matricula { get; private set; } = null!;
     public string Cpf { get; private set; } = null!;
     public Guid CargoId { get; private set; }
+    /// <summary>Preenchido só quando o cargo selecionado é "Outros" — descrição livre do cargo
+    /// real do servidor, já que o catálogo não tem uma entrada específica pra ele.</summary>
+    public string? CargoOutroTexto { get; private set; }
     public string Email { get; private set; } = null!;
     public string? Telefone { get; private set; }
     public DateOnly DataNascimento { get; private set; }
@@ -47,16 +50,18 @@ public class Servidor : BaseEntity
         string? telefone = null,
         StatusServidor status = StatusServidor.Ativo,
         string? createdBy = null,
-        Guid? id = null)
+        Guid? id = null,
+        string? cargoOutroTexto = null)
     {
         ValidateLotacao(setorId, nucleoId);
 
         var servidor = new Servidor
         {
-            Nome = nome.Trim(),
+            Nome = NormalizeNome(nome),
             Matricula = NormalizeMatricula(matricula),
             Cpf = NormalizeCpf(cpf),
             CargoId = cargoId,
+            CargoOutroTexto = NormalizeCargoOutroTexto(cargoOutroTexto),
             Email = NormalizeEmail(email),
             Telefone = NormalizeTelefone(telefone),
             DataNascimento = dataNascimento,
@@ -84,14 +89,16 @@ public class Servidor : BaseEntity
         Guid? nucleoId,
         DateOnly dataNascimento,
         string? telefone = null,
-        string? updatedBy = null)
+        string? updatedBy = null,
+        string? cargoOutroTexto = null)
     {
         ValidateLotacao(setorId, nucleoId);
 
-        Nome = nome.Trim();
+        Nome = NormalizeNome(nome);
         Matricula = NormalizeMatricula(matricula);
         Cpf = NormalizeCpf(cpf);
         CargoId = cargoId;
+        CargoOutroTexto = NormalizeCargoOutroTexto(cargoOutroTexto);
         Email = NormalizeEmail(email);
         Telefone = NormalizeTelefone(telefone);
         DataNascimento = dataNascimento;
@@ -118,6 +125,8 @@ public class Servidor : BaseEntity
     public static bool IsMatriculaValida(string? matricula) =>
         !string.IsNullOrWhiteSpace(matricula) && MatriculaRegex.IsMatch(matricula.Trim());
 
+    public static string NormalizeNome(string nome) => nome.Trim().ToUpperInvariant();
+
     public static string NormalizeMatricula(string matricula) => matricula.Trim();
 
     public static string NormalizeCpf(string cpf) =>
@@ -128,4 +137,7 @@ public class Servidor : BaseEntity
 
     public static string? NormalizeTelefone(string? telefone) =>
         string.IsNullOrWhiteSpace(telefone) ? null : telefone.Trim();
+
+    public static string? NormalizeCargoOutroTexto(string? texto) =>
+        string.IsNullOrWhiteSpace(texto) ? null : texto.Trim();
 }

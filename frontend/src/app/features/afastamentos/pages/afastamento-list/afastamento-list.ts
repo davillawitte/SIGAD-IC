@@ -19,6 +19,7 @@ import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
+import { maskMatricula } from '../../../../shared/input-masks';
 import { AFASTAMENTOS_ROUTE_PAGES } from '../../afastamentos.routes.meta';
 import { AfastamentosApiService } from '../../services/afastamentos-api.service';
 
@@ -227,7 +228,7 @@ export class AfastamentoList implements OnInit {
           items.map((a) => ({
             id: a.id,
             servidor: a.servidorNome,
-            matricula: a.matricula,
+            matricula: maskMatricula(a.matricula),
             setorId: a.setorId,
             nucleoId: a.nucleoId,
             setor: a.setorId

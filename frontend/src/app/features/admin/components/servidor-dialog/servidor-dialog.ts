@@ -28,13 +28,18 @@ import {
   maskCpf,
   maskMatricula,
   maskTelefone,
+  maskUpper,
 } from '../../../../shared/input-masks';
 
 const STATUS_OPTIONS: { label: string; value: StatusServidor }[] = [
   { label: 'Ativo', value: 'Ativo' },
   { label: 'Afastado', value: 'Afastado' },
   { label: 'Cedido', value: 'Cedido' },
+  { label: 'Aposentado', value: 'Aposentado' },
 ];
+
+/** Código do cargo "Outros" no catálogo — espelha `CargoCodes.Outros` no backend. */
+const CARGO_CODIGO_OUTROS = 'OUTROS';
 
 type LotacaoTipo = 'setor' | 'nucleo';
 
@@ -119,6 +124,7 @@ export class ServidorDialog implements OnInit, OnDestroy {
     email: ['', emailFormatValidator],
     telefone: ['', telefoneValidator],
     cargoId: ['', Validators.required],
+    cargoOutroTexto: [''],
     lotacaoTipo: ['setor' as LotacaoTipo, Validators.required],
     setorId: ['', Validators.required],
     nucleoId: [''],
@@ -126,10 +132,15 @@ export class ServidorDialog implements OnInit, OnDestroy {
   });
 
   readonly lotacaoTipo = signal<LotacaoTipo>('setor');
+  readonly isCargoOutros = signal(false);
 
-  readonly cargoOptions = computed<PciSelectOption[]>(() =>
-    this.cargos().map((c) => ({ label: c.nome, value: c.id })),
-  );
+  readonly cargoOptions = computed<PciSelectOption[]>(() => {
+    const outros = this.cargos().filter((c) => c.codigo === CARGO_CODIGO_OUTROS);
+    const resto = this.cargos()
+      .filter((c) => c.codigo !== CARGO_CODIGO_OUTROS)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return [...resto, ...outros].map((c) => ({ label: c.nome, value: c.id }));
+  });
 
   readonly nucleoOptions = computed<PciSelectOption[]>(() =>
     this.nucleos().map((n) => ({ label: `${n.sigla} — ${n.nome}`, value: n.id })),
@@ -142,10 +153,12 @@ export class ServidorDialog implements OnInit, OnDestroy {
   );
 
   ngOnInit(): void {
+    this.bindMask('nome', maskUpper);
     this.bindMask('matricula', maskMatricula);
     this.bindMask('cpf', maskCpf);
     this.bindMask('telefone', maskTelefone);
     this.bindLotacaoTipo();
+    this.bindCargoId();
 
     this.api.listCargos().subscribe({ next: (items) => this.cargos.set(items) });
     this.api.listSetores().subscribe({ next: (items) => this.setores.set(items) });
@@ -172,6 +185,23 @@ export class ServidorDialog implements OnInit, OnDestroy {
         }
         setorControl.updateValueAndValidity({ emitEvent: false });
         nucleoControl.updateValueAndValidity({ emitEvent: false });
+      }),
+    );
+  }
+
+  private bindCargoId(): void {
+    const outroTextoControl = this.form.controls.cargoOutroTexto;
+    this.subs.add(
+      this.form.controls.cargoId.valueChanges.subscribe((cargoId) => {
+        const isOutros = this.cargos().find((c) => c.id === cargoId)?.codigo === CARGO_CODIGO_OUTROS;
+        this.isCargoOutros.set(isOutros);
+        if (isOutros) {
+          outroTextoControl.setValidators(Validators.required);
+        } else {
+          outroTextoControl.clearValidators();
+          outroTextoControl.setValue('', { emitEvent: false });
+        }
+        outroTextoControl.updateValueAndValidity({ emitEvent: false });
       }),
     );
   }
@@ -206,6 +236,7 @@ export class ServidorDialog implements OnInit, OnDestroy {
       telefone: value.telefone.trim() || null,
       dataNascimento,
       cargoId: value.cargoId,
+      cargoOutroTexto: this.isCargoOutros() ? value.cargoOutroTexto.trim() || null : null,
       setorId: value.lotacaoTipo === 'setor' ? value.setorId : null,
       nucleoId: value.lotacaoTipo === 'nucleo' ? value.nucleoId : null,
       status: value.status,
@@ -235,7 +266,10 @@ export class ServidorDialog implements OnInit, OnDestroy {
     this.dialogRef.close(this.created() ?? false);
   }
 
-  private bindMask(controlName: 'matricula' | 'cpf' | 'telefone', maskFn: (v: string) => string): void {
+  private bindMask(
+    controlName: 'nome' | 'matricula' | 'cpf' | 'telefone',
+    maskFn: (v: string) => string,
+  ): void {
     const control = this.form.controls[controlName];
     this.subs.add(
       control.valueChanges.subscribe((raw) => {

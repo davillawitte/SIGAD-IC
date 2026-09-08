@@ -20,6 +20,7 @@ import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
+import { maskMatricula } from '../../../../shared/input-masks';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import {
@@ -62,6 +63,7 @@ export class ServidorList implements OnInit {
   readonly error = signal<string | null>(null);
   readonly allRows = signal<ServidorRow[]>([]);
   readonly cargoOptions = signal<{ label: string; value: string }[]>([]);
+  readonly setorFilterOptions = signal<{ label: string; value: string }[]>([]);
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
@@ -93,6 +95,12 @@ export class ServidorList implements OnInit {
       options: this.cargoOptions(),
     },
     {
+      key: 'setorId',
+      label: 'Setor',
+      type: 'select',
+      options: this.setorFilterOptions(),
+    },
+    {
       key: 'status',
       label: 'Status',
       type: 'select',
@@ -101,6 +109,7 @@ export class ServidorList implements OnInit {
         { label: 'Ativo', value: 'Ativo' },
         { label: 'Afastado', value: 'Afastado' },
         { label: 'Cedido', value: 'Cedido' },
+        { label: 'Aposentado', value: 'Aposentado' },
       ],
     },
   ]);
@@ -159,6 +168,11 @@ export class ServidorList implements OnInit {
     this.api.listCargos().subscribe({
       next: (cargos) =>
         this.cargoOptions.set(cargos.map((c) => ({ label: c.nome, value: c.nome }))),
+    });
+    this.api.listSetores().subscribe({
+      next: (setores) =>
+        this.setorFilterOptions.set(setores.map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id }))),
+      error: () => this.setorFilterOptions.set([]),
     });
     this.reload();
   }
@@ -299,7 +313,7 @@ export class ServidorList implements OnInit {
           items.map((s) => ({
             id: s.id,
             nome: s.nome,
-            matricula: s.matricula,
+            matricula: maskMatricula(s.matricula),
             cargo: s.cargo,
             setor: s.setorNome ?? (s.nucleoNome ? `${s.nucleoNome} (núcleo)` : '—'),
             setorId: s.setorId ?? '',

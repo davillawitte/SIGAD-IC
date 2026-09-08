@@ -27,7 +27,7 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
                 x.Servidor.Cpf.Contains(term));
         }
 
-        var ordered = query.OrderBy(x => x.Login);
+        var ordered = query.OrderBy(x => x.Servidor.Nome);
         var totalItems = await ordered.CountAsync(cancellationToken);
 
         if (totalItems == 0)

@@ -10,6 +10,7 @@ public record ServidorListItemDto(
     Guid CargoId,
     string Cargo,
     string CargoCodigo,
+    string? CargoOutroTexto,
     string? Email,
     string? Telefone,
     DateOnly DataNascimento,
@@ -31,6 +32,7 @@ public record ServidorDetalheDto(
     Guid CargoId,
     string Cargo,
     string CargoCodigo,
+    string? CargoOutroTexto,
     string? Email,
     string? Telefone,
     DateOnly DataNascimento,
@@ -43,7 +45,8 @@ public record ServidorDetalheDto(
     StatusServidor Status);
 
 /// <summary>Informe SetorId (lotação num setor) ou NucleoId (lotação direta no núcleo — chefe de
-/// núcleo/servidor que atua em todos os setores do núcleo), nunca os dois nem nenhum.</summary>
+/// núcleo/servidor que atua em todos os setores do núcleo), nunca os dois nem nenhum.
+/// CargoOutroTexto só é usado (e exigido) quando CargoId aponta pro cargo "Outros".</summary>
 public record CreateServidorRequest(
     string Nome,
     string Matricula,
@@ -54,7 +57,8 @@ public record CreateServidorRequest(
     Guid? NucleoId,
     DateOnly DataNascimento,
     string? Telefone,
-    StatusServidor? Status);
+    StatusServidor? Status,
+    string? CargoOutroTexto = null);
 
 public record UpdateServidorRequest(
     string Nome,
@@ -66,7 +70,8 @@ public record UpdateServidorRequest(
     Guid? NucleoId,
     DateOnly DataNascimento,
     string? Telefone,
-    StatusServidor Status);
+    StatusServidor Status,
+    string? CargoOutroTexto = null);
 
 public record ServidorExclusaoImpactoDto(
     int Escalas,

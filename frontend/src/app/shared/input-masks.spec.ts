@@ -10,6 +10,7 @@ import {
   maskCpf,
   maskMatricula,
   maskTelefone,
+  maskUpper,
 } from './input-masks';
 
 describe('input-masks', () => {
@@ -18,6 +19,14 @@ describe('input-masks', () => {
       expect(digitsOnly('a1b2c3')).toBe('123');
       expect(digitsOnly(null)).toBe('');
       expect(digitsOnly(undefined)).toBe('');
+    });
+  });
+
+  describe('maskUpper', () => {
+    it('converte para maiusculo, preservando acentos', () => {
+      expect(maskUpper('joão da silva')).toBe('JOÃO DA SILVA');
+      expect(maskUpper(null)).toBe('');
+      expect(maskUpper(undefined)).toBe('');
     });
   });
 

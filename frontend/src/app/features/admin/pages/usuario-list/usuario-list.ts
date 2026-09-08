@@ -20,7 +20,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, PageSizeOption } from '../../models/admin.models';
-import { formatCpfDisplay } from '../../../../shared/input-masks';
+import { formatCpfDisplay, maskMatricula } from '../../../../shared/input-masks';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 
 type UsuarioRow = {
@@ -208,7 +208,7 @@ export class UsuarioList implements OnInit {
           result.items.map((u) => ({
             id: u.id,
             nomeServidor: u.nomeServidor,
-            matricula: u.matricula,
+            matricula: maskMatricula(u.matricula),
             cpf: formatCpfDisplay(u.cpf || u.login),
             perfis: (u.perfis ?? []).join(', '),
             status: u.ativo ? 'Ativo' : 'Inativo',

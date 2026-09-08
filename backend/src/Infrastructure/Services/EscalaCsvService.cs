@@ -163,12 +163,21 @@ public class EscalaCsvService(IEscalaService escalaService, ApplicationDbContext
             ws.Range(2, 1, linha - 1, totalColunas).SetAutoFilter();
         }
 
+        // Linha divisória entre o bloco de 24h e o de 12h — sem ela as duas sequências de dias
+        // ficam coladas e é fácil ler um dia de 12h como se fosse de 24h.
+        if (max24h > 0 && max12h > 0)
+        {
+            var divisoria = ws.Range(1, primeiraColuna12h, linha - 1, primeiraColuna12h);
+            divisoria.Style.Border.LeftBorder = XLBorderStyleValues.Medium;
+            divisoria.Style.Border.LeftBorderColor = XLColor.FromHtml("#616161");
+        }
+
         // Legenda dos códigos de afastamento, depois da tabela.
         linha += 1;
         var celulaAmostra = ws.Cell(linha, 1);
         celulaAmostra.Value = "";
         celulaAmostra.Style.Fill.BackgroundColor = XLColor.FromHtml(CorAmareloAfastamento);
-        ws.Cell(linha, 2).Value = "= dia de afastamento (em vez de plantão)";
+        ws.Cell(linha, 2).Value = "= dia de afastamento";
         ws.Cell(linha, 2).Style.Font.Italic = true;
         linha++;
 

@@ -113,6 +113,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.SetorId,
             request.NucleoId,
             null,
+            request.CargoOutroTexto,
             cancellationToken);
         if (validation is not null)
         {
@@ -131,7 +132,8 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.DataNascimento,
             request.Telefone,
             status,
-            actorLogin);
+            actorLogin,
+            cargoOutroTexto: request.CargoOutroTexto);
 
         db.Servidores.Add(servidor);
         await db.SaveChangesAsync(cancellationToken);
@@ -168,6 +170,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.SetorId,
             request.NucleoId,
             id,
+            request.CargoOutroTexto,
             cancellationToken);
         if (validation is not null)
         {
@@ -189,7 +192,8 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             request.NucleoId,
             request.DataNascimento,
             request.Telefone,
-            actorLogin);
+            actorLogin,
+            request.CargoOutroTexto);
         servidor.DefinirStatus(request.Status, actorLogin);
 
         await db.SaveChangesAsync(cancellationToken);
@@ -295,6 +299,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         Guid? setorId,
         Guid? nucleoId,
         Guid? excludingId,
+        string? cargoOutroTexto,
         CancellationToken cancellationToken)
     {
         if (setorId.HasValue == nucleoId.HasValue)
@@ -364,9 +369,19 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             return "Núcleo inválido.";
         }
 
-        if (!await db.Cargos.AnyAsync(x => x.Id == cargoId && x.Ativo, cancellationToken))
+        var cargoCodigo = await db.Cargos
+            .Where(x => x.Id == cargoId && x.Ativo)
+            .Select(x => x.Codigo)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (cargoCodigo is null)
         {
             return "Cargo inválido.";
+        }
+
+        if (string.Equals(cargoCodigo, CargoCodes.Outros, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(cargoOutroTexto))
+        {
+            return "Informe o cargo quando selecionar \"Outros\".";
         }
 
         return null;
@@ -388,6 +403,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             servidor.CargoId,
             servidor.Cargo.Nome,
             servidor.Cargo.Codigo,
+            servidor.CargoOutroTexto,
             servidor.Email,
             servidor.Telefone,
             servidor.DataNascimento,
@@ -408,6 +424,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             servidor.CargoId,
             servidor.Cargo.Nome,
             servidor.Cargo.Codigo,
+            servidor.CargoOutroTexto,
             servidor.Email,
             servidor.Telefone,
             servidor.DataNascimento,

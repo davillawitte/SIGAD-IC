@@ -345,6 +345,9 @@ public static class CargoCodes
     public const string Terceirizado = "TER";
     public const string ServidorExterno = "EXT";
     public const string Enquadrado = "ENQ";
+    public const string AuxForensePericia = "AFP";
+    public const string AuxTecnicoForense = "ATEF";
+    public const string Outros = "OUTROS";
 
     public static readonly IReadOnlyList<(string Codigo, string Nome)> Catalog =
     [
@@ -356,6 +359,9 @@ public static class CargoCodes
         (Terceirizado, "Terceirizado"),
         (ServidorExterno, "Servidor Externo"),
         (Enquadrado, "Enquadrado"),
+        (AuxForensePericia, "Auxiliar Forense de Perícia"),
+        (AuxTecnicoForense, "Auxiliar Técnico Forense"),
+        (Outros, "Outros"),
     ];
 
     /// <summary>Códigos longos legados da seed antiga → sigla atual.</summary>

@@ -172,6 +172,43 @@ describe('escala-ocorrencia.builder', () => {
       'PT',
     ]);
   });
+
+  it('PT24_TL12 dá a cada fase a sua própria duração (PT 24h, TL12 12h), não o horasPadrao do regime', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana,
+      regimesSelected: ['PT24_TL12'],
+      padroesByCodigo: new Map([['PT24_TL12', padraoPT24TL12]]),
+      servidorInicioCiclo: new Map([['a', '2026-07-06']]),
+      horasPorCodigo: new Map([
+        ['PT', 24],
+        ['TL12', 12],
+      ]),
+    });
+
+    const horasPorCodigo = result.map((o) => [o.tipoOcorrenciaCodigo, o.horas] as const);
+    expect(horasPorCodigo).toEqual([
+      ['PT', 24],
+      ['D', null],
+      ['D', null],
+      ['D', null],
+      ['TL12', 12],
+      ['D', null],
+      ['PT', 24],
+    ]);
+  });
+
+  it('sem catálogo de horas, mantém o horasPadrao do regime (comportamento antigo)', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana,
+      regimesSelected: ['PT24_TL12'],
+      padroesByCodigo: new Map([['PT24_TL12', padraoPT24TL12]]),
+      servidorInicioCiclo: new Map([['a', '2026-07-06']]),
+    });
+
+    expect(result.find((o) => o.tipoOcorrenciaCodigo === 'TL12')?.horas).toBe(24);
+  });
 });
 
 // Espelha os casos de `EscalaResumidaRotacaoExpanderTests.cs` — mesma fórmula de módulo

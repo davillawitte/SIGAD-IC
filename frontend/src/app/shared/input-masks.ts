@@ -4,6 +4,11 @@ export function digitsOnly(value: string | null | undefined): string {
   return (value ?? '').replace(/\D/g, '');
 }
 
+/** Nome do servidor: sempre maiúsculo (padrão institucional). */
+export function maskUpper(value: string | null | undefined): string {
+  return (value ?? '').toUpperCase();
+}
+
 /** CPF: 000.000.000-00 */
 export function maskCpf(value: string | null | undefined): string {
   const d = digitsOnly(value).slice(0, 11);

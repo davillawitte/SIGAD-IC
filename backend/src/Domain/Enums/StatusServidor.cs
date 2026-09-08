@@ -5,4 +5,5 @@ public enum StatusServidor
     Ativo = 1,
     Afastado = 2,
     Cedido = 3,
+    Aposentado = 4,
 }
