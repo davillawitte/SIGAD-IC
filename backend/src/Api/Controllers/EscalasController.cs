@@ -29,8 +29,10 @@ public class EscalasController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal("setor", setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal("setor", setorId, nucleoId, mes, ano, status, page, pageSize, search, sort, dir, cancellationToken);
 
     /// <summary>Gestão Institucional: escalas de todos os setores, exceto a Direção do IC.</summary>
     [HttpGet("institucionais")]
@@ -44,8 +46,10 @@ public class EscalasController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal("institucional", setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal("institucional", setorId, nucleoId, mes, ano, status, page, pageSize, search, sort, dir, cancellationToken);
 
     [HttpGet]
     [RequiresPermission(PermissionCodes.EscalasListar)]
@@ -59,8 +63,10 @@ public class EscalasController(
         [FromQuery] int pageSize = 50,
         [FromQuery] string? search = null,
         [FromQuery] string? escopo = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null,
         CancellationToken cancellationToken = default) =>
-        ListInternal(escopo, setorId, nucleoId, mes, ano, status, page, pageSize, search, cancellationToken);
+        ListInternal(escopo, setorId, nucleoId, mes, ano, status, page, pageSize, search, sort, dir, cancellationToken);
 
     private async Task<IActionResult> ListInternal(
         string? escopo,
@@ -72,6 +78,8 @@ public class EscalasController(
         int page,
         int pageSize,
         string? search,
+        string? sort,
+        string? dir,
         CancellationToken cancellationToken)
     {
         var result = await escalaService.ListAsync(
@@ -86,6 +94,8 @@ public class EscalasController(
                 PageSize = pageSize,
                 Search = search,
                 Escopo = escopo,
+                Sort = sort,
+                Dir = dir,
             },
             User.GetLogin(),
             cancellationToken);

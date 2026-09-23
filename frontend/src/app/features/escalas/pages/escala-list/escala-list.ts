@@ -13,10 +13,12 @@ import {
   PciLayoutBreadcrumbService,
   PciListPageComponent,
   PciRowAction,
+  PciSortChange,
   PciStackComponent,
   PciToastService,
 } from '@davillawitte/pci-design-system';
-import { filter } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
+import { catchError, filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import {
@@ -32,6 +34,9 @@ import type { EscalaListItem, SolicitacaoDevolucaoEscala, StatusEscala } from '.
 import { statusEscalaLabel } from '../../models/escalas.models';
 
 type EscalaEscopo = 'setor' | 'institucional';
+
+/** Prefixo que distingue núcleo de setor no filtro de lotação (mesma ideia do wizard). */
+const NUCLEO_FILTER_PREFIX = 'nucleo:';
 
 type EscalaRow = {
   id: string;
@@ -94,6 +99,7 @@ export class EscalaList implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly rows = signal<EscalaRow[]>([]);
+  readonly sort = signal<PciSortChange<EscalaRow> | null>(null);
   readonly totalItems = signal(0);
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
@@ -152,7 +158,7 @@ export class EscalaList implements OnInit, OnDestroy {
     if (this.isInstitucional()) {
       fields.push({
         key: 'setorId',
-        label: 'Setor',
+        label: 'Setor ou núcleo',
         type: 'select',
         options: this.setorFilterOptions(),
       });
@@ -161,14 +167,26 @@ export class EscalaList implements OnInit, OnDestroy {
     return fields;
   });
 
+  // Ordenação é feita pela API (`sortMode="server"`): a listagem é paginada no servidor, então
+  // ordenar só a página atual no cliente daria uma ordem errada. "Período de Referência" ordena
+  // por ano/mês, não pelo texto exibido ("Setembro/2026" alfabético ficaria fora de ordem).
   readonly columns: PciColumn<EscalaRow>[] = [
-    { key: 'periodoReferencia', label: 'Período de Referência', sortable: false },
-    { key: 'setor', label: 'Setor', sortable: false },
-    { key: 'status', label: 'Status', sortable: false },
-    { key: 'publicadaEm', label: 'Publicada em', sortable: false },
-    { key: 'criadoEm', label: 'Criada em', sortable: false },
+    { key: 'periodoReferencia', label: 'Período de Referência', sortable: true },
+    { key: 'setor', label: 'Setor', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'publicadaEm', label: 'Publicada em', sortable: true },
+    { key: 'criadoEm', label: 'Criada em', sortable: true },
     { key: 'criadoPor', label: 'Responsável', sortable: false },
   ];
+
+  /** Coluna da tabela → campo `sort` aceito pela API. */
+  private static readonly SORT_KEYS: Partial<Record<keyof EscalaRow, string>> = {
+    periodoReferencia: 'periodo',
+    setor: 'setor',
+    status: 'status',
+    publicadaEm: 'publicadaEm',
+    criadoEm: 'criadoEm',
+  };
 
   readonly rowActions = computed<PciRowAction<EscalaRow>[]>(() => {
     const actions: PciRowAction<EscalaRow>[] = [
@@ -183,7 +201,7 @@ export class EscalaList implements OnInit, OnDestroy {
           icon: 'edit',
           placement: 'inline',
           hidden: (row) =>
-            !this.auth.canAccessEscala('escalas.editar', row.setorId, row.nucleoId) ||
+            !this.podeAlterar('escalas.editar', row) ||
             (row.statusRaw !== 'Rascunho' && row.statusRaw !== 'Finalizada'),
         },
         {
@@ -192,8 +210,7 @@ export class EscalaList implements OnInit, OnDestroy {
           icon: 'check',
           placement: 'inline',
           hidden: (row) =>
-            !this.auth.canAccessEscala('escalas.publicar', row.setorId, row.nucleoId) ||
-            row.statusRaw !== 'Finalizada',
+            !this.podeAlterar('escalas.publicar', row) || row.statusRaw !== 'Finalizada',
         },
       );
     }
@@ -230,11 +247,20 @@ export class EscalaList implements OnInit, OnDestroy {
       this.breadcrumb.buildFromRoutes(this.routePages, this.listBasePath()),
     );
     if (this.isInstitucional()) {
-      this.adminApi.listSetores().subscribe({
-        next: (setores) =>
-          this.setorFilterOptions.set(
-            setores.map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id })),
-          ),
+      // Escala pode ser de setor OU de núcleo — o filtro lista os dois, com o núcleo prefixado
+      // pra `reload()` saber em qual parâmetro da API mandar.
+      forkJoin({
+        setores: this.adminApi.listSetores(),
+        nucleos: this.adminApi.listNucleos().pipe(catchError(() => of([]))),
+      }).subscribe({
+        next: ({ setores, nucleos }) =>
+          this.setorFilterOptions.set([
+            ...nucleos.map((n) => ({
+              label: `${n.sigla} — ${n.nome}`,
+              value: `${NUCLEO_FILTER_PREFIX}${n.id}`,
+            })),
+            ...setores.map((s) => ({ label: `${s.sigla} — ${s.nome}`, value: s.id })),
+          ]),
         error: () => this.setorFilterOptions.set([]),
       });
     }
@@ -271,6 +297,17 @@ export class EscalaList implements OnInit, OnDestroy {
 
   onFilterClear(): void {
     this.filterValues.set({});
+    this.page.set(1);
+    this.reload();
+  }
+
+  /** Alterar a escala é de quem chefia o setor/núcleo dela (ver `escala-detail`). */
+  private podeAlterar(permissao: string, row: EscalaRow): boolean {
+    return this.auth.hasPermission(permissao) && this.auth.isChefiaDireta(row.setorId, row.nucleoId);
+  }
+
+  onSortChange(sort: PciSortChange<EscalaRow> | null): void {
+    this.sort.set(sort);
     this.page.set(1);
     this.reload();
   }
@@ -539,8 +576,9 @@ export class EscalaList implements OnInit, OnDestroy {
         status: (filters['status'] as string) || undefined,
         ano: Number.isFinite(ano) && ano > 0 ? ano : undefined,
         mes: Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined,
-        setorId: (filters['setorId'] as string) || undefined,
+        ...this.lotacaoParams(filters['setorId'] as string | undefined),
         escopo: this.escopo(),
+        ...this.sortParams(),
       })
       .subscribe({
         next: (result) => {
@@ -555,6 +593,20 @@ export class EscalaList implements OnInit, OnDestroy {
           this.loading.set(false);
         },
       });
+  }
+
+  /** Valor do filtro de lotação → `setorId` ou `nucleoId` na consulta da API. */
+  private lotacaoParams(valor?: string): { setorId?: string; nucleoId?: string } {
+    if (!valor) return {};
+    return valor.startsWith(NUCLEO_FILTER_PREFIX)
+      ? { nucleoId: valor.slice(NUCLEO_FILTER_PREFIX.length) }
+      : { setorId: valor };
+  }
+
+  private sortParams(): { sort?: string; dir?: 'asc' | 'desc' } {
+    const sort = this.sort();
+    const key = sort ? EscalaList.SORT_KEYS[sort.key] : undefined;
+    return key ? { sort: key, dir: sort!.dir } : {};
   }
 
   private toRow(item: EscalaListItem): EscalaRow {
@@ -581,7 +633,7 @@ export class EscalaList implements OnInit, OnDestroy {
       periodoReferencia: `${mesNome}/${item.ano}`,
       setor: item.setorId
         ? `${item.setorSigla} — ${item.setorNome}`
-        : `${item.nucleoSigla} — ${item.nucleoNome} (núcleo)`,
+        : `${item.nucleoSigla} — ${item.nucleoNome}`,
       status: statusEscalaLabel(item.status),
       statusRaw: item.status,
       publicadaEm:

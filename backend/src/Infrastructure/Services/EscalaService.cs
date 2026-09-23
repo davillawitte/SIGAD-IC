@@ -107,8 +107,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 (x.Nucleo != null && (x.Nucleo.Nome.ToLower().Contains(term) || x.Nucleo.Sigla.ToLower().Contains(term))));
         }
 
-        q = q.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes)
-            .ThenBy(x => x.Setor != null ? x.Setor.Nome : x.Nucleo!.Nome);
+        q = OrdenarLista(q, query.Sort, query.Dir);
 
         var totalItems = await q.CountAsync(cancellationToken);
         if (totalItems == 0)
@@ -439,7 +438,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         var conflitos = await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
-            db, novosIds, escalaInfo.Ano, escalaInfo.Mes, excluirEscalaId: id, cancellationToken);
+            db, novosIds, escalaInfo.Ano, escalaInfo.Mes, excluirEscalaId: id,
+            escalaInfo.SetorId, escalaInfo.NucleoId, cancellationToken);
         if (conflitos.Count > 0)
         {
             return Result<EscalaDetailDto>.Failure(EscalaConflitoChecker.FormatarMensagem(conflitos));
@@ -838,6 +838,30 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 "Somente quem é chefe do setor (ou do núcleo que o engloba) pode excluir, e só enquanto a escala está em rascunho ou finalizada.");
         }
 
+        // A escala resumida vinculada é planejamento DESTA escala: sem removê-la junto, ela fica
+        // solta no banco e é readotada depois por outra escala do mesmo núcleo/mês (lixo que
+        // reaparecia com equipes e pessoas de outra ocasião). Exceção: resumida de núcleo com
+        // outra escala viva no mesmo núcleo/mês é compartilhada entre os setores — essa fica.
+        var resumida = await db.EscalasResumidas
+            .FirstOrDefaultAsync(x => x.EscalaId == escala.Id, cancellationToken);
+        if (resumida is not null)
+        {
+            var compartilhada = escala.NucleoId is null
+                && resumida.NucleoId is Guid nucleoDaResumida
+                && await db.Escalas.AnyAsync(
+                    x => x.Id != escala.Id
+                         && x.Ano == resumida.Ano
+                         && x.Mes == resumida.Mes
+                         && (x.NucleoId == nucleoDaResumida
+                             || (x.SetorId != null && x.Setor!.NucleoId == nucleoDaResumida)),
+                    cancellationToken);
+
+            if (!compartilhada)
+            {
+                db.EscalasResumidas.Remove(resumida);
+            }
+        }
+
         db.Escalas.Remove(escala);
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
@@ -1145,6 +1169,14 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Sem permissão para esta escala.");
         }
 
+        // Só escala publicada serve de origem: rascunho/finalizada ainda está em montagem, e
+        // copiar uma versão que pode mudar (ou ser descartada) leva padrões que não valem.
+        if (origem.Status != StatusEscala.Publicada)
+        {
+            return Result<EscalaDetailDto>.Failure(
+                "Só é possível copiar escalas publicadas. Publique a escala de origem antes de copiá-la.");
+        }
+
         var jaExisteDestino = origem.SetorId is Guid origemSetorId
             ? await db.Escalas.AnyAsync(
                 x => x.SetorId == origemSetorId && x.Ano == request.Ano && x.Mes == request.Mes
@@ -1171,6 +1203,10 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         {
             return Result<EscalaDetailDto>.Failure(ex.Message);
         }
+
+        // A cópia grava em várias etapas (escala, servidores, jornadas, ocorrências); sem
+        // transação, uma falha no meio deixava a escala criada pela metade no banco.
+        await using var transacao = await db.Database.BeginTransactionAsync(cancellationToken);
 
         db.Escalas.Add(nova);
         await db.SaveChangesAsync(cancellationToken);
@@ -1237,6 +1273,16 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
             if (!request.SobrescreverManuais)
             {
+                // `ApplyJornadaAsync` só adiciona as ocorrências ao contexto; sem gravar aqui, as
+                // da última jornada ficariam pendentes e invisíveis para a consulta abaixo — uma
+                // ocorrência manual no mesmo dia viraria uma segunda linha, violando
+                // IX_EscalaOcorrencia_EscalaServidorId_Data (erro 500 ao copiar).
+                await db.SaveChangesAsync(cancellationToken);
+
+                var ocorrenciasPorData = await db.EscalaOcorrencias
+                    .Where(x => x.EscalaServidorId == dest.Id)
+                    .ToDictionaryAsync(x => x.Data, cancellationToken);
+
                 foreach (var oc in src.Ocorrencias.Where(x => x.Origem == OrigemOcorrencia.Manual))
                 {
                     var data = ShiftMonth(oc.Data, deltaMonths, destinoInicio, destinoFim);
@@ -1245,12 +1291,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                         continue;
                     }
 
-                    var existing = await db.EscalaOcorrencias
-                        .FirstOrDefaultAsync(x => x.EscalaServidorId == dest.Id && x.Data == data, cancellationToken);
-
-                    if (existing is null)
+                    // O dicionário também acumula o que foi adicionado neste laço: `AddMonths`
+                    // ajusta o dia quando o mês de destino é mais curto (31/01 + 1 mês = 28/02),
+                    // então duas datas de origem podem cair no mesmo dia — a última prevalece,
+                    // em vez de virar uma segunda linha.
+                    if (!ocorrenciasPorData.TryGetValue(data.Value, out var existing))
                     {
-                        db.EscalaOcorrencias.Add(EscalaOcorrencia.Create(
+                        var criada = EscalaOcorrencia.Create(
                             dest.Id,
                             data.Value,
                             oc.TipoOcorrenciaCodigo,
@@ -1259,7 +1306,9 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                             oc.HoraFim,
                             oc.Horas,
                             observacao: oc.Observacao,
-                            createdBy: actorLogin));
+                            createdBy: actorLogin);
+                        db.EscalaOcorrencias.Add(criada);
+                        ocorrenciasPorData[data.Value] = criada;
                     }
                     else
                     {
@@ -1276,7 +1325,35 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
         return await GetByIdAsync(nova.Id, actorLogin, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ordenação da listagem. Padrão (e desempate de todas as colunas): período mais recente
+    /// primeiro e, dentro do mesmo mês, a escala criada por último — sem esse desempate, duas
+    /// escalas do mesmo setor/mês (versões antes de publicar) saíam em ordem imprevisível.
+    /// </summary>
+    private static IQueryable<Escala> OrdenarLista(IQueryable<Escala> q, string? sort, string? dir)
+    {
+        var asc = string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase);
+
+        IOrderedQueryable<Escala> ordenada = (sort?.ToLowerInvariant()) switch
+        {
+            "setor" => asc
+                ? q.OrderBy(x => x.Setor != null ? x.Setor.Nome : x.Nucleo!.Nome)
+                : q.OrderByDescending(x => x.Setor != null ? x.Setor.Nome : x.Nucleo!.Nome),
+            "status" => asc ? q.OrderBy(x => x.Status) : q.OrderByDescending(x => x.Status),
+            "publicadaem" => asc ? q.OrderBy(x => x.PublicadaEm) : q.OrderByDescending(x => x.PublicadaEm),
+            "criadoem" => asc ? q.OrderBy(x => x.CreatedAt) : q.OrderByDescending(x => x.CreatedAt),
+            _ => asc
+                ? q.OrderBy(x => x.Ano).ThenBy(x => x.Mes)
+                : q.OrderByDescending(x => x.Ano).ThenByDescending(x => x.Mes),
+        };
+
+        return ordenada
+            .ThenBy(x => x.Setor != null ? x.Setor.Nome : x.Nucleo!.Nome)
+            .ThenByDescending(x => x.CreatedAt);
     }
 
     public async Task<IReadOnlyList<ConflitoServidorDto>> CheckConflitosServidoresAsync(
@@ -1287,7 +1364,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var ids = (request.ServidorIds ?? []).Distinct().ToList();
         return await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
             db, ids, request.Ano, request.Mes,
-            request.ExcluirEscalaId, cancellationToken);
+            request.ExcluirEscalaId, request.SetorId, request.NucleoId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TipoOcorrenciaDto>> ListTiposOcorrenciaAsync(CancellationToken cancellationToken = default) =>
@@ -1346,15 +1423,18 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         var mesAnterior = new DateOnly(ano, mes, 1).AddMonths(-1);
+        // Pode haver mais de uma versão no mês anterior (só a publicada é única): prefere a
+        // publicada e, entre rascunhos/finalizadas, a mais recentemente alterada.
         var anterior = await db.Escalas
             .AsNoTracking()
             .Include(x => x.Setor)
             .Include(x => x.Nucleo)
             .Include(x => x.Servidores)
-            .FirstOrDefaultAsync(
-                x => (setorId != null ? x.SetorId == setorId : x.NucleoId == nucleoId)
-                     && x.Ano == mesAnterior.Year && x.Mes == mesAnterior.Month,
-                cancellationToken);
+            .Where(x => (setorId != null ? x.SetorId == setorId : x.NucleoId == nucleoId)
+                        && x.Ano == mesAnterior.Year && x.Mes == mesAnterior.Month)
+            .OrderByDescending(x => x.Status == StatusEscala.Publicada)
+            .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (anterior is null)
         {
@@ -1434,7 +1514,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             }
 
             var conflitosGerar = await EscalaConflitoChecker.FindServidoresJaEscaladosAsync(
-                db, faltantes, escala.Ano, escala.Mes, excluirEscalaId: escala.Id, cancellationToken);
+                db, faltantes, escala.Ano, escala.Mes, excluirEscalaId: escala.Id,
+                escala.SetorId, escala.NucleoId, cancellationToken);
             if (conflitosGerar.Count > 0)
             {
                 return Result<EscalaDetailDto>.Failure(EscalaConflitoChecker.FormatarMensagem(conflitosGerar));
@@ -2134,12 +2215,14 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .ToHashSet();
     }
 
+    /// <summary>
+    /// Alterar uma escala exige chefia DE VERDADE do setor (direta ou pelo núcleo que o engloba)
+    /// ou do núcleo — visão institucional não escala para escrita, por mais amplo que seja o
+    /// perfil (inclusive Direção IC/superadministrador). A permissão da operação em si
+    /// (editar/finalizar/publicar/excluir) continua sendo exigida no controller.
+    /// </summary>
     private static bool CanMutate(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
-        setorId is Guid s
-            ? actor.PodeAcessar(PermissionCodes.EscalasEditar, s) || actor.GerenciaSetorViaNucleo(s)
-            : nucleoId is Guid n
-                && (actor.GerenciaNucleo(n)
-                    || (actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasEditar)));
+        IsChefiaDireta(actor, setorId, nucleoId);
 
     private static bool CanSolicitarDevolucao(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
         setorId is Guid s
@@ -2155,9 +2238,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             ? actor.SetoresGerenciadosIds.Contains(s) || actor.GerenciaSetorViaNucleo(s)
             : nucleoId is Guid n && actor.GerenciaNucleo(n);
 
+    // Chefe de núcleo enxerga as escalas dos setores que o núcleo engloba, mesmo sem chefia
+    // direta do setor — mesma regra de `CanMutate` e de `AfastamentoService`. Sem isso ele podia
+    // criar/copiar a escala de um setor do núcleo, mas tomava "sem permissão" ao ler o resultado
+    // (a cópia chegava a ser gravada antes de falhar, deixando escala órfã).
     private static bool CanView(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
         setorId is Guid s
-            ? actor.PodeVer(PermissionCodes.EscalasListar, s)
+            ? actor.PodeVer(PermissionCodes.EscalasListar, s) || actor.GerenciaSetorViaNucleo(s)
             : CanMutate(actor, setorId, nucleoId)
                 || (nucleoId is Guid n2 && actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasListar));
 

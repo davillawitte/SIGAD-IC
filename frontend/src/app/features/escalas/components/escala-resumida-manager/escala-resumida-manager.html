@@ -91,7 +91,7 @@
                               class="rotacao-editor__select"
                               label="Servidor"
                               [formControl]="pos.principal"
-                              [options]="elegiveisOptions()"
+                              [options]="opcoesDoSetor(setor)"
                             />
                             @if (isAgentesSetor(setor)) {
                               @if (temSegundaPosicaoAberta(equipe.id, $index)) {
@@ -99,7 +99,7 @@
                                   class="rotacao-editor__select"
                                   label="Reforço (opcional)"
                                   [formControl]="pos.segunda"
-                                  [options]="elegiveisOptionsSemDo()"
+                                  [options]="opcoesDoSetorSemDo(setor)"
                                 />
                                 <pci-icon-button
                                   icon="x"
@@ -184,7 +184,7 @@
           <app-escala-resumida-grid
             [escala]="e"
             [editable]="isRascunhoOuFinalizada()"
-            [elegiveis]="elegiveis()"
+            [elegiveis]="elegiveisPermitidos()"
             (cellSave)="onCellSave($event)"
             (cellRevert)="onCellRevert($event)"
           />

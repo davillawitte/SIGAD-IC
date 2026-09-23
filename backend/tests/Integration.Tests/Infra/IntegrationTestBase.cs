@@ -22,7 +22,11 @@ public abstract class IntegrationTestBase(PostgresFixture fixture) : IAsyncLifet
 
     public async Task InitializeAsync() => _database = await fixture.CreateDatabaseAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync()
+    {
+        _database.LiberarConexoes();
+        return Task.CompletedTask;
+    }
 
     protected ApplicationDbContext NewContext() => _database.CreateContext();
 

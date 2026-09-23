@@ -364,6 +364,13 @@ public static class CargoCodes
         (Outros, "Outros"),
     ];
 
+    /// <summary>Perito criminal, aceitando também o código longo da seed antiga.</summary>
+    public static bool EhPeritoCriminal(string? codigo) =>
+        !string.IsNullOrWhiteSpace(codigo)
+        && (string.Equals(codigo, PeritoCriminal, StringComparison.OrdinalIgnoreCase)
+            || (ObsoleteToSigla.TryGetValue(codigo, out var sigla)
+                && string.Equals(sigla, PeritoCriminal, StringComparison.OrdinalIgnoreCase)));
+
     /// <summary>Códigos longos legados da seed antiga → sigla atual.</summary>
     public static readonly IReadOnlyDictionary<string, string> ObsoleteToSigla =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

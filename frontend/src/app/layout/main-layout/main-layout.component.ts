@@ -50,7 +50,13 @@ export class MainLayoutComponent {
     perfis: '/perfis',
     servidores: '/servidores',
     'estrutura-organizacional': '/estrutura-organizacional',
+    'minhas-escalas': '/minhas-escalas',
+    'minhas-permutas': '/minhas-permutas',
+    'minhas-diarias': '/minhas-diarias',
     escalas: '/escalas',
+    permutas: '/permutas',
+    'diarias-operacionais': '/diarias-operacionais',
+    'diarias-operacionais-institucionais': '/diarias-operacionais-institucionais',
     'escalas-institucionais': '/escalas-institucionais',
     afastamentos: '/afastamentos',
     'afastamentos-institucionais': '/afastamentos-institucionais',
@@ -67,6 +73,17 @@ export class MainLayoutComponent {
       },
     ];
 
+    // Área do Servidor: acesso mínimo de quem tem login. Chefe e diretor continuam vendo suas
+    // seções de gestão além desta — não precisa marcar nada no perfil pra ter esta aqui.
+    groups.push({
+      title: 'Área do Servidor',
+      items: [
+        { id: 'minhas-escalas', label: 'Escalas', icon: 'clock' },
+        { id: 'minhas-permutas', label: 'Permutas', icon: 'refresh' },
+        { id: 'minhas-diarias', label: 'Diárias Operacionais', icon: 'credit-card' },
+      ],
+    });
+
     const gestaoInstitucional = [
       ...(this.auth.hasGestaoInstitucional()
         ? [
@@ -79,6 +96,11 @@ export class MainLayoutComponent {
               id: 'afastamentos-institucionais',
               label: 'Afastamentos',
               icon: 'user-x' as const,
+            },
+            {
+              id: 'diarias-operacionais-institucionais',
+              label: 'Diárias Operacionais',
+              icon: 'credit-card' as const,
             },
           ]
         : []),
@@ -123,6 +145,10 @@ export class MainLayoutComponent {
             ...(this.auth.hasPermission('afastamentos.listar')
               ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'user-x' as const }]
               : []),
+            // Sem permissão própria ainda: enquanto permutas/diárias não têm código de permissão,
+            // valem as mesmas condições da seção (ser chefia de setor ou de núcleo).
+            { id: 'permutas', label: 'Permutas', icon: 'refresh' as const },
+            { id: 'diarias-operacionais', label: 'Diárias Operacionais', icon: 'credit-card' as const },
           ]
         : [];
     if (gestaoSetor.length) {

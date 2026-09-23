@@ -109,24 +109,29 @@ export class EscalaDetail implements OnInit {
     if (tab) this.viewTab.set(tab);
   }
 
-  canEdit(): boolean {
+  /** Alterar a escala é de quem chefia o setor/núcleo dela — visão institucional (Direção IC,
+   * superadministrador) só visualiza e devolve, mesma regra de `EscalaService.CanMutate`. */
+  private podeAlterar(permissao: string): boolean {
     const e = this.escala();
-    return this.auth.canAccessEscala('escalas.editar', e?.setorId, e?.nucleoId);
+    return (
+      this.auth.hasPermission(permissao) && this.auth.isChefiaDireta(e?.setorId, e?.nucleoId)
+    );
+  }
+
+  canEdit(): boolean {
+    return this.podeAlterar('escalas.editar');
   }
 
   canPublish(): boolean {
-    const e = this.escala();
-    return this.auth.canAccessEscala('escalas.publicar', e?.setorId, e?.nucleoId);
+    return this.podeAlterar('escalas.publicar');
   }
 
   canFinalizar(): boolean {
-    const e = this.escala();
-    return this.auth.canAccessEscala('escalas.finalizar', e?.setorId, e?.nucleoId);
+    return this.podeAlterar('escalas.finalizar');
   }
 
   canExcluir(): boolean {
-    const e = this.escala();
-    return this.auth.canAccessEscala('escalas.excluir', e?.setorId, e?.nucleoId);
+    return this.podeAlterar('escalas.excluir');
   }
 
   canSolicitarDevolucao(): boolean {

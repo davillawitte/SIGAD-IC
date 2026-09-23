@@ -61,6 +61,18 @@ export const routes: Routes = [
       {
         path: '',
         loadChildren: () =>
+          import('./features/permutas/permutas.routes').then((m) => m.PERMUTAS_ROUTES),
+      },
+      {
+        path: '',
+        loadChildren: () =>
+          import('./features/diarias-operacionais/diarias-operacionais.routes').then(
+            (m) => m.DIARIAS_OPERACIONAIS_ROUTES,
+          ),
+      },
+      {
+        path: '',
+        loadChildren: () =>
           import('./features/calendario-institucional/calendario-institucional.routes').then(
             (m) => m.CALENDARIO_INSTITUCIONAL_ROUTES,
           ),

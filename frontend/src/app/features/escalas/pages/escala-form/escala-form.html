@@ -71,11 +71,11 @@
           </pci-card-content>
         </pci-card>
 
-        @if (!isEditMode() && !escalaDeNucleo()) {
+        @if (!isEditMode()) {
           <pci-card>
             <pci-card-content>
               <h3>Copiar escala existente (opcional)</h3>
-              <p>Selecione uma escala do setor para reaproveitar regimes, servidores e continuidade de plantão no mês de destino. Sem seleção, a escala é montada do zero.</p>
+              <p>Selecione uma escala anterior para reaproveitar regimes, servidores e continuidade de plantão no mês de destino.</p>
               <div class="pci-form-group">
                 <pci-select
                   [appFormCol]="12"
@@ -407,6 +407,7 @@
             <app-escala-resumida-manager
               [escala]="resumidaEscala()!"
               [podeGerenciarSetores]="podeGerenciarOutrosSetoresDoNucleo()"
+              [restricaoServidores]="restricaoServidoresResumida()"
               (escalaChange)="onResumidaChange($event)"
             />
           </div>

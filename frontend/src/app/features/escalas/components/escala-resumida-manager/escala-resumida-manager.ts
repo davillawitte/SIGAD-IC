@@ -32,6 +32,7 @@ import type {
   EscalaResumidaServidorElegivel,
   EscalaResumidaSetor,
 } from '../../models/escalas-resumidas.models';
+import { httpErrorMessage } from '../../../../shared/http-error';
 
 const DO_VALUE = '__DO__';
 
@@ -49,8 +50,8 @@ interface RotacaoDraft {
   membros: PosicaoDraft[];
 }
 
-function errMsg(err: { error?: { message?: string } }, fallback: string): string {
-  return err.error?.message ?? fallback;
+function errMsg(err: unknown, fallback: string): string {
+  return httpErrorMessage(err, fallback);
 }
 
 /**
@@ -93,6 +94,14 @@ export class EscalaResumidaManager implements OnInit {
    * núcleo nesta mesma escala resumida — um chefe de setor simples já tem seu único setor
    * implícito, sem precisar desta seção. */
   readonly podeGerenciarSetores = input(false);
+  /** Wizard de escala: servidores da lotação da escala sendo montada (`pool`) só aparecem pra
+   * seleção se foram escolhidos no passo de servidores (`selecionados`) — quem ficou de fora
+   * ali (ex.: já escalado em outra escala no mês) não deve voltar pela resumida. Servidores
+   * de OUTROS setores do núcleo não são afetados: cada um é filtrado pela própria escala. */
+  readonly restricaoServidores = input<{
+    pool: ReadonlySet<string>;
+    selecionados: ReadonlySet<string>;
+  } | null>(null);
   readonly escalaChange = output<EscalaResumidaDetail>();
 
   readonly working = signal(false);
@@ -134,9 +143,39 @@ export class EscalaResumidaManager implements OnInit {
     return this.setoresDoNucleo().filter((s) => s.nucleoId === nucleoId);
   });
 
+  readonly elegiveisPermitidos = computed(() => {
+    const restricao = this.restricaoServidores();
+    const todos = this.elegiveis();
+    if (!restricao) return todos;
+    // Quem já está no rodízio continua na lista mesmo sem estar selecionado no passo 2 — senão
+    // o nome dele sumia da célula/seleção (a opção deixava de existir) e a equipe parecia vazia.
+    const jaNoRodizio = this.servidoresNoRodizio();
+    return todos.filter(
+      (s) => !restricao.pool.has(s.id) || restricao.selecionados.has(s.id) || jaNoRodizio.has(s.id),
+    );
+  });
+
+  /** Servidores já usados no rodízio ou na grade da escala resumida atual. */
+  private readonly servidoresNoRodizio = computed(() => {
+    const ids = new Set<string>();
+    for (const setor of this.escala()?.setores ?? []) {
+      for (const equipe of setor.equipes) {
+        for (const membro of equipe.rotacao) {
+          if (membro.servidorId) ids.add(membro.servidorId);
+          if (membro.servidorId2) ids.add(membro.servidorId2);
+        }
+        for (const dia of equipe.dias) {
+          if (dia.servidorId) ids.add(dia.servidorId);
+          if (dia.servidorId2) ids.add(dia.servidorId2);
+        }
+      }
+    }
+    return ids;
+  });
+
   readonly elegiveisOptions = computed<PciSelectOption[]>(() => [
     { label: 'DO', value: DO_VALUE },
-    ...this.elegiveis().map((s) => ({
+    ...this.elegiveisPermitidos().map((s) => ({
       label: s.nome,
       value: s.id,
     })),
@@ -147,6 +186,45 @@ export class EscalaResumidaManager implements OnInit {
   readonly elegiveisOptionsSemDo = computed<PciSelectOption[]>(() =>
     this.elegiveisOptions().filter((o) => o.value !== DO_VALUE),
   );
+
+  /** Opções do rodízio de um grupo. No grupo "Agentes" entram só os servidores que NÃO são
+   * peritos — é o que define o grupo. Quem já está no rodízio continua listado, mesmo perito,
+   * pra um cadastro anterior não perder o nome da vaga. */
+  opcoesDoSetor(setor: { setorId: string | null }): PciSelectOption[] {
+    if (!this.isAgentesSetor(setor)) return this.elegiveisOptions();
+    // Escape hatch restrito a quem já está no rodízio DESTE grupo: usar o rodízio inteiro da
+    // escala deixava passar os peritos escalados nos setores, que é justamente quem não pode
+    // aparecer aqui.
+    const jaNesteGrupo = this.servidoresNoRodizioDoSetor(setor);
+    return [
+      { label: 'DO', value: DO_VALUE },
+      ...this.elegiveisPermitidos()
+        .filter((sv) => !sv.ehPerito || jaNesteGrupo.has(sv.id))
+        .map((sv) => ({ label: sv.nome, value: sv.id })),
+    ];
+  }
+
+  /** Servidores usados no rodízio/grade de um grupo (setor ou Agentes) da escala resumida. */
+  private servidoresNoRodizioDoSetor(setor: { setorId: string | null }): Set<string> {
+    const ids = new Set<string>();
+    const alvo = this.escala()?.setores.find((s) => s.setorId === setor.setorId);
+    for (const equipe of alvo?.equipes ?? []) {
+      for (const membro of equipe.rotacao) {
+        if (membro.servidorId) ids.add(membro.servidorId);
+        if (membro.servidorId2) ids.add(membro.servidorId2);
+      }
+      for (const dia of equipe.dias) {
+        if (dia.servidorId) ids.add(dia.servidorId);
+        if (dia.servidorId2) ids.add(dia.servidorId2);
+      }
+    }
+    return ids;
+  }
+
+  /** Mesma lista de `opcoesDoSetor`, sem "DO" — usada no reforço da posição. */
+  opcoesDoSetorSemDo(setor: { setorId: string | null }): PciSelectOption[] {
+    return this.opcoesDoSetor(setor).filter((o) => o.value !== DO_VALUE);
+  }
 
   readonly isRascunhoOuFinalizada = computed(() => {
     const status = this.escala()?.status;
@@ -324,7 +402,7 @@ export class EscalaResumidaManager implements OnInit {
     const draft = this.rotacaoAberta()[equipeId];
     const posicao = draft?.membros[index];
     if (!posicao) return;
-    posicao.segunda.setValue(this.elegiveis()[0]?.id ?? '');
+    posicao.segunda.setValue(this.elegiveisPermitidos().find((sv) => !sv.ehPerito)?.id ?? '');
     this.rotacaoAberta.update((map) => ({ ...map, [equipeId]: { ...draft } }));
   }
 

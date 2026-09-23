@@ -234,7 +234,7 @@ export class AfastamentoList implements OnInit {
             setor: a.setorId
               ? `${a.setorSigla} — ${a.setorNome}`
               : a.nucleoId
-                ? `${a.nucleoSigla} — ${a.nucleoNome} (núcleo)`
+                ? `${a.nucleoSigla} — ${a.nucleoNome}`
                 : '—',
             periodo: `${this.fmt(a.dataInicio)} a ${this.fmt(a.dataFim)}`,
             tipo: `${a.tipoOcorrenciaCodigo} — ${a.tipoOcorrenciaNome}`,

@@ -40,6 +40,8 @@ export class EscalasApiService {
     pageSize?: number;
     search?: string;
     escopo?: 'setor' | 'institucional';
+    sort?: string;
+    dir?: 'asc' | 'desc';
   }): Observable<PagedEscalas> {
     let httpParams = new HttpParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -84,6 +86,9 @@ export class EscalasApiService {
     mes: number;
     servidorIds: string[];
     excluirEscalaId?: string;
+    /** Lotação da escala sendo montada — outras versões dela no mesmo mês não conflitam. */
+    setorId?: string;
+    nucleoId?: string;
   }): Observable<ConflitoServidor[]> {
     return this.http.post<ConflitoServidor[]>(`${this.base}/api/escalas/conflitos-servidores`, payload);
   }

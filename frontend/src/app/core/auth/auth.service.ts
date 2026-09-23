@@ -143,7 +143,13 @@ export class AuthService {
     nucleoId?: string | null,
   ): boolean {
     if (setorId) {
-      return this.canAccess(permissao, setorId);
+      // Chefe de núcleo gerencia os setores que o núcleo engloba mesmo sem chefia direta deles
+      // — mesma regra do backend (`EscalaService.CanMutate`/`CanView`). Sem isto, a tela negava
+      // ao chefe de núcleo uma ação que a API aceitaria.
+      return (
+        this.canAccess(permissao, setorId) ||
+        (this.hasPermission(permissao) && this.gerenciaSetorViaNucleo(setorId))
+      );
     }
     if (nucleoId) {
       return this.isChefeNucleo(nucleoId) || (this.hasVisaoGlobal(modulo) && this.hasPermission(permissao));
@@ -167,6 +173,11 @@ export class AuthService {
   isChefeNucleo(nucleoId?: string): boolean {
     const ids = this.currentUserSignal()?.nucleosGerenciadosIds ?? [];
     return nucleoId ? ids.includes(nucleoId) : ids.length > 0;
+  }
+
+  /** Setor pertence a um núcleo que o usuário chefia (espelha `ActorContext.GerenciaSetorViaNucleo`). */
+  gerenciaSetorViaNucleo(setorId: string): boolean {
+    return (this.currentUserSignal()?.setoresDosNucleosGerenciadosIds ?? []).includes(setorId);
   }
 
   /** Chefe do setor informado (ou de algum setor, se omitido) — habilita o passo opcional de

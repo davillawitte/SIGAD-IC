@@ -23,10 +23,17 @@ public class EscalaConfiguration : IEntityTypeConfiguration<Escala>
         builder.Ignore(x => x.DataInicio);
         builder.Ignore(x => x.DataFim);
 
+        // Só escala PUBLICADA ocupa o mês: rascunhos/finalizadas do mesmo setor/núcleo+mês podem
+        // coexistir (versões montadas antes de publicar a que vale) — mesma regra de
+        // `EscalaService.CreateAsync`/`CopiarAsync`/`PublicarAsync`.
         builder.HasIndex(x => x.SetorId);
-        builder.HasIndex(x => new { x.SetorId, x.Ano, x.Mes }).IsUnique();
+        builder.HasIndex(x => new { x.SetorId, x.Ano, x.Mes })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Publicada'");
         builder.HasIndex(x => x.NucleoId);
-        builder.HasIndex(x => new { x.NucleoId, x.Ano, x.Mes }).IsUnique();
+        builder.HasIndex(x => new { x.NucleoId, x.Ano, x.Mes })
+            .IsUnique()
+            .HasFilter("\"Status\" = 'Publicada'");
         builder.HasIndex(x => x.Status);
 
         builder.HasOne(x => x.Setor)

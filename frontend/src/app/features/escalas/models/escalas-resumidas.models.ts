@@ -96,6 +96,10 @@ export interface EscalaResumidaServidorElegivel {
   matricula: string;
   setorId?: string | null;
   setorNome?: string | null;
+  cargoCodigo?: string | null;
+  cargoNome?: string | null;
+  /** Perito criminal — o grupo "Agentes" é dos servidores que não são peritos. */
+  ehPerito?: boolean;
 }
 
 export interface EscalaResumidaAnteriorInfo {

@@ -10,7 +10,8 @@ namespace TemplateSistema.Infrastructure.Services;
 /// <summary>
 /// Gera o Excel "resumido" (auxílio-alimentação) de uma escala: por servidor, cargo/matrícula/
 /// núcleo/setor, quantidade e valor do auxílio (cada plantão de 24h vale 3 unidades, cada
-/// plantão de 12h vale 2 — R$ 20,00 cada), e a sequência cronológica dos dias de plantão do mês,
+/// plantão de 12h vale 2 — R$ 20,00 cada; teletrabalho de 12h conta como plantão de 12h), e a
+/// sequência cronológica dos dias de plantão do mês,
 /// com férias/licenças (FR/LM/LO/LP) ocupando uma posição na mesma sequência quando caem num dia
 /// que substituiria um plantão (destacadas em amarelo, com legenda dos códigos no fim da planilha).
 /// </summary>
@@ -21,6 +22,13 @@ public class EscalaCsvService(IEscalaService escalaService, ApplicationDbContext
     private const int UnidadesPorPlantao12h = 2;
 
     private static readonly string[] CodigosAfastamento = ["FR", "LM", "LO", "LP"];
+
+    /// <summary>Jornadas de 12h que geram auxílio: plantão diurno/noturno e o teletrabalho de
+    /// 12h (TL12), que vale o mesmo — 2 unidades. Teletrabalho de 6h (TL6) não entra.</summary>
+    private static readonly string[] Codigos12hComAuxilio = ["PD", "PN", "TL12"];
+
+    private static bool EhJornada12h(string codigo) =>
+        Codigos12hComAuxilio.Any(c => IsCodigo(codigo, c));
 
     private static readonly (string Nome, string Descricao)[] LegendaAfastamento =
     [
@@ -304,7 +312,7 @@ public class EscalaCsvService(IEscalaService escalaService, ApplicationDbContext
         var ocorrencias = s.Ocorrencias.OrderBy(o => o.Data).ToList();
 
         var qtd24h = ocorrencias.Count(o => IsCodigo(o.TipoOcorrenciaCodigo, "PT"));
-        var qtd12h = ocorrencias.Count(o => IsCodigo(o.TipoOcorrenciaCodigo, "PD") || IsCodigo(o.TipoOcorrenciaCodigo, "PN"));
+        var qtd12h = ocorrencias.Count(o => EhJornada12h(o.TipoOcorrenciaCodigo));
         var unidades = qtd24h * UnidadesPorPlantao24h + qtd12h * UnidadesPorPlantao12h;
 
         var temAfastamento = ocorrencias.Any(o => CodigosAfastamento.Any(c => IsCodigo(o.TipoOcorrenciaCodigo, c)));
@@ -330,7 +338,7 @@ public class EscalaCsvService(IEscalaService escalaService, ApplicationDbContext
                 continue;
             }
 
-            if (IsCodigo(o.TipoOcorrenciaCodigo, "PD") || IsCodigo(o.TipoOcorrenciaCodigo, "PN"))
+            if (EhJornada12h(o.TipoOcorrenciaCodigo))
             {
                 dias12h.Add(o.Data.Day.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 continue;

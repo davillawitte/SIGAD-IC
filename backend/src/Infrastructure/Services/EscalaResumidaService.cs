@@ -651,6 +651,7 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
         var servidores = await db.Servidores
             .AsNoTracking()
             .Include(x => x.Setor)
+            .Include(x => x.Cargo)
             .Where(x => x.Status == StatusServidor.Ativo
                 && (setorId.HasValue
                     ? x.SetorId == setorId.Value
@@ -659,7 +660,15 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             .ToListAsync(cancellationToken);
 
         return servidores
-            .Select(x => new EscalaResumidaServidorElegivelDto(x.Id, x.Nome, x.Matricula, x.SetorId, x.Setor?.Nome))
+            .Select(x => new EscalaResumidaServidorElegivelDto(
+                x.Id,
+                x.Nome,
+                x.Matricula,
+                x.SetorId,
+                x.Setor?.Nome,
+                x.Cargo?.Codigo,
+                x.Cargo?.Nome,
+                CargoCodes.EhPeritoCriminal(x.Cargo?.Codigo)))
             .ToList();
     }
 
@@ -1043,12 +1052,15 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);
 
+    /// <summary>
+    /// Mesma regra da escala normal (<c>EscalaService.CanMutate</c>): alterar exige chefia do
+    /// setor (direta ou via núcleo) ou do núcleo. Ver/exportar continua liberado pra visão
+    /// institucional em <see cref="CanView"/>.
+    /// </summary>
     private static bool CanMutate(ActorContext actor, Guid? nucleoId, Guid? setorId) =>
         setorId is Guid s
-            ? actor.PodeAcessar(PermissionCodes.EscalasEditar, s) || actor.GerenciaSetorViaNucleo(s)
-            : nucleoId is Guid n
-                && (actor.GerenciaNucleo(n)
-                    || (actor.TemVisaoGlobal(PermissionModules.Escalas) && actor.TemPermissao(PermissionCodes.EscalasEditar)));
+            ? actor.SetoresGerenciadosIds.Contains(s) || actor.GerenciaSetorViaNucleo(s)
+            : nucleoId is Guid n && actor.GerenciaNucleo(n);
 
     private static bool CanView(ActorContext actor, Guid? nucleoId, Guid? setorId) =>
         CanMutate(actor, nucleoId, setorId)

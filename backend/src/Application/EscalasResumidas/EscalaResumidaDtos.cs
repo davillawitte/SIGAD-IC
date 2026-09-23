@@ -86,12 +86,17 @@ public record EscalaResumidaDiaDto(
 
 /// <summary>Pool de servidores elegíveis pra rodízio do núcleo: chefe do núcleo, servidores
 /// lotados direto no núcleo, e servidores de qualquer setor que o núcleo engloba.</summary>
+/// <summary><c>EhPerito</c> separa perito criminal dos demais cargos: o grupo "Agentes" da
+/// escala resumida é dos servidores que não são peritos.</summary>
 public record EscalaResumidaServidorElegivelDto(
     Guid Id,
     string Nome,
     string Matricula,
     Guid? SetorId,
-    string? SetorNome);
+    string? SetorNome,
+    string? CargoCodigo = null,
+    string? CargoNome = null,
+    bool EhPerito = false);
 
 /// <summary>Exatamente um entre <paramref name="NucleoId"/> e <paramref name="SetorId"/>
 /// deve vir preenchido — ver <see cref="TemplateSistema.Domain.Entities.EscalaResumida"/>.</summary>

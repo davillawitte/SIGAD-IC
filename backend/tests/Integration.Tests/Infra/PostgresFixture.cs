@@ -47,7 +47,7 @@ public sealed class PostgresFixture : IAsyncLifetime
             .UseNpgsql(ConnectionStringFor(database, pooling))
             .Options;
 
-    private string ConnectionStringFor(string database, bool pooling) =>
+    internal string ConnectionStringFor(string database, bool pooling) =>
         new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
         {
             Database = database,
@@ -66,4 +66,12 @@ public sealed class PostgresFixture : IAsyncLifetime
 public sealed class TestDatabase(PostgresFixture fixture, string database)
 {
     public ApplicationDbContext CreateContext() => new(fixture.BuildOptions(database));
+
+    /// <summary>
+    /// Cada banco de teste tem o próprio pool do Npgsql, que segura conexões ociosas por minutos.
+    /// Sem liberar ao fim do teste, a suíte soma um pool por teste e estoura o
+    /// <c>max_connections</c> (100) do Postgres ("53300: too many clients already").
+    /// </summary>
+    public void LiberarConexoes() =>
+        NpgsqlConnection.ClearPool(new NpgsqlConnection(fixture.ConnectionStringFor(database, pooling: true)));
 }

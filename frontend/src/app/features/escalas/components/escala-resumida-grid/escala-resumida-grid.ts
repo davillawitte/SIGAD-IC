@@ -148,14 +148,15 @@ export class EscalaResumidaGrid {
 
   /** Opções da segunda pessoa: qualquer servidor elegível do núcleo (não precisa já estar no
    * pool de rodízio desta equipe — é um reforço avulso) mais "DO", exceto quem já é a pessoa
-   * principal do dia. */
+   * principal do dia. Só aparece no grupo "Agentes" (ver template), que é dos servidores que
+   * não são peritos — por isso perito fica de fora da lista. */
   segundaPessoaOptions(equipe: EscalaResumidaEquipe, day: string): PciSelectOption[] {
     const principal = this.currentValue(equipe, day);
     return [
       { label: '—', value: '' },
       { label: 'DO', value: DO_VALUE },
       ...this.elegiveis()
-        .filter((s) => s.id !== principal)
+        .filter((s) => s.id !== principal && !s.ehPerito)
         .map((s) => ({
           label: s.nome,
           value: s.id,

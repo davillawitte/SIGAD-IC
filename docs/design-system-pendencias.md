@@ -141,6 +141,16 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
   `this.feedback.showSuccess(...).subscribe(() => this.perguntarCriarUsuario(created))` e remover
   o `feedbackClosed$`/`toObservable` manual.
 
+## Ícones ausentes: permuta e valor financeiro
+
+- **O quê**: `PciIconName` não tem ícone de troca/permuta (`repeat`, `exchange`, `swap`) nem de
+  valor financeiro (`dollar-sign`, `coins`, `wallet`).
+- **Onde**: menu lateral (`layout/main-layout/main-layout.component.ts`) — itens "Permutas" e
+  "Diárias Operacionais" nas seções Área do Servidor, Gestão do Setor e Gestão Institucional.
+- **Workaround**: `refresh` para Permutas e `credit-card` para Diárias Operacionais.
+- **Spec pra portar**: acrescentar ao pacote `repeat` (duas setas em ciclo, como o "repeat" do
+  Lucide) e `dollar-sign`/`coins`; depois trocar os dois ícones no menu.
+
 ## Como usar este documento
 
 Sempre que algo for implementado localmente por falta de suporte no design system, registrar

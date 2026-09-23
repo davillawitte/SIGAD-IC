@@ -221,12 +221,16 @@ public record CopiarEscalaRequest(int Ano, int Mes, bool SobrescreverManuais = f
 
 /// <summary>Checagem pró-ativa (antes de salvar) de que nenhum servidor selecionado já está em
 /// outra escala (por setor ou núcleo) no mesmo período. Escala resumida não entra nessa
-/// checagem — é só planejamento/visualização, não gera nem sofre conflito.</summary>
+/// checagem — é só planejamento/visualização, não gera nem sofre conflito. <c>SetorId</c>/
+/// <c>NucleoId</c> = lotação da escala sendo montada: outras versões dela no mesmo mês não
+/// contam como conflito.</summary>
 public record CheckConflitosServidoresRequest(
     int Ano,
     int Mes,
     IReadOnlyList<Guid> ServidorIds,
-    Guid? ExcluirEscalaId = null);
+    Guid? ExcluirEscalaId = null,
+    Guid? SetorId = null,
+    Guid? NucleoId = null);
 
 /// <summary>Um servidor já escalado em outro lugar no mesmo período — <c>Origem</c> identifica
 /// onde (setor/núcleo da escala), pra quem vê o erro saber exatamente aonde ir resolver o
@@ -305,4 +309,11 @@ public record EscalaListQuery : PaginationQuery
     /// <c>institucional</c>: demais setores, quando há visão global (Gestão Institucional).
     /// </summary>
     public string? Escopo { get; init; }
+
+    /// <summary>Coluna de ordenação: <c>periodo</c> (padrão), <c>setor</c>, <c>status</c>,
+    /// <c>publicadaEm</c> ou <c>criadoEm</c>.</summary>
+    public string? Sort { get; init; }
+
+    /// <summary><c>asc</c> ou <c>desc</c> (padrão).</summary>
+    public string? Dir { get; init; }
 }

@@ -11,6 +11,9 @@ namespace TemplateSistema.Infrastructure.Services;
 /// servidor pode estar no rodízio de uma escala resumida e, ao mesmo tempo, numa escala real
 /// de outro setor, sem conflito. Só a escala de verdade (por setor ou núcleo) é considerada
 /// aqui.
+/// Outras versões da MESMA lotação (rascunhos/finalizadas do mesmo setor ou núcleo no mesmo mês)
+/// também não conflitam: são alternativas da mesma escala, montadas antes de publicar a que vale
+/// (só a publicada ocupa o mês — ver índice filtrado em <c>EscalaConfiguration</c>).
 /// </summary>
 public static class EscalaConflitoChecker
 {
@@ -20,6 +23,8 @@ public static class EscalaConflitoChecker
         int ano,
         int mes,
         Guid? excluirEscalaId,
+        Guid? setorId,
+        Guid? nucleoId,
         CancellationToken cancellationToken)
     {
         if (servidorIds.Count == 0)
@@ -32,7 +37,9 @@ public static class EscalaConflitoChecker
             .Where(x => servidorIds.Contains(x.ServidorId)
                 && x.Escala.Ano == ano
                 && x.Escala.Mes == mes
-                && x.EscalaId != excluirEscalaId)
+                && x.EscalaId != excluirEscalaId
+                && !(setorId != null && x.Escala.SetorId == setorId)
+                && !(nucleoId != null && x.Escala.NucleoId == nucleoId))
             .Select(x => new
             {
                 x.ServidorId,

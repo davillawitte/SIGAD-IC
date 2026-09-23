@@ -1,9 +1,18 @@
 import { Routes } from '@angular/router';
 
-import { permissionGuard } from '../../core/auth/auth.guard';
+import { authGuard, permissionGuard } from '../../core/auth/auth.guard';
 import { escalaFormCanDeactivate } from './escala-form.guard';
 
 export const ESCALAS_ROUTES: Routes = [
+  {
+    // Área do Servidor: acesso mínimo de qualquer servidor autenticado — não exige
+    // `escalas.listar`, que é a permissão da gestão (escalas do setor/instituição).
+    path: 'minhas-escalas',
+    canActivate: [authGuard],
+    data: { navId: 'minhas-escalas' },
+    loadComponent: () =>
+      import('./pages/minhas-escalas-list/minhas-escalas-list').then((m) => m.MinhasEscalasList),
+  },
   {
     path: 'escalas',
     canActivate: [permissionGuard('escalas.listar')],

@@ -1,0 +1,13 @@
+<section class="em-desenvolvimento">
+  <pci-page-header [title]="titulo()" [description]="descricao()" />
+
+  <pci-alert
+    variant="info"
+    title="Funcionalidade em desenvolvimento"
+    [message]="
+      previsao()
+        ? previsao() + ' Esta tela ainda não está disponível.'
+        : 'Esta tela ainda não está disponível. Ela será liberada em uma próxima versão do sistema.'
+    "
+  />
+</section>

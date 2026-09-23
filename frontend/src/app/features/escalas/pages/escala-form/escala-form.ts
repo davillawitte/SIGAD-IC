@@ -31,6 +31,7 @@ import { catchError, debounceTime, map, switchMap, tap } from 'rxjs/operators';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { AdminApiService } from '../../../admin/services/admin-api.service';
 import type { NucleoListItem, ServidorListItem, SetorListItem } from '../../../admin/models/admin.models';
+import { httpErrorMessage } from '../../../../shared/http-error';
 import { EscalaResumidaManager } from '../../components/escala-resumida-manager/escala-resumida-manager';
 import { EscalasResumidasApiService } from '../../services/escalas-resumidas-api.service';
 import type { EscalaResumidaDetail } from '../../models/escalas-resumidas.models';
@@ -150,13 +151,17 @@ export class EscalaForm implements OnInit {
 
   /** Capturado na criação — `getCurrentNavigation()` só funciona durante a construção. */
   private readonly initialNavState = this.router.getCurrentNavigation()?.extras.state as
-    | { openStep?: number; abrirResumida?: boolean }
+    | { openStep?: number; abrirResumida?: boolean; origemPeriodo?: { ano: number; mes: number } }
     | undefined;
   private readonly initialOpenStep: WizardStep =
     this.initialNavState?.openStep === 2 ? 'servidores' : 'afastamentos';
   /** Só relevante quando `initialOpenStep === 3` — veio de `copiarOrigem` com o checkbox de
    * escala resumida marcado; abre o painel antes de mostrar o passo 3. */
   private readonly initialAbrirResumida = !!this.initialNavState?.abrirResumida;
+  /** Período da escala copiada — usado pra achar a escala resumida da origem e trazê-la junto
+   * (copiar escala sem copiar a resumida fazia o wizard adotar, calado, qualquer resumida solta
+   * que existisse no mês de destino, de outra ocasião). */
+  private readonly initialOrigemPeriodo = this.initialNavState?.origemPeriodo ?? null;
 
   readonly routePages = ESCALAS_ROUTE_PAGES;
 
@@ -234,11 +239,14 @@ export class EscalaForm implements OnInit {
     return value.slice(EscalaForm.NUCLEO_OPTION_PREFIX.length);
   }
 
-  /** Escala sendo criada tem dono núcleo (não setor) — esconde "Copiar escala existente" e
-   * muda o pool de servidores do passo 2 pra todo o núcleo. */
+  /** Escala sendo criada tem dono núcleo (não setor) — muda o pool de servidores do passo 2
+   * pra todo o núcleo (copiar escala existente vale para os dois casos, ver
+   * `loadOrigensDisponiveis`). */
   readonly escalaDeNucleo = computed(() => this.isNucleoOption(this.setorIdValue()));
 
   readonly origemOptions = signal<PciSelectOption[]>([]);
+  /** Período (ano/mês) de cada escala oferecida em "Copiar escala existente". */
+  private readonly origemPeriodos = new Map<string, { ano: number; mes: number }>();
   readonly origemEscalaId = signal('');
   readonly usarEscalaResumida = signal(false);
 
@@ -295,6 +303,7 @@ export class EscalaForm implements OnInit {
   readonly resumidaWorking = signal(false);
   readonly resumidaEscala = signal<EscalaResumidaDetail | null>(null);
   readonly resumidaAnteriorId = signal<string | null>(null);
+
   readonly resumidaAnteriorLabel = signal<string | null>(null);
   /** true só quando a resumida foi CRIADA por esta sessão do wizard (`criarResumidaDoZero`/
    * `copiarResumidaAnterior`) — não quando reaproveitada de um núcleo/período que já tinha
@@ -303,6 +312,12 @@ export class EscalaForm implements OnInit {
    * wizard sem salvar a escala normal como rascunho (ver `cleanupResumidaOrfa$`) — nunca se
    * aplica a uma resumida que já pertencia a outra escala. */
   readonly resumidaCriadaNestaSessao = signal(false);
+  /** Na escala resumida, servidores da lotação desta escala só podem entrar no rodízio se
+   * foram selecionados no passo 2 (ver `EscalaResumidaManager.restricaoServidores`). */
+  readonly restricaoServidoresResumida = computed(() => ({
+    pool: new Set(this.servidoresSetor().map((s) => s.id)) as ReadonlySet<string>,
+    selecionados: this.selectedServidorIds() as ReadonlySet<string>,
+  }));
   /** Ciclo pessoal derivado do rodízio da escala resumida por servidor (posição no pool +
    * âncora) — separado de `servidorRegimes` porque o tamanho do pool é arbitrário e não
    * corresponde a nenhum dos 4 `RegimeCodigo` fixos. */
@@ -343,6 +358,9 @@ export class EscalaForm implements OnInit {
   );
   readonly servidoresSetor = signal<ServidorListItem[]>([]);
   private lastAppliedRegimesFingerprint = '';
+  /** Rodízio da escala resumida reaplicado desde o último rascunho local — força regerar as
+   * ocorrências em `enterStep3` mesmo sem mudança de regime. */
+  private draftDesatualizadoPelaResumida = false;
   readonly selectedServidorIds = signal<Set<string>>(new Set());
   /** Cards com o bloco de "Expediente tarde" expandido, no passo 2 — só controla exibição,
    * não afeta os dados salvos. */
@@ -717,8 +735,8 @@ export class EscalaForm implements OnInit {
             this.feedback.showSuccess('Rascunho salvo com sucesso.');
           }),
           map(() => true),
-          catchError((err: { error?: { message?: string } }) => {
-            this.fail(err.error?.message ?? 'Não foi possível salvar o rascunho.');
+          catchError((err: unknown) => {
+            this.fail(httpErrorMessage(err, 'Não foi possível salvar o rascunho.'));
             return of(false);
           }),
         );
@@ -837,29 +855,39 @@ export class EscalaForm implements OnInit {
         this.skipDeactivateGuard = true;
         void this.router.navigate(['/escalas', escala.id, 'editar'], {
           replaceUrl: true,
-          state: { openStep: 3, abrirResumida },
+          state: { openStep: 3, abrirResumida, origemPeriodo: this.origemPeriodos.get(origemId) },
         });
       },
-      error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
+      error: (err: unknown) => this.fail(httpErrorMessage(err)),
     });
   }
 
   private loadOrigensDisponiveis(): void {
     const setorId = this.step1Form.getRawValue().setorId;
-    // Copiar uma escala existente só faz sentido pra uma escala de setor — uma escala de
-    // núcleo não tem de onde copiar (é o próprio conceito novo).
-    if (!setorId || this.isNucleoOption(setorId)) {
+    if (!setorId) {
       this.origemOptions.set([]);
       this.step1Form.controls.origemEscalaId.setValue('', { emitEvent: false });
       this.origemEscalaId.set('');
       return;
     }
 
-    this.api.list({ setorId, page: 1, pageSize: 100 }).subscribe({
+    // Escala de núcleo copia de outra escala do MESMO núcleo (mesma lotação da origem, que é
+    // o que `CopiarAsync` reaproveita) — não das escalas dos setores que o compõem.
+    const lotacao = this.isNucleoOption(setorId)
+      ? { nucleoId: this.extractNucleoId(setorId) }
+      : { setorId };
+
+    // Só escala publicada serve de origem (mesma regra do backend em `CopiarAsync`):
+    // rascunho/finalizada ainda está em montagem e pode mudar ou ser descartada.
+    this.api.list({ ...lotacao, status: 'Publicada', page: 1, pageSize: 100 }).subscribe({
       next: (result) => {
         const items = [...(result.items ?? [])].sort((a, b) =>
           b.ano !== a.ano ? b.ano - a.ano : b.mes - a.mes,
         );
+        this.origemPeriodos.clear();
+        for (const item of items) {
+          this.origemPeriodos.set(item.id, { ano: item.ano, mes: item.mes });
+        }
         this.origemOptions.set([
           { label: 'Não copiar — Criar integralmente', value: '' },
           ...items.map((item) => this.toOrigemOption(item)),
@@ -882,7 +910,7 @@ export class EscalaForm implements OnInit {
 
   private sugerirOrigemAnterior(items?: EscalaListItem[]): void {
     const v = this.step1Form.getRawValue();
-    if (!v.setorId || !v.mes || !v.ano || this.isNucleoOption(v.setorId)) return;
+    if (!v.setorId || !v.mes || !v.ano) return;
     if (this.step1Form.controls.origemEscalaId.dirty) return;
 
     const apply = (id: string | null | undefined) => {
@@ -902,7 +930,10 @@ export class EscalaForm implements OnInit {
       }
     }
 
-    this.api.getEscalaAnterior({ setorId: v.setorId }, Number(v.ano), Number(v.mes)).subscribe({
+    const lotacao = this.isNucleoOption(v.setorId)
+      ? { nucleoId: this.extractNucleoId(v.setorId) }
+      : { setorId: v.setorId };
+    this.api.getEscalaAnterior(lotacao, Number(v.ano), Number(v.mes)).subscribe({
       next: (info) => apply(info?.id),
       error: () => undefined,
     });
@@ -1229,6 +1260,9 @@ export class EscalaForm implements OnInit {
         mes: Number(v.mes),
         servidorIds: Array.from(this.selectedServidorIds()),
         excluirEscalaId: this.escala()?.id || undefined,
+        ...(this.isNucleoOption(v.setorId)
+          ? { nucleoId: this.extractNucleoId(v.setorId) }
+          : { setorId: v.setorId || undefined }),
       })
       .subscribe({
         next: (conflitos) => {
@@ -1267,34 +1301,124 @@ export class EscalaForm implements OnInit {
     mes: number,
   ): void {
     this.resumidaWorking.set(true);
-    this.resumidaApi.list({ ...container, ano, mes, pageSize: 1 }).subscribe({
-      next: (result) => {
-        this.resumidaWorking.set(false);
-        const existente = result.items[0];
-        if (existente) {
-          this.resumidaApi.get(existente.id).subscribe({ next: (e) => this.resumidaEscala.set(e) });
+    const origemPeriodo = this.initialOrigemPeriodo;
+    const resumidaDaOrigem$ = origemPeriodo
+      ? this.resumidaApi
+          .list({ ...container, ano: origemPeriodo.ano, mes: origemPeriodo.mes, pageSize: 1 })
+          .pipe(
+            map((r) => r.items[0] ?? null),
+            catchError(() => of(null)),
+          )
+      : of(null);
+
+    forkJoin({
+      destino: this.resumidaApi.list({ ...container, ano, mes, pageSize: 1 }),
+      origem: resumidaDaOrigem$,
+    }).subscribe({
+      next: ({ destino, origem }) => {
+        const existente = destino.items[0];
+        if (!existente) {
+          this.resumidaWorking.set(false);
+          this.resumidaEscala.set(null);
+          // Veio de uma cópia: a resumida da origem acompanha a escala, sem perguntar nada.
+          if (origem) {
+            this.copiarResumida(origem.id, 'origem');
+            return;
+          }
+          this.oferecerResumidaAnterior(container, ano, mes);
           return;
         }
-        this.resumidaEscala.set(null);
-        this.resumidaApi.getAnterior(container, ano, mes).subscribe({
-          next: (info) => {
-            if (!info?.id) {
-              // Sem escala resumida anterior pra copiar: já se sabe (pelo checkbox do passo 1)
-              // que o usuário quer escala resumida — cria do zero direto, sem perguntar de novo.
-              this.resumidaAnteriorId.set(null);
-              this.criarResumidaDoZero();
+
+        this.resumidaApi.get(existente.id).subscribe({
+          next: (detalhe) => {
+            this.resumidaWorking.set(false);
+            // Resumida solta no mês de destino (sem escala vinculada) é rascunho de outra
+            // ocasião: a cópia manda, e a solta é descartada pra não voltar com equipes e
+            // pessoas que não têm relação com a escala copiada. Se estiver vinculada a uma
+            // escala, é a resumida compartilhada com outro setor do núcleo — essa fica.
+            if (origem && origem.id !== detalhe.id && !detalhe.escalaId) {
+              this.substituirResumidaSolta(detalhe.id, origem.id);
               return;
             }
-            this.resumidaAnteriorId.set(info.id);
-            this.resumidaAnteriorLabel.set(info.identificacao ?? null);
+            this.resumidaEscala.set(detalhe);
+            this.manterResumidaNoWizard();
           },
-          error: () => {
-            this.resumidaAnteriorId.set(null);
-            this.criarResumidaDoZero();
-          },
+          error: () => this.resumidaWorking.set(false),
         });
       },
       error: () => this.resumidaWorking.set(false),
+    });
+  }
+
+  /** Sem resumida no mês de destino e sem cópia: oferece a do mês anterior (ou cria do zero). */
+  private oferecerResumidaAnterior(
+    container: { nucleoId: string } | { setorId: string },
+    ano: number,
+    mes: number,
+  ): void {
+    this.resumidaApi.getAnterior(container, ano, mes).subscribe({
+      next: (info) => {
+        if (!info?.id) {
+          // Sem escala resumida anterior pra copiar: já se sabe (pelo checkbox do passo 1)
+          // que o usuário quer escala resumida — cria do zero direto, sem perguntar de novo.
+          this.resumidaAnteriorId.set(null);
+          this.criarResumidaDoZero();
+          return;
+        }
+        this.resumidaAnteriorId.set(info.id);
+        this.resumidaAnteriorLabel.set(info.identificacao ?? null);
+      },
+      error: () => {
+        this.resumidaAnteriorId.set(null);
+        this.criarResumidaDoZero();
+      },
+    });
+  }
+
+  /** Descarta a resumida solta do mês de destino e põe no lugar a cópia da escala de origem. */
+  private substituirResumidaSolta(soltaId: string, origemId: string): void {
+    this.resumidaWorking.set(true);
+    this.resumidaApi.delete(soltaId).subscribe({
+      next: () => this.copiarResumida(origemId, 'origem'),
+      // Não conseguir apagar a solta não pode travar o fluxo: segue com ela mesma.
+      error: () => {
+        this.resumidaWorking.set(false);
+        this.resumidaApi.get(soltaId).subscribe({
+          next: (e) => {
+            this.resumidaEscala.set(e);
+            this.manterResumidaNoWizard();
+          },
+        });
+      },
+    });
+  }
+
+  private copiarResumida(origemId: string, tipo: 'origem' | 'anterior'): void {
+    const v = this.step1Form.getRawValue();
+    this.resumidaWorking.set(true);
+    this.resumidaApi.copiar(origemId, { ano: Number(v.ano), mes: Number(v.mes) }).subscribe({
+      next: (escala) => {
+        this.resumidaEscala.set(escala);
+        this.manterResumidaNoWizard();
+        this.resumidaCriadaNestaSessao.set(true);
+        this.resumidaWorking.set(false);
+        this.feedback.showSuccess(
+          tipo === 'origem'
+            ? 'Escala resumida copiada junto com a escala de origem.'
+            : 'Escala resumida copiada — os últimos 4 dias do mês anterior continuam o rodízio automaticamente.',
+        );
+      },
+      error: (err: unknown) => {
+        this.error.set(
+          httpErrorMessage(
+            err,
+            tipo === 'origem'
+              ? 'Não foi possível copiar a escala resumida da escala de origem.'
+              : 'Não foi possível copiar a escala resumida do mês anterior.',
+          ),
+        );
+        this.resumidaWorking.set(false);
+      },
     });
   }
 
@@ -1307,11 +1431,12 @@ export class EscalaForm implements OnInit {
     this.resumidaApi.create({ ...container, ano: Number(v.ano), mes: Number(v.mes) }).subscribe({
       next: (escala) => {
         this.resumidaEscala.set(escala);
+        this.manterResumidaNoWizard();
         this.resumidaCriadaNestaSessao.set(true);
         this.resumidaWorking.set(false);
       },
-      error: (err: { error?: { message?: string } }) => {
-        this.error.set(err.error?.message ?? 'Não foi possível criar a escala resumida.');
+      error: (err: unknown) => {
+        this.error.set(httpErrorMessage(err, 'Não foi possível criar a escala resumida.'));
         this.resumidaWorking.set(false);
       },
     });
@@ -1320,27 +1445,21 @@ export class EscalaForm implements OnInit {
   copiarResumidaAnterior(): void {
     const origemId = this.resumidaAnteriorId();
     if (!origemId) return;
-    const v = this.step1Form.getRawValue();
-
-    this.resumidaWorking.set(true);
-    this.resumidaApi.copiar(origemId, { ano: Number(v.ano), mes: Number(v.mes) }).subscribe({
-      next: (escala) => {
-        this.resumidaEscala.set(escala);
-        this.resumidaCriadaNestaSessao.set(true);
-        this.resumidaWorking.set(false);
-        this.feedback.showSuccess(
-          'Escala resumida copiada — os últimos 4 dias do mês anterior continuam o rodízio automaticamente.',
-        );
-      },
-      error: (err: { error?: { message?: string } }) => {
-        this.error.set(err.error?.message ?? 'Não foi possível copiar a escala resumida do mês anterior.');
-        this.resumidaWorking.set(false);
-      },
-    });
+    this.copiarResumida(origemId, 'anterior');
   }
 
   voltarResumida(): void {
     this.voltarStep('servidores');
+  }
+
+  /** A escala resumida em uso mantém o checkbox do passo 1 marcado — é ele que sustenta
+   * `resumidaAtiva()` e, com ele, o passo "Escala Resumida" no stepper. Sem isso, voltar da
+   * resumida pro passo de servidores fazia o passo desaparecer e "Continuar" pulava direto pra
+   * escala definitiva, mesmo numa escala copiada que já tem resumida. */
+  private manterResumidaNoWizard(): void {
+    if (!this.step1Form.controls.usarEscalaResumida.value) {
+      this.step1Form.controls.usarEscalaResumida.setValue(true);
+    }
   }
 
   /** Qualquer edição real na escala resumida (setores, equipes, rodízio, célula) invalida as
@@ -1365,11 +1484,15 @@ export class EscalaForm implements OnInit {
     this.enterStep3();
   }
 
-  /** Deriva sugestões de servidor+regime pro passo seguinte a partir do rodízio configurado
-   * na escala resumida (equipes do setor sendo criado) — o usuário só revisa/ajusta em vez de
-   * montar tudo do zero. Só considera equipes do PRÓPRIO setor desta escala (uma escala
-   * resumida de núcleo pode incluir outros setores, mas cada um recebe sua sugestão quando a
-   * própria escala daquele setor for criada/editada). */
+  /** Deriva o ciclo de cada servidor do passo 2 a partir do rodízio configurado na escala
+   * resumida (equipes do setor sendo criado). Quem entra na escala é SEMPRE quem foi
+   * selecionado no passo 2 — a resumida não adiciona ninguém: senão um servidor desmarcado ali
+   * (ex.: por já estar em outra escala no mês) voltava pela resumida, pulando a checagem de
+   * conflito. O mapa de ciclos é recalculado do zero a cada aplicação, então quem saiu do
+   * rodízio perde o ciclo derivado e volta a seguir o regime escolhido no passo 2. Só considera
+   * equipes do PRÓPRIO setor desta escala (uma escala resumida de núcleo pode incluir outros
+   * setores, mas cada um recebe sua sugestão quando a própria escala daquele setor for
+   * criada/editada). */
   private aplicarSugestoesDeResumida(): void {
     const resumida = this.resumidaEscala();
     const setorId = this.step1Form.getRawValue().setorId;
@@ -1380,16 +1503,14 @@ export class EscalaForm implements OnInit {
     const setores = this.escalaDeNucleo()
       ? resumida.setores
       : resumida.setores.filter((s) => s.setorId === setorId);
-    if (setores.length === 0) return;
 
     const inicioEscala = normalizeDay(resumida.dataInicio);
     const poolServidores = new Set(this.servidoresSetor().map((s) => s.id));
-    const ciclos = new Map(this.servidorCicloResumida());
+    const selecionados = this.selectedServidorIds();
+    const ciclos = new Map<string, { ancora: string; tamanhoPool: number }>();
     const iniciosCiclo = new Map(this.servidorInicioCiclo());
-    const ids = new Set(this.selectedServidorIds());
     const idsComCicloPersonalizado: string[] = [];
-    let novos = 0;
-    let algumMembroEncontrado = false;
+    const foraDoPasso2 = new Set<string>();
 
     for (const setor of setores) {
       for (const equipe of setor.equipes) {
@@ -1399,10 +1520,12 @@ export class EscalaForm implements OnInit {
 
         for (const membro of equipe.rotacao) {
           if (!membro.servidorId || !poolServidores.has(membro.servidorId)) continue;
+          if (!selecionados.has(membro.servidorId)) {
+            foraDoPasso2.add(membro.servidorId);
+            continue;
+          }
           const ancoraServidor = primeiraDataParaPosicao(inicioEscala, ancoraEquipe, tamanhoPool, membro.posicao);
           if (!ancoraServidor) continue;
-
-          algumMembroEncontrado = true;
 
           // Servidor com regime explícito escolhido no passo 2 que exige ciclo personalizado
           // (ex.: PT24_TL12, com TL12 na sequência) não pode ser gerado pelo caminho simples
@@ -1419,20 +1542,12 @@ export class EscalaForm implements OnInit {
           } else {
             ciclos.set(membro.servidorId, { ancora: ancoraServidor, tamanhoPool });
           }
-
-          if (!ids.has(membro.servidorId)) {
-            ids.add(membro.servidorId);
-            novos++;
-          }
         }
       }
     }
 
-    if (!algumMembroEncontrado) return;
-
     this.servidorCicloResumida.set(ciclos);
     this.servidorInicioCiclo.set(iniciosCiclo);
-    this.selectedServidorIds.set(ids);
     this.ensureRegimeControls();
     this.ensureInicioCicloControls();
     // `ensureInicioCicloControls` só cria o controle se ele ainda não existir — se o usuário já
@@ -1442,10 +1557,17 @@ export class EscalaForm implements OnInit {
     for (const id of idsComCicloPersonalizado) {
       this.inicioCicloForm.get(id)?.setValue(iniciosCiclo.get(id) ?? '', { emitEvent: false });
     }
+    // O rodízio mudou: o rascunho local precisa ser regerado no próximo `enterStep3` — sem
+    // isso, com regimes inalterados, as ocorrências antigas eram mantidas e a escala
+    // definitiva continuava mostrando o rodízio anterior (inclusive quem já tinha saído dele).
+    this.draftDesatualizadoPelaResumida = true;
     this.markDirty();
-    if (novos > 0) {
-      this.toast.showSuccess(
-        `${novos} servidor(es) da escala resumida pré-preenchido(s) nesta escala.`,
+    if (foraDoPasso2.size > 0) {
+      const nomes = [...foraDoPasso2].map(
+        (id) => this.servidoresSetor().find((s) => s.id === id)?.nome ?? id,
+      );
+      this.toast.showWarning(
+        `Fora desta escala (não selecionado(s) no passo de servidores): ${nomes.join(', ')}.`,
       );
     }
   }
@@ -1491,7 +1613,9 @@ export class EscalaForm implements OnInit {
       hasRegimeSelection &&
       (fingerprint !== this.lastAppliedRegimesFingerprint ||
         (current != null && current.tipoFuncionamento !== tipo));
-    const mustRegenerate = this.needsInicioCiclo() || regimesChanged;
+    const mustRegenerate =
+      this.needsInicioCiclo() || regimesChanged || this.draftDesatualizadoPelaResumida;
+    this.draftDesatualizadoPelaResumida = false;
 
     if (this.isEditMode() && current) {
       this.rebuildDraftFromSelection(current, {
@@ -1608,8 +1732,27 @@ export class EscalaForm implements OnInit {
     opts: { keepOcorrencias: boolean; tipoFuncionamento?: TipoFuncionamento },
   ): void {
     const days = daysInRange(base.dataInicio, base.dataFim);
-    const selected = this.servidoresSetor().filter((s) => this.selectedServidorIds().has(s.id));
     const existingById = new Map(base.servidores.map((s) => [s.servidorId, s]));
+    // Quem já está na escala mas não veio no pool do passo 2 (ex.: servidor de outro setor do
+    // núcleo que a lista carregada não trouxe) continua na escala: antes ele sumia do rascunho
+    // e o `syncServidores` do salvamento acabava removendo-o de vez.
+    const selected = [
+      ...this.servidoresSetor().filter((s) => this.selectedServidorIds().has(s.id)),
+      ...base.servidores
+        .filter(
+          (s) =>
+            this.selectedServidorIds().has(s.servidorId) &&
+            !this.servidoresSetor().some((p) => p.id === s.servidorId),
+        )
+        .map((s) => ({
+          id: s.servidorId,
+          cargoId: s.cargoId,
+          nome: s.servidorNome,
+          matricula: s.matricula,
+          cargo: s.cargoNome,
+          cargoCodigo: s.cargoCodigo,
+        })),
+    ];
     const tipo = opts.tipoFuncionamento ?? this.deriveTipoFuncionamento();
 
     const servidores: EscalaServidor[] = selected.map((s, index) => {
@@ -1974,8 +2117,8 @@ export class EscalaForm implements OnInit {
           URL.revokeObjectURL(url);
           this.feedback.showSuccess('PDF gerado com sucesso.');
         },
-        error: (err: { error?: { message?: string } }) => {
-          const msg = err.error?.message ?? 'Falha ao exportar PDF.';
+        error: (err: unknown) => {
+          const msg = httpErrorMessage(err, 'Falha ao exportar PDF.');
           this.error.set(msg);
           this.toast.showError(msg);
         },
@@ -1988,7 +2131,7 @@ export class EscalaForm implements OnInit {
     }
     this.persistDraft$().subscribe({
       next: (escala) => run(escala.id),
-      error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
+      error: (err: unknown) => this.fail(httpErrorMessage(err)),
     });
   }
 
@@ -2005,7 +2148,7 @@ export class EscalaForm implements OnInit {
         this.feedback.showSuccess('Rascunho salvo com sucesso.');
         void this.router.navigateByUrl('/escalas');
       },
-      error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
+      error: (err: unknown) => this.fail(httpErrorMessage(err)),
     });
   }
 
@@ -2019,7 +2162,7 @@ export class EscalaForm implements OnInit {
           this.feedback.showSuccess('Escala finalizada com sucesso.');
           void this.router.navigateByUrl('/escalas');
         },
-        error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
+        error: (err: unknown) => this.fail(httpErrorMessage(err)),
       });
   }
 

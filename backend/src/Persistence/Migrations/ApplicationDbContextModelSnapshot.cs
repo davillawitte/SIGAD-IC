@@ -228,10 +228,12 @@ namespace TemplateSistema.Persistence.Migrations
                     b.HasIndex("Status");
 
                     b.HasIndex("NucleoId", "Ano", "Mes")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Publicada'");
 
                     b.HasIndex("SetorId", "Ano", "Mes")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Publicada'");
 
                     b.ToTable("Escala", "public", t =>
                         {
