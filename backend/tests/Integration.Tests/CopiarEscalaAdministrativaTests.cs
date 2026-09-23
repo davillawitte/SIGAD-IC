@@ -134,17 +134,66 @@ public class CopiarEscalaAdministrativaTests(PostgresFixture fixture) : Integrat
         (await DatasAsync(copiaId, "FR")).ShouldBe([new DateOnly(Ano, Mes + 1, 8)]);
     }
 
+    /// <summary>
+    /// Escala administrativa real: a matriz inteira é gravada como manual (expediente M de seg a
+    /// sex, descanso D no fim de semana e home office TL6 em terça e quinta). Copiar pelo dia do
+    /// mês jogava o descanso de sábado para o meio da semana seguinte.
+    /// </summary>
     [Fact]
-    public async Task Home_office_nao_marca_fim_de_semana_nem_dia_sem_expediente()
+    public async Task Semana_inteira_da_escala_administrativa_e_reproduzida_no_mes_seguinte()
     {
         var ctx = await PrepararAsync();
-        await GerarExpedienteAsync(ctx.EscalaId, ctx.ServidorId);
-        // Sábado 5 de setembro: marcação avulsa, fora do expediente de seg a sex.
-        await LancarAsync(ctx.EscalaId, ctx.ServidorId, 5, "TL6");
+        var diasDoMes = DateTime.DaysInMonth(Ano, Mes);
+        for (var dia = 1; dia <= diasDoMes; dia++)
+        {
+            var data = new DateOnly(Ano, Mes, dia);
+            var codigo = data.DayOfWeek switch
+            {
+                DayOfWeek.Saturday or DayOfWeek.Sunday => "D",
+                DayOfWeek.Tuesday or DayOfWeek.Thursday => "TL6",
+                _ => "M",
+            };
+            await LancarAsync(ctx.EscalaId, ctx.ServidorId, dia, codigo);
+        }
 
         var copiaId = await CopiarParaOutubroAsync(ctx.EscalaId);
 
-        // Os sábados de outubro não têm expediente gerado, então não viram home office.
+        var grade = await GradeAsync(copiaId);
+        grade.Count.ShouldBe(DateTime.DaysInMonth(Ano, Mes + 1));
+        foreach (var (data, codigo) in grade)
+        {
+            var esperado = data.DayOfWeek switch
+            {
+                DayOfWeek.Saturday or DayOfWeek.Sunday => "D",
+                DayOfWeek.Tuesday or DayOfWeek.Thursday => "TL6",
+                _ => "M",
+            };
+            codigo.ShouldBe(esperado, $"{data:dd/MM} ({data.DayOfWeek})");
+        }
+    }
+
+    /// <summary>Dia da semana com códigos diferentes ao longo do mês: vale o mais frequente.</summary>
+    [Fact]
+    public async Task Marcacao_avulsa_nao_vira_a_regra_do_dia_da_semana()
+    {
+        var ctx = await PrepararAsync();
+        await GerarExpedienteAsync(ctx.EscalaId, ctx.ServidorId);
+        // Três quartas de expediente (2, 16 e 23) e uma única de home office (9).
+        await LancarAsync(ctx.EscalaId, ctx.ServidorId, 9, "TL6");
+
+        var copiaId = await CopiarParaOutubroAsync(ctx.EscalaId);
+
         (await DatasAsync(copiaId, "TL6")).ShouldBeEmpty();
+    }
+
+    private async Task<List<(DateOnly Data, string Codigo)>> GradeAsync(Guid escalaId)
+    {
+        await using var db = NewContext();
+        var itens = await db.EscalaOcorrencias
+            .Where(x => x.EscalaServidor.EscalaId == escalaId)
+            .OrderBy(x => x.Data)
+            .Select(x => new { x.Data, x.TipoOcorrenciaCodigo })
+            .ToListAsync();
+        return itens.Select(x => (x.Data, x.TipoOcorrenciaCodigo)).ToList();
     }
 }

@@ -1293,70 +1293,72 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
                 var manuais = src.Ocorrencias.Where(x => x.Origem == OrigemOcorrencia.Manual).ToList();
 
-                // Escala administrativa: marcação manual de TRABALHO (ex.: TL6 de home office) é
-                // um combinado semanal — "toda quinta" continua toda quinta no mês de destino, e
-                // não no mesmo dia do mês, que cairia em outro dia da semana. Folga avulsa, férias
-                // e licenças são datas específicas, então seguem pela data, como o resto.
+                // Escala administrativa é montada por dia da semana: expediente de seg a sex,
+                // descanso no fim de semana e home office em dias fixos (ex.: terça e quinta).
+                // Como o wizard grava a matriz inteira como manual, copiar pelo dia DO MÊS jogava
+                // o descanso de sábado para o meio da semana seguinte. Aqui a semana da origem é
+                // reproduzida no mês de destino: cada dia recebe o que aquele dia da semana tinha.
+                // Férias e licenças ficam de fora — são datas de processo e seguem pela data.
                 if (origem.TipoFuncionamento == TipoFuncionamento.Expediente)
                 {
-                    var semanais = manuais
+                    // A semana vem de TODAS as ocorrências da origem, não só das manuais: numa
+                    // escala com regime gerado, as outras quartas são ocorrências de regra, e
+                    // ignorá-las faria um home office avulso virar a regra daquele dia da semana.
+                    var semanais = src.Ocorrencias
                         .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
-                                    == CategoriaOcorrencia.Trabalho)
+                                    != CategoriaOcorrencia.Afastamento)
                         .ToList();
-                    manuais = manuais.Except(semanais).ToList();
+                    manuais = manuais
+                        .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
+                                    == CategoriaOcorrencia.Afastamento)
+                        .ToList();
 
-                    foreach (var grupo in semanais.GroupBy(x => x.TipoOcorrenciaCodigo, StringComparer.OrdinalIgnoreCase))
+                    // Um dia da semana pode ter códigos diferentes ao longo do mês (ex.: três
+                    // terças de expediente e uma de home office): vale o mais frequente e, no
+                    // empate, o da data mais recente.
+                    var modeloPorDiaDaSemana = semanais
+                        .GroupBy(x => x.Data.DayOfWeek)
+                        .ToDictionary(
+                            diaDaSemana => diaDaSemana.Key,
+                            diaDaSemana => diaDaSemana
+                                .GroupBy(x => x.TipoOcorrenciaCodigo, StringComparer.OrdinalIgnoreCase)
+                                .OrderByDescending(porCodigo => porCodigo.Count())
+                                .ThenByDescending(porCodigo => porCodigo.Max(x => x.Data))
+                                .First()
+                                .OrderByDescending(x => x.Data)
+                                .First());
+
+                    for (var data = destinoInicio; data <= destinoFim; data = data.AddDays(1))
                     {
-                        var diasDaSemana = grupo.Select(x => x.Data.DayOfWeek).ToHashSet();
-                        var modelo = grupo.OrderBy(x => x.Data).First();
-
-                        for (var data = destinoInicio; data <= destinoFim; data = data.AddDays(1))
+                        if (!modeloPorDiaDaSemana.TryGetValue(data.DayOfWeek, out var modelo))
                         {
-                            if (!diasDaSemana.Contains(data.DayOfWeek))
-                            {
-                                continue;
-                            }
+                            continue;
+                        }
 
-                            // Não transforma folga/feriado/afastamento do mês de destino em dia de
-                            // trabalho: o home office substitui um dia de expediente. Em dia ainda
-                            // vazio (escala montada sem regime) só entra se for dia útil — senão
-                            // uma marcação avulsa de sábado viraria todos os sábados do mês.
-                            if (ocorrenciasPorData.TryGetValue(data, out var noDia))
-                            {
-                                if (categoriaPorCodigo.GetValueOrDefault(noDia.TipoOcorrenciaCodigo)
-                                    != CategoriaOcorrencia.Trabalho)
-                                {
-                                    continue;
-                                }
-
-                                noDia.AtualizarManual(
-                                    modelo.TipoOcorrenciaCodigo,
-                                    modelo.HoraInicio,
-                                    modelo.HoraFim,
-                                    modelo.Horas,
-                                    modelo.Observacao,
-                                    actorLogin);
-                                continue;
-                            }
-
-                            if (data.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-                            {
-                                continue;
-                            }
-
-                            var criadaSemanal = EscalaOcorrencia.Create(
-                                dest.Id,
-                                data,
+                        if (ocorrenciasPorData.TryGetValue(data, out var noDia))
+                        {
+                            noDia.AtualizarManual(
                                 modelo.TipoOcorrenciaCodigo,
-                                OrigemOcorrencia.Manual,
                                 modelo.HoraInicio,
                                 modelo.HoraFim,
                                 modelo.Horas,
-                                observacao: modelo.Observacao,
-                                createdBy: actorLogin);
-                            db.EscalaOcorrencias.Add(criadaSemanal);
-                            ocorrenciasPorData[data] = criadaSemanal;
+                                modelo.Observacao,
+                                actorLogin);
+                            continue;
                         }
+
+                        var criadaSemanal = EscalaOcorrencia.Create(
+                            dest.Id,
+                            data,
+                            modelo.TipoOcorrenciaCodigo,
+                            OrigemOcorrencia.Manual,
+                            modelo.HoraInicio,
+                            modelo.HoraFim,
+                            modelo.Horas,
+                            observacao: modelo.Observacao,
+                            createdBy: actorLogin);
+                        db.EscalaOcorrencias.Add(criadaSemanal);
+                        ocorrenciasPorData[data] = criadaSemanal;
                     }
                 }
 

@@ -169,11 +169,13 @@ public class EscalaVersoesMesmoMesTests(PostgresFixture fixture) : IntegrationTe
             Login));
         gerada.Error.ShouldBeNull();
 
-        // Ocorrência manual por cima de um dia que a jornada 12x36 já preencheu.
+        // Ocorrência manual por cima de um dia que a jornada 12x36 já preencheu. Férias (FR) é
+        // afastamento: a cópia leva pela data, sem entrar na reprodução da semana que vale para
+        // a escala administrativa (ver CopiarEscalaAdministrativaTests).
         var manual = await ExecutarAsync(s => s.UpsertOcorrenciaAsync(
             ctx.EscalaId,
             ctx.ServidorId,
-            new UpsertOcorrenciaRequest(primeiroDia, "F", null, null, null, "Férias"),
+            new UpsertOcorrenciaRequest(primeiroDia, "FR", null, null, null, "Férias"),
             Login));
         manual.Error.ShouldBeNull();
         (await PublicarAsync(ctx.EscalaId)).Error.ShouldBeNull();
@@ -188,7 +190,7 @@ public class EscalaVersoesMesmoMesTests(PostgresFixture fixture) : IntegrationTe
                         && x.Data == new DateOnly(Ano, Mes + 1, 1))
             .ToListAsync();
         ocorrenciasDoDia.Count.ShouldBe(1);
-        ocorrenciasDoDia[0].TipoOcorrenciaCodigo.ShouldBe("F");
+        ocorrenciasDoDia[0].TipoOcorrenciaCodigo.ShouldBe("FR");
     }
 
     [Fact]
