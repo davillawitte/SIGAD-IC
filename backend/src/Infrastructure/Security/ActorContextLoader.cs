@@ -73,6 +73,15 @@ public static class ActorContextLoader
                 .Select(x => x.Id)
                 .ToListAsync(cancellationToken);
 
+        var nucleosDosSetoresGerenciados = setoresGerenciados.Count == 0
+            ? []
+            : await db.Setores
+                .AsNoTracking()
+                .Where(x => setoresGerenciados.Contains(x.Id) && x.NucleoId != null)
+                .Select(x => x.NucleoId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
         return new ActorContext(
             usuario.Id,
             usuario.ServidorId,
@@ -81,6 +90,7 @@ public static class ActorContextLoader
             setoresGerenciados,
             concessoes,
             nucleosGerenciados,
-            setoresDosNucleosGerenciados);
+            setoresDosNucleosGerenciados,
+            nucleosDosSetoresGerenciados);
     }
 }

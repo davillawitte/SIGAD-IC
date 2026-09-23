@@ -633,7 +633,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         var existing = escalaServidor.Ocorrencias.FirstOrDefault(x => x.Data == request.Data);
         if (existing is null)
         {
-            escalaServidor.Ocorrencias.Add(EscalaOcorrencia.Create(
+            // Add no DbSet, não só na coleção: a entidade já nasce com `Id` preenchido
+            // (`BaseEntity`), então o EF a descobriria pela navegação como registro EXISTENTE e
+            // emitiria UPDATE — que falha com "0 rows affected" (dia ainda sem ocorrência, ex.:
+            // home office num sábado ou numa escala montada sem regime).
+            db.EscalaOcorrencias.Add(EscalaOcorrencia.Create(
                 escalaServidor.Id,
                 request.Data,
                 request.TipoOcorrenciaCodigo,
@@ -1211,6 +1215,10 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         db.Escalas.Add(nova);
         await db.SaveChangesAsync(cancellationToken);
 
+        var categoriaPorCodigo = await db.TiposOcorrencia
+            .AsNoTracking()
+            .ToDictionaryAsync(x => x.Codigo, x => x.Categoria, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
         var deltaMonths = (request.Ano - origem.Ano) * 12 + (request.Mes - origem.Mes);
         var destinoInicio = nova.DataInicio;
         var destinoFim = nova.DataFim;
@@ -1283,7 +1291,76 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     .Where(x => x.EscalaServidorId == dest.Id)
                     .ToDictionaryAsync(x => x.Data, cancellationToken);
 
-                foreach (var oc in src.Ocorrencias.Where(x => x.Origem == OrigemOcorrencia.Manual))
+                var manuais = src.Ocorrencias.Where(x => x.Origem == OrigemOcorrencia.Manual).ToList();
+
+                // Escala administrativa: marcação manual de TRABALHO (ex.: TL6 de home office) é
+                // um combinado semanal — "toda quinta" continua toda quinta no mês de destino, e
+                // não no mesmo dia do mês, que cairia em outro dia da semana. Folga avulsa, férias
+                // e licenças são datas específicas, então seguem pela data, como o resto.
+                if (origem.TipoFuncionamento == TipoFuncionamento.Expediente)
+                {
+                    var semanais = manuais
+                        .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
+                                    == CategoriaOcorrencia.Trabalho)
+                        .ToList();
+                    manuais = manuais.Except(semanais).ToList();
+
+                    foreach (var grupo in semanais.GroupBy(x => x.TipoOcorrenciaCodigo, StringComparer.OrdinalIgnoreCase))
+                    {
+                        var diasDaSemana = grupo.Select(x => x.Data.DayOfWeek).ToHashSet();
+                        var modelo = grupo.OrderBy(x => x.Data).First();
+
+                        for (var data = destinoInicio; data <= destinoFim; data = data.AddDays(1))
+                        {
+                            if (!diasDaSemana.Contains(data.DayOfWeek))
+                            {
+                                continue;
+                            }
+
+                            // Não transforma folga/feriado/afastamento do mês de destino em dia de
+                            // trabalho: o home office substitui um dia de expediente. Em dia ainda
+                            // vazio (escala montada sem regime) só entra se for dia útil — senão
+                            // uma marcação avulsa de sábado viraria todos os sábados do mês.
+                            if (ocorrenciasPorData.TryGetValue(data, out var noDia))
+                            {
+                                if (categoriaPorCodigo.GetValueOrDefault(noDia.TipoOcorrenciaCodigo)
+                                    != CategoriaOcorrencia.Trabalho)
+                                {
+                                    continue;
+                                }
+
+                                noDia.AtualizarManual(
+                                    modelo.TipoOcorrenciaCodigo,
+                                    modelo.HoraInicio,
+                                    modelo.HoraFim,
+                                    modelo.Horas,
+                                    modelo.Observacao,
+                                    actorLogin);
+                                continue;
+                            }
+
+                            if (data.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                            {
+                                continue;
+                            }
+
+                            var criadaSemanal = EscalaOcorrencia.Create(
+                                dest.Id,
+                                data,
+                                modelo.TipoOcorrenciaCodigo,
+                                OrigemOcorrencia.Manual,
+                                modelo.HoraInicio,
+                                modelo.HoraFim,
+                                modelo.Horas,
+                                observacao: modelo.Observacao,
+                                createdBy: actorLogin);
+                            db.EscalaOcorrencias.Add(criadaSemanal);
+                            ocorrenciasPorData[data] = criadaSemanal;
+                        }
+                    }
+                }
+
+                foreach (var oc in manuais)
                 {
                     var data = ShiftMonth(oc.Data, deltaMonths, destinoInicio, destinoFim);
                     if (data is null)
@@ -1819,7 +1896,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 var existing = escalaServidor.Ocorrencias.FirstOrDefault(x => x.Data == data);
                 if (existing is null)
                 {
-                    escalaServidor.Ocorrencias.Add(EscalaOcorrencia.Create(
+                    // Add no DbSet — mesmo motivo do comentário em `UpsertOcorrenciaAsync`.
+                    db.EscalaOcorrencias.Add(EscalaOcorrencia.Create(
                         escalaServidor.Id,
                         data,
                         codigo,

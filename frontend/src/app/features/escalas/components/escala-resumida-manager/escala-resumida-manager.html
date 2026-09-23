@@ -4,25 +4,27 @@
 
 @if (escala(); as e) {
   @if (isRascunhoOuFinalizada()) {
-    @if (podeGerenciarSetores()) {
+    @if (mostraAgentes()) {
       <div class="setores-row">
-        <pci-card class="setores-row__setores">
-          <pci-card-content>
-            <h3>Setores do núcleo</h3>
-            <p>Marque os setores que participam desta escala resumida.</p>
-            <div class="pci-form-group">
-              <div [appFormCol]="12" class="wizard-checkbox-row">
-                @for (setor of setorOptions(); track setor.id) {
-                  <pci-checkbox
-                    [label]="setor.sigla + ' — ' + setor.nome"
-                    [checked]="isSetorSelected(setor.id)"
-                    (changed)="toggleSetor(setor.id)"
-                  />
-                }
+        @if (podeGerenciarSetores()) {
+          <pci-card class="setores-row__setores">
+            <pci-card-content>
+              <h3>Setores do núcleo</h3>
+              <p>Marque os setores que participam desta escala resumida.</p>
+              <div class="pci-form-group">
+                <div [appFormCol]="12" class="wizard-checkbox-row">
+                  @for (setor of setorOptions(); track setor.id) {
+                    <pci-checkbox
+                      [label]="setor.sigla + ' — ' + setor.nome"
+                      [checked]="isSetorSelected(setor.id)"
+                      (changed)="toggleSetor(setor.id)"
+                    />
+                  }
+                </div>
               </div>
-            </div>
-          </pci-card-content>
-        </pci-card>
+            </pci-card-content>
+          </pci-card>
+        }
 
         <pci-card class="setores-row__agentes">
           <pci-card-content>

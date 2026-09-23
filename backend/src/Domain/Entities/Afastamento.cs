@@ -29,7 +29,7 @@ public class Afastamento : BaseEntity
         string? sei = null,
         string? createdBy = null)
     {
-        Validate(dataInicio, dataFim, tipoOcorrenciaCodigo);
+        Validate(dataInicio, dataFim, tipoOcorrenciaCodigo, sei);
 
         var entity = new Afastamento
         {
@@ -53,7 +53,7 @@ public class Afastamento : BaseEntity
         string? sei = null,
         string? updatedBy = null)
     {
-        Validate(dataInicio, dataFim, tipoOcorrenciaCodigo);
+        Validate(dataInicio, dataFim, tipoOcorrenciaCodigo, sei);
         DataInicio = dataInicio;
         DataFim = dataFim;
         TipoOcorrenciaCodigo = tipoOcorrenciaCodigo.Trim().ToUpperInvariant();
@@ -65,8 +65,20 @@ public class Afastamento : BaseEntity
     private static string? NormalizeSei(string? sei) =>
         string.IsNullOrWhiteSpace(sei) ? null : sei.Trim();
 
-    private static void Validate(DateOnly dataInicio, DateOnly dataFim, string tipoOcorrenciaCodigo)
+    private static void Validate(
+        DateOnly dataInicio,
+        DateOnly dataFim,
+        string tipoOcorrenciaCodigo,
+        string? sei)
     {
+        // Todo afastamento nasce de um processo: sem o número do SEI não há como conferir a
+        // concessão depois. Afastamentos antigos sem SEI continuam no banco, mas qualquer
+        // gravação a partir de agora exige o número.
+        if (string.IsNullOrWhiteSpace(sei))
+        {
+            throw new ArgumentException("Informe o número do processo SEI do afastamento.");
+        }
+
         if (dataFim < dataInicio)
         {
             throw new ArgumentException("Data fim deve ser maior ou igual à data início.");

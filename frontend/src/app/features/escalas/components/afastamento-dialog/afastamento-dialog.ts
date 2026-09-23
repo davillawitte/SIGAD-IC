@@ -68,7 +68,7 @@ export class AfastamentoDialog implements OnInit {
     dataInicio: ['', Validators.required],
     dataFim: ['', Validators.required],
     tipoOcorrenciaCodigo: ['FR', Validators.required],
-    sei: [''],
+    sei: ['', Validators.required],
     observacao: [''],
   });
 

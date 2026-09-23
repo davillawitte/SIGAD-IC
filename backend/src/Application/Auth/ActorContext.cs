@@ -18,11 +18,16 @@ public sealed class ActorContext
     public IReadOnlyList<Guid> SetoresGerenciadosIds { get; }
     public IReadOnlyList<Guid> NucleosGerenciadosIds { get; }
     public IReadOnlyList<Guid> SetoresDosNucleosGerenciadosIds { get; }
+
+    /// <summary>Núcleos que englobam algum setor chefiado por este ator (o contrário de
+    /// <see cref="SetoresDosNucleosGerenciadosIds"/>).</summary>
+    public IReadOnlyList<Guid> NucleosDosSetoresGerenciadosIds { get; }
     public IReadOnlyList<PerfilConcessao> Perfis { get; }
 
     private readonly HashSet<Guid> _setoresGerenciados;
     private readonly HashSet<Guid> _nucleosGerenciados;
     private readonly HashSet<Guid> _setoresDosNucleosGerenciados;
+    private readonly HashSet<Guid> _nucleosDosSetoresGerenciados;
 
     public ActorContext(
         Guid usuarioId,
@@ -32,7 +37,8 @@ public sealed class ActorContext
         IReadOnlyList<Guid> setoresGerenciadosIds,
         IReadOnlyList<PerfilConcessao> perfis,
         IReadOnlyList<Guid>? nucleosGerenciadosIds = null,
-        IReadOnlyList<Guid>? setoresDosNucleosGerenciadosIds = null)
+        IReadOnlyList<Guid>? setoresDosNucleosGerenciadosIds = null,
+        IReadOnlyList<Guid>? nucleosDosSetoresGerenciadosIds = null)
     {
         UsuarioId = usuarioId;
         ServidorId = servidorId;
@@ -41,10 +47,12 @@ public sealed class ActorContext
         SetoresGerenciadosIds = setoresGerenciadosIds;
         NucleosGerenciadosIds = nucleosGerenciadosIds ?? [];
         SetoresDosNucleosGerenciadosIds = setoresDosNucleosGerenciadosIds ?? [];
+        NucleosDosSetoresGerenciadosIds = nucleosDosSetoresGerenciadosIds ?? [];
         Perfis = perfis;
         _setoresGerenciados = setoresGerenciadosIds.ToHashSet();
         _nucleosGerenciados = (nucleosGerenciadosIds ?? []).ToHashSet();
         _setoresDosNucleosGerenciados = (setoresDosNucleosGerenciadosIds ?? []).ToHashSet();
+        _nucleosDosSetoresGerenciados = (nucleosDosSetoresGerenciadosIds ?? []).ToHashSet();
     }
 
     public static ActorContext Empty { get; } = new(
@@ -64,6 +72,10 @@ public sealed class ActorContext
     /// setor) — usado por módulos que queiram tratar chefia de núcleo como suficiente pra
     /// mutar qualquer setor do núcleo, sem alterar a semântica geral de <see cref="Abrange"/>.</summary>
     public bool GerenciaSetorViaNucleo(Guid setorId) => _setoresDosNucleosGerenciados.Contains(setorId);
+
+    /// <summary>Chefia algum setor que o núcleo engloba — usado onde o recurso é do núcleo mas o
+    /// chefe de setor participa dele (escala resumida: o grupo do setor dele e o de Agentes).</summary>
+    public bool GerenciaAlgumSetorDoNucleo(Guid nucleoId) => _nucleosDosSetoresGerenciados.Contains(nucleoId);
 
     /// <summary>Gate grosso: união das permissões dos perfis (sem bypass).</summary>
     public bool TemPermissao(string code) =>

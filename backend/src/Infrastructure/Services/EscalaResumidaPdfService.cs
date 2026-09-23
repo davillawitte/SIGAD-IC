@@ -154,77 +154,124 @@ public class EscalaResumidaPdfService(
             .Select(i => escala.DataInicio.AddDays(i))
             .ToList();
 
+        var paginas = DividirPaginas(escala);
+
         return Document.Create(container =>
         {
-            container.Page(page =>
+            foreach (var gruposDaPagina in paginas)
             {
-                page.Size(PageSizes.A4.Landscape());
-                page.Margin(18);
-                page.DefaultTextStyle(x => x.FontSize(7));
-
-                page.Header().Column(col =>
-                {
-                    col.Item().Row(row =>
-                    {
-                        if (brasaoPci is { Length: > 0 })
-                        {
-                            row.ConstantItem(48).Height(48).Image(brasaoPci).FitArea();
-                        }
-                        else
-                        {
-                            row.ConstantItem(48);
-                        }
-
-                        row.RelativeItem().AlignMiddle().AlignCenter().Column(center =>
-                        {
-                            center.Item().AlignCenter().Text(OrgaoTitulo).FontSize(10).SemiBold();
-                            center.Item().AlignCenter().Text(OrgaoSubtitulo).FontSize(7);
-                        });
-
-                        if (brasaoRn is { Length: > 0 })
-                        {
-                            row.ConstantItem(48).Height(48).Image(brasaoRn).FitArea();
-                        }
-                        else
-                        {
-                            row.ConstantItem(48);
-                        }
-                    });
-
-                    col.Item().PaddingTop(4).Text(escala.Identificacao.ToUpperInvariant()).Bold().FontSize(12);
-                    var containerLabel = escala.SetorId is not null
-                        ? $"Setor: {escala.SetorNome} ({escala.SetorSigla})"
-                        : $"Núcleo: {escala.NucleoNome} ({escala.NucleoSigla})";
-                    col.Item().Text($"Ano: {escala.Ano}  |  Mês: {MesNome(escala.Mes)}  |  {containerLabel}");
-                    col.Item().Text($"Gerado em {NowBrasil():dd/MM/yyyy HH:mm}  |  Status: {escala.Status}");
-                    col.Item().PaddingTop(6);
-                });
-
-                page.Content().Column(content =>
-                {
-                    content.Item().Row(row =>
-                    {
-                        foreach (var setor in escala.Setores.Where(s => s.Equipes.Count > 0))
-                        {
-                            row.RelativeItem().PaddingRight(6).Column(setorCol =>
-                            {
-                                var setorLabel = setor.SetorId is null
-                                    ? EscalaResumidaSetor.AgentesLabel
-                                    : $"{setor.SetorSigla} — {setor.SetorNome}";
-                                setorCol.Item().Background(Colors.Grey.Lighten1).Padding(2)
-                                    .Text(setorLabel).Bold().FontSize(7);
-                                setorCol.Item().Table(table => BuildSetorTable(table, setor, days));
-                            });
-                        }
-                    });
-
-                    content.Item().Column(sig => ComposeSignature(
-                        sig, chefe, escala.SetorNome ?? escala.NucleoNome ?? "—"));
-                });
-
-                page.Footer().PaddingTop(8).Text("DO = Diária Operacional disponível.");
-            });
+                container.Page(page => ComposePage(page, escala, gruposDaPagina, days, brasaoPci, brasaoRn, chefe));
+            }
         }).GeneratePdf();
+    }
+
+    /// <summary>
+    /// Grupos de cada folha. Agentes (grupo sem setor) sai em página própria: são servidores à
+    /// disposição de todo o núcleo, e misturá-los na mesma folha dos setores espremia as duas
+    /// grades. Cada página repete cabeçalho, assinatura e rodapé, então se sustenta sozinha
+    /// impressa. Sem nenhum grupo com equipe sai uma folha vazia, como antes — serve de escala
+    /// resumida em branco pra preencher à mão.
+    /// </summary>
+    public static IReadOnlyList<IReadOnlyList<EscalaResumidaSetorDto>> DividirPaginas(
+        EscalaResumidaDetailDto escala)
+    {
+        var grupos = escala.Setores.Where(x => x.Equipes.Count > 0).ToList();
+        var setores = grupos.Where(x => x.SetorId is not null).ToList();
+        var agentes = grupos.Where(x => x.SetorId is null).ToList();
+
+        var paginas = new List<IReadOnlyList<EscalaResumidaSetorDto>>();
+        if (setores.Count > 0)
+        {
+            paginas.Add(setores);
+        }
+
+        if (agentes.Count > 0)
+        {
+            paginas.Add(agentes);
+        }
+
+        if (paginas.Count == 0)
+        {
+            paginas.Add([]);
+        }
+
+        return paginas;
+    }
+
+    private static void ComposePage(
+        PageDescriptor page,
+        EscalaResumidaDetailDto escala,
+        IReadOnlyList<EscalaResumidaSetorDto> grupos,
+        List<DateOnly> days,
+        byte[]? brasaoPci,
+        byte[]? brasaoRn,
+        (string Nome, string Matricula, TipoChefia Tipo)? chefe)
+    {
+        page.Size(PageSizes.A4.Landscape());
+        page.Margin(18);
+        page.DefaultTextStyle(x => x.FontSize(7));
+
+        page.Header().Column(col =>
+        {
+            col.Item().Row(row =>
+            {
+                if (brasaoPci is { Length: > 0 })
+                {
+                    row.ConstantItem(48).Height(48).Image(brasaoPci).FitArea();
+                }
+                else
+                {
+                    row.ConstantItem(48);
+                }
+
+                row.RelativeItem().AlignMiddle().AlignCenter().Column(center =>
+                {
+                    center.Item().AlignCenter().Text(OrgaoTitulo).FontSize(10).SemiBold();
+                    center.Item().AlignCenter().Text(OrgaoSubtitulo).FontSize(7);
+                });
+
+                if (brasaoRn is { Length: > 0 })
+                {
+                    row.ConstantItem(48).Height(48).Image(brasaoRn).FitArea();
+                }
+                else
+                {
+                    row.ConstantItem(48);
+                }
+            });
+
+            col.Item().PaddingTop(4).Text(escala.Identificacao.ToUpperInvariant()).Bold().FontSize(12);
+            var containerLabel = escala.SetorId is not null
+                ? $"Setor: {escala.SetorNome} ({escala.SetorSigla})"
+                : $"Núcleo: {escala.NucleoNome} ({escala.NucleoSigla})";
+            col.Item().Text($"Ano: {escala.Ano}  |  Mês: {MesNome(escala.Mes)}  |  {containerLabel}");
+            col.Item().Text($"Gerado em {NowBrasil():dd/MM/yyyy HH:mm}  |  Status: {escala.Status}");
+            col.Item().PaddingTop(6);
+        });
+
+        page.Content().Column(content =>
+        {
+            content.Item().Row(row =>
+            {
+                foreach (var setor in grupos)
+                {
+                    row.RelativeItem().PaddingRight(6).Column(setorCol =>
+                    {
+                        var setorLabel = setor.SetorId is null
+                            ? EscalaResumidaSetor.AgentesLabel
+                            : $"{setor.SetorSigla} — {setor.SetorNome}";
+                        setorCol.Item().Background(Colors.Grey.Lighten1).Padding(2)
+                            .Text(setorLabel).Bold().FontSize(7);
+                        setorCol.Item().Table(table => BuildSetorTable(table, setor, days));
+                    });
+                }
+            });
+
+            content.Item().Column(sig => ComposeSignature(
+                sig, chefe, escala.SetorNome ?? escala.NucleoNome ?? "—"));
+        });
+
+        page.Footer().PaddingTop(8).Text("DO = Diária Operacional disponível.");
     }
 
     private static void BuildSetorTable(TableDescriptor table, EscalaResumidaSetorDto setor, List<DateOnly> days)

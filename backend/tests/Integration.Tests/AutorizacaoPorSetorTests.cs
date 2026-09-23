@@ -358,7 +358,10 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
                 new DateOnly(Ano, 8, 1),
                 new DateOnly(Ano, 8, 5),
                 "LM",
-                null),
+                null,
+                // SEI é obrigatório (ver AfastamentoSeiObrigatorioTests); aqui o que se testa é
+                // a autorização, então o número é só um preenchimento válido.
+                Sei: "SEI-000000"),
             ChefeNb);
 
         permitido.Succeeded.ShouldBeTrue(permitido.Error);

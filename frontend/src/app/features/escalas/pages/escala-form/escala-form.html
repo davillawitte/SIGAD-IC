@@ -407,6 +407,7 @@
             <app-escala-resumida-manager
               [escala]="resumidaEscala()!"
               [podeGerenciarSetores]="podeGerenciarOutrosSetoresDoNucleo()"
+              [podeGerenciarAgentes]="podeIncluirAgentesNaResumida()"
               [restricaoServidores]="restricaoServidoresResumida()"
               (escalaChange)="onResumidaChange($event)"
             />

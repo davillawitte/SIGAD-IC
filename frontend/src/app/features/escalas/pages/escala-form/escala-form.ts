@@ -278,6 +278,13 @@ export class EscalaForm implements OnInit {
     return !!nucleoId && this.auth.isChefeNucleo(nucleoId);
   });
 
+  /** Chefe de setor numa resumida de núcleo: não escolhe os setores participantes, mas pode
+   * incluir o grupo "Agentes" (servidores lotados direto no núcleo). Quem chefia o núcleo já vê
+   * o card de Agentes junto da lista de setores. */
+  readonly podeIncluirAgentesNaResumida = computed(
+    () => !!this.nucleoIdDoSetor() && !this.podeGerenciarOutrosSetoresDoNucleo(),
+  );
+
   /** Container da escala resumida: o núcleo do setor escolhido quando existir; senão o próprio
    * setor (resumida de setor único, sem seção de "setores participantes" — o setor sozinho já
    * é o único container). `null` só quando nada foi escolhido ainda ou a opção é diretamente

@@ -194,6 +194,25 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             }
 
             db.EscalasResumidas.Add(escalaNucleo);
+
+            // Quem não chefia o núcleo não tem a etapa de "setores participantes" (só o chefe de
+            // núcleo escolhe), então a resumida nasceria vazia e sem como avançar: já entra com o
+            // grupo dos setores que o criador chefia dentro deste núcleo.
+            if (!actor.GerenciaNucleo(nucleoId))
+            {
+                var meusSetoresDoNucleo = await db.Setores
+                    .Where(x => x.NucleoId == nucleoId && actor.SetoresGerenciadosIds.Contains(x.Id))
+                    .OrderBy(x => x.Sigla)
+                    .ToListAsync(cancellationToken);
+
+                var ordem = 0;
+                foreach (var meuSetor in meusSetoresDoNucleo)
+                {
+                    db.EscalaResumidaSetores.Add(EscalaResumidaSetor.Create(
+                        escalaNucleo.Id, meuSetor.Id, ordem++, meuSetor.Nome, meuSetor.Sigla, actorLogin));
+                }
+            }
+
             await db.SaveChangesAsync(cancellationToken);
             return await GetByIdAsync(escalaNucleo.Id, actorLogin, cancellationToken);
         }
@@ -282,6 +301,34 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
         if (request.Setores.Count(x => x.SetorId is null) > 1)
         {
             return Result<EscalaResumidaDetailDto>.Failure("Só pode haver um grupo de Agentes.");
+        }
+
+        // Só o chefe do núcleo escolhe os setores participantes. O chefe de setor pode mexer no
+        // grupo do próprio setor e no de Agentes; os grupos dos outros setores ficam como estão.
+        if (escala.NucleoId is Guid nucleoDaEscala && !actor.GerenciaNucleo(nucleoDaEscala))
+        {
+            var alheios = escala.Setores
+                .Where(x => x.SetorId is Guid outro && !actor.SetoresGerenciadosIds.Contains(outro))
+                .ToList();
+
+            var mexeuEmSetorAlheio = request.Setores.Any(
+                x => x.SetorId is Guid pedido
+                     && !actor.SetoresGerenciadosIds.Contains(pedido)
+                     && alheios.All(a => a.SetorId != pedido));
+
+            if (mexeuEmSetorAlheio)
+            {
+                return Result<EscalaResumidaDetailDto>.Failure(
+                    "Só o chefe do núcleo pode incluir outros setores nesta escala resumida.");
+            }
+
+            // Preserva os grupos alheios que não vieram na requisição, em vez de removê-los.
+            var pedidos = request.Setores.ToList();
+            pedidos.AddRange(
+                alheios
+                    .Where(a => request.Setores.All(x => x.SetorId != a.SetorId))
+                    .Select(a => new ConfigurarSetorItem(a.SetorId, a.Ordem)));
+            request = new ConfigurarSetoresRequest(pedidos);
         }
 
         var setorIdsRequisitados = request.Setores
@@ -1060,7 +1107,11 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
     private static bool CanMutate(ActorContext actor, Guid? nucleoId, Guid? setorId) =>
         setorId is Guid s
             ? actor.SetoresGerenciadosIds.Contains(s) || actor.GerenciaSetorViaNucleo(s)
-            : nucleoId is Guid n && actor.GerenciaNucleo(n);
+            // Escala resumida de núcleo não é exclusiva do chefe de núcleo: o chefe de um setor
+            // que o núcleo engloba monta a parte dele (o grupo do próprio setor e o de Agentes).
+            // Escolher QUAIS setores participam continua sendo só do chefe de núcleo — ver
+            // `ConfigurarSetoresAsync`.
+            : nucleoId is Guid n && (actor.GerenciaNucleo(n) || actor.GerenciaAlgumSetorDoNucleo(n));
 
     private static bool CanView(ActorContext actor, Guid? nucleoId, Guid? setorId) =>
         CanMutate(actor, nucleoId, setorId)

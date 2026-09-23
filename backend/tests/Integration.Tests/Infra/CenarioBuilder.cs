@@ -165,7 +165,9 @@ public sealed class CenarioBuilder(ApplicationDbContext db, Cargo cargo)
         DateOnly dataInicio,
         DateOnly dataFim,
         string tipoOcorrenciaCodigo = "FR",
-        string? sei = null)
+        // SEI é obrigatório no afastamento (ver `Afastamento.Validate`); o número em si não
+        // importa pros cenários, então vem um padrão.
+        string? sei = "SEI-000000")
     {
         var afastamento = Afastamento.Create(
             servidor.Id,

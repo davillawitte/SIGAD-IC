@@ -94,6 +94,13 @@ export class EscalaResumidaManager implements OnInit {
    * núcleo nesta mesma escala resumida — um chefe de setor simples já tem seu único setor
    * implícito, sem precisar desta seção. */
   readonly podeGerenciarSetores = input(false);
+  /** Resumida de núcleo montada por quem chefia só um setor dele: não escolhe os setores
+   * participantes (isso é do chefe de núcleo), mas inclui/retira o grupo "Agentes", que são os
+   * servidores lotados direto no núcleo à disposição de todos os setores. */
+  readonly podeGerenciarAgentes = input(false);
+
+  /** Card do grupo "Agentes" — aparece pros dois casos, sozinho quando só ele é permitido. */
+  readonly mostraAgentes = computed(() => this.podeGerenciarSetores() || this.podeGerenciarAgentes());
   /** Wizard de escala: servidores da lotação da escala sendo montada (`pool`) só aparecem pra
    * seleção se foram escolhidos no passo de servidores (`selecionados`) — quem ficou de fora
    * ali (ex.: já escalado em outra escala no mês) não deve voltar pela resumida. Servidores
