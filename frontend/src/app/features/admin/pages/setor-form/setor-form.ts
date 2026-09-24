@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -11,13 +10,10 @@ import {
   PciInputComponent,
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
-import { Observable, of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
 
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
 import type {
-  ChefiaConflito,
   CreateSetorPayload,
   NucleoListItem,
   ServidorListItem,
@@ -25,7 +21,6 @@ import type {
   TipoChefia,
 } from '../../models/admin.models';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
-import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 
 const DIRECAO_IC_SIGLA = 'Direção IC';
 const DIRECAO_IC_NOME = 'Direção do Instituto de Criminalística';
@@ -47,7 +42,6 @@ function isDirecaoSigla(value: string): boolean {
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatDialogModule,
     MatSelectModule,
     PciAlertComponent,
     PciFormPageComponent,
@@ -63,7 +57,6 @@ export class SetorForm implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
-  private readonly dialog = inject(MatDialog);
   private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
@@ -202,76 +195,22 @@ export class SetorForm implements OnInit {
       chefias,
     };
 
-    this.api
-      .previewChefiasConflitos({
-        setorId: this.editId,
-        chefias,
-      })
-      .pipe(
-        switchMap((conflitos) =>
-          this.confirmChefiasConflitos$(conflitos).pipe(
-            switchMap((confirmed) => {
-              if (!confirmed) {
-                this.saving.set(false);
-                return of(null);
-              }
-              this.saving.set(true);
-              const payload = {
-                ...common,
-                confirmarRemocaoChefiasEmOutrosSetores: conflitos.length > 0,
-              };
-              if (this.isEdit() && this.editId) {
-                return this.api.updateSetor(this.editId, payload);
-              }
-              return this.api.createSetor(payload);
-            }),
-          ),
-        ),
-      )
-      .subscribe({
-        next: (result) => {
-          if (!result) return;
-          this.feedback.showSuccess(
-            this.isEdit() ? 'Setor atualizado com sucesso.' : 'Setor criado com sucesso.',
-          );
-          void this.router.navigateByUrl('/estrutura-organizacional');
-        },
-        error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
-      });
-  }
+    // O mesmo servidor pode chefiar vários setores (e também um núcleo), então salvar é direto:
+    // não há mais conflito de chefia a confirmar.
+    const salvar$ =
+      this.isEdit() && this.editId
+        ? this.api.updateSetor(this.editId, common)
+        : this.api.createSetor(common);
 
-  private confirmChefiasConflitos$(conflitos: ChefiaConflito[]): Observable<boolean> {
-    if (!conflitos.length) {
-      return of(true);
-    }
-    this.saving.set(false);
-    const parts = conflitos.map((c) => {
-      const tipo = this.labelTipoChefia(c.tipoChefia);
-      return `${c.servidorNome} (${tipo} em ${c.setorNome})`;
+    salvar$.subscribe({
+      next: () => {
+        this.feedback.showSuccess(
+          this.isEdit() ? 'Setor atualizado com sucesso.' : 'Setor criado com sucesso.',
+        );
+        void this.router.navigateByUrl('/estrutura-organizacional');
+      },
+      error: (err: { error?: { message?: string } }) => this.fail(err.error?.message),
     });
-    return openConfirmDialog(this.dialog, {
-      title: 'Conflito de chefia',
-      message:
-        'Os servidores abaixo já são chefia em outro setor. Ao confirmar, esses vínculos serão removidos:\n\n' +
-        parts.join('\n'),
-      confirmLabel: 'Remover e continuar',
-      danger: true,
-    });
-  }
-
-  private labelTipoChefia(tipo: TipoChefia): string {
-    switch (tipo) {
-      case 'ChefiaImediata':
-        return 'Chefia imediata';
-      case 'ChefiaSubstituta':
-        return 'Chefia substituta';
-      case 'Diretor':
-        return 'Diretor';
-      case 'Subcoordenador':
-        return 'Subcoordenador';
-      default:
-        return tipo;
-    }
   }
 
   cancel(): void {

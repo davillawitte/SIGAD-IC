@@ -367,6 +367,13 @@ export class AuthService {
         return;
       }
 
+      // Troca de senha obrigatória não sobrevive ao fechamento da janela: quem não concluiu o
+      // primeiro acesso volta para o login em vez de reabrir direto na tela de nova senha.
+      if (session.user.deveAlterarSenha === true) {
+        this.logout();
+        return;
+      }
+
       this.accessToken = session.accessToken;
       this.currentUserSignal.set({
         ...session.user,
@@ -388,7 +395,8 @@ export class AuthService {
             (p as { abrangenciaPorModulo?: Record<string, Abrangencia> }).abrangenciaPorModulo ??
             {},
         })),
-        deveAlterarSenha: session.user.deveAlterarSenha === true,
+        // Sessão pendente de troca de senha já foi descartada acima.
+        deveAlterarSenha: false,
         meta:
           session.user.setorLotacaoNome ??
           session.user.meta ??

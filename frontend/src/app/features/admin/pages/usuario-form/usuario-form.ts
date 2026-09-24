@@ -23,6 +23,7 @@ import { AdminApiService } from '../../services/admin-api.service';
 import { ServidorDialog } from '../../components/servidor-dialog/servidor-dialog';
 import type { PerfilListItem, ServidorListItem } from '../../models/admin.models';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
+import { httpErrorMessage } from '../../../../shared/http-error';
 
 @Component({
   selector: 'app-usuario-form',
@@ -193,11 +194,17 @@ export class UsuarioForm implements OnInit {
   }
 
   private loadLookups(): void {
+    // Sem tratar o erro, uma falha aqui (ex.: 403 na listagem de servidores) deixava o select
+    // vazio sem explicação nenhuma na tela.
     this.api.listServidores(true).subscribe({
       next: (items) => this.servidores.set(items),
+      error: (err: unknown) =>
+        this.error.set(httpErrorMessage(err, 'Não foi possível carregar a lista de servidores.')),
     });
     this.api.listPerfis({ page: 1, pageSize: 100 }).subscribe({
       next: (result) => this.perfis.set(result.items.filter((p) => p.ativo)),
+      error: (err: unknown) =>
+        this.error.set(httpErrorMessage(err, 'Não foi possível carregar a lista de perfis.')),
     });
   }
 }

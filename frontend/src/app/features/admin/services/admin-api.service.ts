@@ -18,12 +18,10 @@ import {
   CreatePerfilPayload,
   CreateServidorPayload,
   SetPerfilPermissoesPayload,
-  ChefiaConflito,
   CreateSetorPayload,
   CreateUsuarioPayload,
   CargoListItem,
   EstruturaOrganizacional,
-  SetorChefiaInput,
   NucleoDetail,
   NucleoListItem,
   ResetSenhaResult,
@@ -170,13 +168,6 @@ export class AdminApiService {
 
   getEstruturaOrganizacional(): Observable<EstruturaOrganizacional> {
     return this.http.get<EstruturaOrganizacional>(`${this.base}/api/setores/estrutura`);
-  }
-
-  previewChefiasConflitos(payload: {
-    setorId?: string | null;
-    chefias: SetorChefiaInput[];
-  }): Observable<ChefiaConflito[]> {
-    return this.http.post<ChefiaConflito[]>(`${this.base}/api/setores/chefias-conflitos`, payload);
   }
 
   createSetor(payload: CreateSetorPayload): Observable<SetorListItem> {

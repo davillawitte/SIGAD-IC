@@ -39,13 +39,6 @@ public class SetoresController(ISetorService setorService) : ControllerBase
         return result.Succeeded ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
 
-    [HttpPost("chefias-conflitos")]
-    [RequiresAnyPermission(PermissionCodes.SetoresCriar, PermissionCodes.SetoresEditar)]
-    public async Task<IActionResult> PreviewChefiasConflitos(
-        [FromBody] PreviewChefiasConflitosRequest request,
-        CancellationToken cancellationToken) =>
-        Ok(await setorService.PreviewChefiasConflitosAsync(request, cancellationToken));
-
     [HttpPost]
     [RequiresPermission(PermissionCodes.SetoresCriar)]
     public async Task<IActionResult> Create([FromBody] CreateSetorRequest request, CancellationToken cancellationToken)

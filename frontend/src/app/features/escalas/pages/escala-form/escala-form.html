@@ -300,32 +300,8 @@
                   <div class="wizard-servidor-card__field"></div>
                 }
 
-                @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id)) {
-                  <pci-icon-button
-                    [icon]="isServidorCardExpanded(s.id) ? 'chevron-up' : 'chevron-down'"
-                    variant="outline"
-                    size="sm"
-                    ariaLabel="Mais detalhes"
-                    (clicked)="toggleServidorCardExpanded(s.id)"
-                  />
-                } @else {
-                  <div class="wizard-servidor-card__toggle-spacer"></div>
-                }
+                <div class="wizard-servidor-card__toggle-spacer"></div>
               </div>
-              @if (showExpedienteTardeForServidor(s.id) && isServidorSelected(s.id) && isServidorCardExpanded(s.id)) {
-                <div class="wizard-servidor-card__extra">
-                  <span class="wizard-servidor-tarde__label">Expediente tarde (T)</span>
-                  <div class="wizard-checkbox-row">
-                    @for (wd of weekdayOptions; track wd.value) {
-                      <pci-checkbox
-                        [label]="wd.label"
-                        [checked]="isExpedienteTardeDay(s.id, wd.value)"
-                        (changed)="toggleExpedienteTardeDay(s.id, wd.value)"
-                      />
-                    }
-                  </div>
-                </div>
-              }
             } @empty {
               <p class="wizard-hint">Nenhum servidor encontrado para este setor.</p>
             }

@@ -21,7 +21,7 @@ public static class PadraoEscalaSeed
 
         AddIfMissing(PadraoEscala.Create(
             "EXP_ADM",
-            "Expediente Administrativo",
+            "Expediente Administrativo (manhã)",
             TipoFuncionamento.Expediente,
             TipoJornada.Expediente,
             RecorrenciaTipo.DiasSemana,
@@ -30,6 +30,24 @@ public static class PadraoEscalaSeed
             diasSemana: "1,2,3,4,5",
             horaInicioPadrao: new TimeOnly(8, 0),
             horaFimPadrao: new TimeOnly(14, 0),
+            horasPadrao: 6,
+            sistema: true,
+            createdBy: "seed"));
+
+        // Turno da tarde do expediente administrativo. É um regime próprio (e não uma exceção
+        // por dia) porque o servidor da tarde é da tarde no mês inteiro — e assim a escolha fica
+        // guardada na jornada, sobrevive à regeneração da grade e acompanha a cópia.
+        AddIfMissing(PadraoEscala.Create(
+            "EXP_ADM_TARDE",
+            "Expediente Administrativo (tarde)",
+            TipoFuncionamento.Expediente,
+            TipoJornada.Expediente,
+            RecorrenciaTipo.DiasSemana,
+            tipoOcorrenciaTrabalho: "T",
+            tipoOcorrenciaFolga: "D",
+            diasSemana: "1,2,3,4,5",
+            horaInicioPadrao: new TimeOnly(13, 0),
+            horaFimPadrao: new TimeOnly(19, 0),
             horasPadrao: 6,
             sistema: true,
             createdBy: "seed"));

@@ -1291,7 +1291,15 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     .Where(x => x.EscalaServidorId == dest.Id)
                     .ToDictionaryAsync(x => x.Data, cancellationToken);
 
-                var manuais = src.Ocorrencias.Where(x => x.Origem == OrigemOcorrencia.Manual).ToList();
+                // Férias e licenças não são copiadas: elas têm data própria no cadastro de
+                // Afastamentos, que é reaplicado no fim (ver `ApplyAfastamentosToEscalaAsync`).
+                // Copiá-las deslocando o mês ressuscitava licença já encerrada e ignorava a
+                // continuidade de quem se afasta atravessando a virada do mês.
+                var manuais = src.Ocorrencias
+                    .Where(x => x.Origem == OrigemOcorrencia.Manual
+                                && categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
+                                   != CategoriaOcorrencia.Afastamento)
+                    .ToList();
 
                 // Escala administrativa é montada por dia da semana: expediente de seg a sex,
                 // descanso no fim de semana e home office em dias fixos (ex.: terça e quinta).
@@ -1308,10 +1316,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                         .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
                                     != CategoriaOcorrencia.Afastamento)
                         .ToList();
-                    manuais = manuais
-                        .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
-                                    == CategoriaOcorrencia.Afastamento)
-                        .ToList();
+                    // Afastamento já ficou de fora de `manuais`; aqui sobra o que a semana cobre.
+                    manuais = [];
 
                     // Um dia da semana pode ter códigos diferentes ao longo do mês (ex.: três
                     // terças de expediente e uma de home office): vale o mais frequente e, no
@@ -1404,6 +1410,12 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Férias/licenças vêm do cadastro, recortadas na janela do mês de destino: cobre tanto a
+        // continuidade de quem já estava afastado no mês anterior quanto a ausência de quem
+        // voltou. `nova.Servidores` é preenchido pelo fixup do EF ao adicionar os EscalaServidor.
+        await ApplyAfastamentosToEscalaAsync(nova, actorLogin, cancellationToken);
+
         await transacao.CommitAsync(cancellationToken);
         return await GetByIdAsync(nova.Id, actorLogin, cancellationToken);
     }

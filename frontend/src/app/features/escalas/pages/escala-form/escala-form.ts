@@ -340,7 +340,8 @@ export class EscalaForm implements OnInit {
   }));
 
   readonly regimeOptions: { codigo: RegimeCodigo; label: string }[] = [
-    { codigo: 'EXP_ADM', label: 'Expediente administrativo 6h' },
+    { codigo: 'EXP_ADM', label: 'Expediente administrativo (manhã)' },
+    { codigo: 'EXP_ADM_TARDE', label: 'Expediente administrativo (tarde)' },
     { codigo: '12X36', label: 'Plantão 12h' },
     { codigo: '24X72', label: 'Plantão 24h' },
     { codigo: 'PT24_TL12', label: 'Plantão 24h + Laudo 12h' },
@@ -369,9 +370,6 @@ export class EscalaForm implements OnInit {
    * ocorrências em `enterStep3` mesmo sem mudança de regime. */
   private draftDesatualizadoPelaResumida = false;
   readonly selectedServidorIds = signal<Set<string>>(new Set());
-  /** Cards com o bloco de "Expediente tarde" expandido, no passo 2 — só controla exibição,
-   * não afeta os dados salvos. */
-  readonly expandedServidorCards = signal<Set<string>>(new Set());
   /** Regime de plantão escolhido por servidor (um só por servidor) — Set por compatibilidade
    * com o formato usado ao restaurar de `EscalaJornada` existentes em `hydrateSelectionFromEscala`. */
   readonly servidorRegimes = signal<Map<string, Set<RegimeCodigo>>>(new Map());
@@ -413,7 +411,6 @@ export class EscalaForm implements OnInit {
 
   readonly afastamentos = signal<AfastamentoItem[]>([]);
   readonly homeOfficeDays = signal<Map<string, Set<number>>>(new Map());
-  readonly expedienteTardeDays = signal<Map<string, Set<number>>>(new Map());
   readonly selectedCells = signal<SelectedCell[]>([]);
   private clipboard: string[] = [];
 
@@ -1150,7 +1147,13 @@ export class EscalaForm implements OnInit {
         const fromPadrao = j.padraoEscalaId
           ? (padroesById.get(j.padraoEscalaId)?.codigo as RegimeCodigo | undefined)
           : undefined;
-        const inferred = this.inferRegimeCodigo(j.recorrenciaTipo, j.diasTrabalho, j.diasFolga, j.tipoJornada);
+        const inferred = this.inferRegimeCodigo(
+          j.recorrenciaTipo,
+          j.diasTrabalho,
+          j.diasFolga,
+          j.tipoJornada,
+          j.tipoOcorrenciaCodigo,
+        );
         const codigo = fromPadrao && this.isRegimeCodigo(fromPadrao) ? fromPadrao : inferred;
         if (!codigo) continue;
         regs.add(codigo);
@@ -1158,9 +1161,16 @@ export class EscalaForm implements OnInit {
           inicio.set(s.servidorId, j.dataInicioCiclo.slice(0, 10));
         }
       }
+      // Escalas montadas antes de a tarde virar regime têm jornada de manhã e células "T".
+      // Sem isto, reabrir e salvar uma dessas escalas transformaria a tarde em manhã.
+      if (regs.has('EXP_ADM') && !regs.has('EXP_ADM_TARDE') && this.ehTurnoDaTardeNaGrade(s)) {
+        regs.delete('EXP_ADM');
+        regs.add('EXP_ADM_TARDE');
+      }
       if (regs.size) porServidor.set(s.servidorId, regs);
     }
 
+    this.hydrateHomeOfficeFromEscala(escala);
     this.servidorRegimes.set(porServidor);
     this.servidorInicioCiclo.set(inicio);
     this.selectedServidorIds.set(new Set(escala.servidores.map((s) => s.servidorId)));
@@ -1174,8 +1184,42 @@ export class EscalaForm implements OnInit {
     this.lastAppliedRegimesFingerprint = this.regimesFingerprint();
   }
 
+  /** Home office não é regime (são dias soltos), então os dias marcados são reconstruídos das
+   * células "TL6" já salvas — senão os checkboxes voltam vazios e uma regeneração da grade
+   * apagaria o teletrabalho. */
+  private hydrateHomeOfficeFromEscala(escala: EscalaDetail): void {
+    const porServidor = new Map<string, Set<number>>();
+    for (const s of escala.servidores) {
+      const dias = new Set<number>();
+      for (const o of s.ocorrencias) {
+        if ((o.tipoOcorrenciaCodigo || '').toUpperCase() !== 'TL6') continue;
+        dias.add(new Date(o.data.slice(0, 10) + 'T00:00:00').getDay());
+      }
+      if (dias.size) porServidor.set(s.servidorId, dias);
+    }
+    this.homeOfficeDays.set(porServidor);
+  }
+
+  /** Maioria dos dias de trabalho do servidor lançada como "T" (tarde) na grade salva. */
+  private ehTurnoDaTardeNaGrade(servidor: EscalaServidor): boolean {
+    let tarde = 0;
+    let manha = 0;
+    for (const o of servidor.ocorrencias) {
+      const codigo = (o.tipoOcorrenciaCodigo || '').toUpperCase();
+      if (codigo === 'T') tarde++;
+      else if (codigo === 'M') manha++;
+    }
+    return tarde > manha;
+  }
+
   private isRegimeCodigo(value: string): value is RegimeCodigo {
-    return value === 'EXP_ADM' || value === '12X36' || value === '24X72' || value === 'PT24_TL12';
+    return (
+      value === 'EXP_ADM' ||
+      value === 'EXP_ADM_TARDE' ||
+      value === '12X36' ||
+      value === '24X72' ||
+      value === 'PT24_TL12'
+    );
   }
 
   private inferRegimeCodigo(
@@ -1183,6 +1227,7 @@ export class EscalaForm implements OnInit {
     diasTrabalho?: number | null,
     diasFolga?: number | null,
     tipoJornada?: string,
+    tipoOcorrenciaCodigo?: string | null,
   ): RegimeCodigo | null {
     if (recorrencia === 'CicloPlantao') {
       if (diasTrabalho === 1 && diasFolga === 1) return '12X36';
@@ -1196,7 +1241,8 @@ export class EscalaForm implements OnInit {
       tipoJornada === 'Expediente' ||
       recorrencia === 'DiasSemana'
     ) {
-      return 'EXP_ADM';
+      // "T" é o código do expediente da tarde; qualquer outro é o da manhã.
+      return tipoOcorrenciaCodigo?.toUpperCase() === 'T' ? 'EXP_ADM_TARDE' : 'EXP_ADM';
     }
     return null;
   }
@@ -1227,17 +1273,6 @@ export class EscalaForm implements OnInit {
   removerSelecionados(): void {
     this.selectedServidorIds.set(new Set());
     this.markDirty();
-  }
-
-  isServidorCardExpanded(id: string): boolean {
-    return this.expandedServidorCards().has(id);
-  }
-
-  toggleServidorCardExpanded(id: string): void {
-    const set = new Set(this.expandedServidorCards());
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    this.expandedServidorCards.set(set);
   }
 
   continuar2(): void {
@@ -1654,11 +1689,6 @@ export class EscalaForm implements OnInit {
     return true;
   }
 
-  /** UI de tarde (T) no passo 2: só pra servidor com regime EXP_ADM. */
-  showExpedienteTardeForServidor(servidorId: string): boolean {
-    return this.servidorRegimeCodigo(servidorId) === 'EXP_ADM';
-  }
-
   private deriveTipoFuncionamento(): TipoFuncionamento {
     return this.regimesSelected().some((r) => r === '12X36' || r === '24X72' || r === 'PT24_TL12')
       ? 'VinteQuatroHoras'
@@ -1824,12 +1854,9 @@ export class EscalaForm implements OnInit {
         next: (items) => {
           this.afastamentos.set(items);
           this.applyAfastamentosToDraft(items);
-          // Dias T marcados no passo 2 — após afastamentos para não sobrescrever FR/LM/etc.
-          this.aplicarExpedienteTarde();
         },
         error: () => {
           this.afastamentos.set([]);
-          this.aplicarExpedienteTarde();
         },
       });
   }
@@ -1933,54 +1960,6 @@ export class EscalaForm implements OnInit {
           return this.oc(day, 'TL6', 6);
         }
         // Demais dias: preservar o que já estava (ex.: T, M, D).
-        return existing ?? this.emptyOc(day);
-      });
-      return { ...servidor, ocorrencias };
-    });
-
-    this.escala.set({ ...e, servidores });
-    this.recalcCargas();
-    this.markDirty();
-  }
-
-  isExpedienteTardeDay(servidorId: string, day: number): boolean {
-    return this.expedienteTardeDays().get(servidorId)?.has(day) ?? false;
-  }
-
-  toggleExpedienteTardeDay(servidorId: string, day: number): void {
-    const map = new Map(this.expedienteTardeDays());
-    const set = new Set(map.get(servidorId) ?? []);
-    if (set.has(day)) set.delete(day);
-    else set.add(day);
-    map.set(servidorId, set);
-    this.expedienteTardeDays.set(map);
-  }
-
-  /** Aplica dias T marcados no passo 2 sobre a matriz já gerada (só servidores EXP_ADM com dias). */
-  aplicarExpedienteTarde(): void {
-    const e = this.escala();
-    if (!e) return;
-
-    const servidores = e.servidores.map((servidor) => {
-      if (!this.showExpedienteTardeForServidor(servidor.servidorId)) {
-        return servidor;
-      }
-      const tardeDays = this.expedienteTardeDays().get(servidor.servidorId);
-      if (!tardeDays || tardeDays.size === 0) {
-        return servidor;
-      }
-      const ocorrencias = this.matrizDays().map((day) => {
-        const existing = servidor.ocorrencias.find((o) => o.data.slice(0, 10) === day);
-        if (this.hasBlockingAfastamento(servidor.servidorId, day)) {
-          return existing ?? this.emptyOc(day);
-        }
-        const weekday = new Date(day + 'T00:00:00').getDay();
-        if (weekday === 0 || weekday === 6) {
-          return existing ?? this.oc(day, 'D');
-        }
-        if (tardeDays.has(weekday)) {
-          return this.oc(day, 'T', 6, '14:00', '20:00');
-        }
         return existing ?? this.emptyOc(day);
       });
       return { ...servidor, ocorrencias };

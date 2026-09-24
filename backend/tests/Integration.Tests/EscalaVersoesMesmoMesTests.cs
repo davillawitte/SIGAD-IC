@@ -160,8 +160,18 @@ public class EscalaVersoesMesmoMesTests(PostgresFixture fixture) : IntegrationTe
         var padrao12x36 = await PadraoIdAsync("12X36");
         var primeiroDia = new DateOnly(Ano, Mes, 1);
 
+        // Escala de plantão (não administrativa): aqui a cópia leva a marcação manual pela data,
+        // sem a reprodução da semana que vale para o expediente.
+        var escalaPlantao = await ExecutarAsync(s => s.CreateAsync(
+            new CreateEscalaRequest(ctx.SetorId, null, Ano, Mes, TipoFuncionamento.VinteQuatroHoras, null),
+            Login));
+        escalaPlantao.Error.ShouldBeNull();
+        var escalaId = escalaPlantao.Value!.Id;
+        (await ExecutarAsync(s => s.AddServidoresAsync(
+            escalaId, new AddEscalaServidoresRequest([ctx.ServidorId]), Login))).Error.ShouldBeNull();
+
         var gerada = await ExecutarAsync(s => s.GerarEscalaAsync(
-            ctx.EscalaId,
+            escalaId,
             new GerarEscalaRequest(
                 [new GerarEscalaItemRequest(ctx.ServidorId, padrao12x36, primeiroDia, null, null)],
                 DistribuirAutomaticamente: false,
@@ -169,19 +179,19 @@ public class EscalaVersoesMesmoMesTests(PostgresFixture fixture) : IntegrationTe
             Login));
         gerada.Error.ShouldBeNull();
 
-        // Ocorrência manual por cima de um dia que a jornada 12x36 já preencheu. Férias (FR) é
-        // afastamento: a cópia leva pela data, sem entrar na reprodução da semana que vale para
-        // a escala administrativa (ver CopiarEscalaAdministrativaTests).
+        // Ocorrência manual por cima de um dia que a jornada 12x36 já preencheu. Usa teletrabalho
+        // (e não férias) porque afastamento não é copiado — vem do cadastro (ver
+        // CopiarEscalaComAfastamentoTests).
         var manual = await ExecutarAsync(s => s.UpsertOcorrenciaAsync(
-            ctx.EscalaId,
+            escalaId,
             ctx.ServidorId,
-            new UpsertOcorrenciaRequest(primeiroDia, "FR", null, null, null, "Férias"),
+            new UpsertOcorrenciaRequest(primeiroDia, "TL12", null, null, null, "Laudo"),
             Login));
         manual.Error.ShouldBeNull();
-        (await PublicarAsync(ctx.EscalaId)).Error.ShouldBeNull();
+        (await PublicarAsync(escalaId)).Error.ShouldBeNull();
 
         var copia = await ExecutarAsync(s => s.CopiarAsync(
-            ctx.EscalaId, new CopiarEscalaRequest(Ano, Mes + 1), Login));
+            escalaId, new CopiarEscalaRequest(Ano, Mes + 1), Login));
 
         copia.Error.ShouldBeNull();
         await using var db = NewContext();
@@ -190,7 +200,7 @@ public class EscalaVersoesMesmoMesTests(PostgresFixture fixture) : IntegrationTe
                         && x.Data == new DateOnly(Ano, Mes + 1, 1))
             .ToListAsync();
         ocorrenciasDoDia.Count.ShouldBe(1);
-        ocorrenciasDoDia[0].TipoOcorrenciaCodigo.ShouldBe("FR");
+        ocorrenciasDoDia[0].TipoOcorrenciaCodigo.ShouldBe("TL12");
     }
 
     [Fact]

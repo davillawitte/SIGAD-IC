@@ -198,14 +198,6 @@ export interface SetorListItem {
   chefias: SetorChefia[];
 }
 
-export interface ChefiaConflito {
-  servidorId: string;
-  servidorNome: string;
-  tipoChefia: TipoChefia;
-  setorId: string;
-  setorNome: string;
-}
-
 export interface CreateSetorPayload {
   nome: string;
   sigla: string;

@@ -59,8 +59,11 @@ export class TrocarSenhaForm {
     event.target?.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  /** Enquanto a troca de senha é obrigatória, não há para onde voltar dentro do sistema (o
+   * guard devolveria para cá): cancelar encerra a sessão e volta para o login. */
   cancel(): void {
-    void this.router.navigateByUrl('/');
+    this.auth.logout();
+    void this.router.navigateByUrl('/login');
   }
 
   submit(): void {

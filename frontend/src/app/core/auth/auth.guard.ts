@@ -18,7 +18,9 @@ export const authGuard: CanActivateFn = () => {
 
 /**
  * Não autenticado: libera /login, exceto quando ainda falta concluir o setup (redireciona
- * para /setup). Autenticado: mesma prioridade de sempre (troca de senha obrigatória > home).
+ * para /setup). Autenticado: vai para a home — a não ser que a troca de senha obrigatória
+ * esteja pendente, caso em que pedir o login é desistir do primeiro acesso: a sessão é
+ * encerrada e o login aparece (mesma saída do botão "Cancelar" em `trocar-senha-form`).
  */
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
@@ -26,7 +28,8 @@ export const guestGuard: CanActivateFn = () => {
 
   if (auth.isAuthenticated()) {
     if (auth.deveAlterarSenha()) {
-      return router.createUrlTree(['/trocar-senha']);
+      auth.logout();
+      return true;
     }
 
     return router.createUrlTree(['/']);

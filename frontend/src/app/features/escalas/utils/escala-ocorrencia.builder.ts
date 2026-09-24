@@ -1,6 +1,6 @@
 import type { EscalaOcorrencia, PadraoEscala } from '../models/escalas.models';
 
-export type RegimeCodigo = 'EXP_ADM' | '12X36' | '24X72' | 'PT24_TL12';
+export type RegimeCodigo = 'EXP_ADM' | 'EXP_ADM_TARDE' | '12X36' | '24X72' | 'PT24_TL12';
 
 export interface BuildOcorrenciasInput {
   servidorId: string;
@@ -114,13 +114,16 @@ export function buildOcorrenciasForServidor(input: BuildOcorrenciasInput): Escal
     return days.map((day) => emptyOc(day));
   }
 
-  if (regime === 'EXP_ADM') {
+  // Expediente administrativo: dia útil de manhã (M) ou de tarde (T), conforme o regime do
+  // servidor; fim de semana é descanso nos dois casos.
+  if (regime === 'EXP_ADM' || regime === 'EXP_ADM_TARDE') {
+    const tarde = regime === 'EXP_ADM_TARDE';
     return days.map((day) => {
       const wd = new Date(day + 'T00:00:00').getDay();
       if (wd === 0 || wd === 6) {
         return oc(day, 'D');
       }
-      return oc(day, 'M', 6, '08:00', '14:00');
+      return tarde ? oc(day, 'T', 6, '13:00', '19:00') : oc(day, 'M', 6, '08:00', '14:00');
     });
   }
 

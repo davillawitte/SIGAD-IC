@@ -231,13 +231,25 @@ public static class AuthSeed
 
         var catalogCodes = PermissionCodes.Catalog.Select(x => x.Codigo).ToHashSet(StringComparer.Ordinal);
 
-        // Super Administrador: somente Administração do Sistema (usuários/perfis/permissões).
-        // Operação (escalas, afastamentos, etc.) vem de outros perfis do mesmo usuário.
-        var adminPermissaoIds = await context.Permissoes
+        // Super Administrador: Administração do Sistema (usuários/perfis/permissões) mais a
+        // CONSULTA dos cadastros do Instituto inteiro — sem isso ele não conseguia nem listar os
+        // servidores pra criar um usuário, que é a função dele. Operação (criar/editar escala,
+        // afastamento, etc.) continua vindo de outros perfis do mesmo usuário: ver tudo não dá
+        // direito de mutar nada.
+        string[] cadastrosInstitucionais =
+        [
+            PermissionCodes.ServidoresListar,
+            PermissionCodes.SetoresListar,
+            PermissionCodes.NucleosListar,
+            PermissionCodes.CargosListar,
+        ];
+
+        var superAdminPermissaoIds = await context.Permissoes
             .Where(x =>
                 x.Ativo &&
                 catalogCodes.Contains(x.Codigo) &&
-                x.Area == PermissionAreas.AdministracaoDoSistema)
+                (x.Area == PermissionAreas.AdministracaoDoSistema
+                 || cadastrosInstitucionais.Contains(x.Codigo)))
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
 
@@ -247,7 +259,11 @@ public static class AuthSeed
             .FirstOrDefaultAsync(cancellationToken);
         if (superAdminId != Guid.Empty)
         {
-            await SyncPerfilPermissoesAsync(context, superAdminId, adminPermissaoIds, cancellationToken);
+            await SyncPerfilPermissoesAsync(context, superAdminId, superAdminPermissaoIds, cancellationToken);
+            // A consulta dos cadastros é institucional: precisa de TodosOsSetores no MESMO perfil
+            // pra `ActorContext.TemVisaoGlobal` valer (o `Sync` grava com a abrangência padrão).
+            await EnsurePerfilPermissoesAsync(
+                context, superAdminId, cadastrosInstitucionais, Abrangencia.TodosOsSetores, cancellationToken);
         }
 
         if (criados.Contains(PerfilChefeSetorId))

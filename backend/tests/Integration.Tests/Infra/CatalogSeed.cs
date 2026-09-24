@@ -114,6 +114,8 @@ public static class CatalogSeed
         }
     }
 
+    /// <summary>Espelha `AuthSeed`: Administração do Sistema mais a CONSULTA dos cadastros do
+    /// Instituto (institucional, TodosOsSetores) — operação continua vindo de outros perfis.</summary>
     private static async Task SeedSuperAdminPermissoesAsync(
         ApplicationDbContext db,
         CancellationToken cancellationToken)
@@ -127,6 +129,18 @@ public static class CatalogSeed
         {
             db.PerfilPermissoes.Add(PerfilPermissao.Create(PerfilSuperAdminId, permissaoId));
         }
+
+        await LinkPermissoesAsync(
+            db,
+            PerfilSuperAdminId,
+            [
+                PermissionCodes.ServidoresListar,
+                PermissionCodes.SetoresListar,
+                PermissionCodes.NucleosListar,
+                PermissionCodes.CargosListar,
+            ],
+            Abrangencia.TodosOsSetores,
+            cancellationToken);
     }
 
     private static async Task LinkPermissoesAsync(

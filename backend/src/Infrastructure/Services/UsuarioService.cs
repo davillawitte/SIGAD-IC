@@ -131,8 +131,14 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             return Result<UsuarioDetailDto>.Failure("Usuário não encontrado.");
         }
 
-        if (request.PerfilIds is { Count: > 0 })
+        if (request.PerfilIds is not null)
         {
+            // Lista vazia não pode passar em silêncio: antes a API respondia 200 sem salvar nada.
+            if (request.PerfilIds.Count == 0)
+            {
+                return Result<UsuarioDetailDto>.Failure("Informe ao menos um perfil para o usuário.");
+            }
+
             var perfisValidos = await db.Perfis
                 .Where(x => request.PerfilIds.Contains(x.Id) && x.Ativo)
                 .Select(x => x.Id)
@@ -143,7 +149,9 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
                 return Result<UsuarioDetailDto>.Failure("Um ou mais perfis são inválidos.");
             }
 
-            db.UsuarioPerfis.RemoveRange(usuario.UsuarioPerfis);
+            // `ToList()`: remover enumerando a própria coleção rastreada é frágil (mesmo cuidado
+            // de `PerfilService.SetPermissoesAsync`).
+            db.UsuarioPerfis.RemoveRange(usuario.UsuarioPerfis.ToList());
             foreach (var perfilId in perfisValidos)
             {
                 usuario.UsuarioPerfis.Add(UsuarioPerfil.Create(usuario.Id, perfilId));
@@ -161,8 +169,25 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.Desativar(actorLogin);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
-        return Result<UsuarioDetailDto>.Success(MapDetail(usuario));
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<UsuarioDetailDto>.Failure(
+                "Não foi possível salvar os perfis do usuário. Recarregue a página e tente novamente.");
+        }
+
+        // Recarrega antes de mapear: o vínculo recém-criado só tem as chaves, e a navegação
+        // `Perfil` fica nula (a validação acima projeta só os ids, então o EF não rastreia os
+        // perfis novos). Sem isto, `MapDetail` estourava NullReference DEPOIS de já ter gravado —
+        // o usuário via erro 500 no primeiro clique e sucesso no segundo. Mesmo padrão de
+        // `CreateAsync` e de `PerfilService.SetPermissoesAsync`.
+        var atualizado = await LoadAsync(id, cancellationToken);
+        return atualizado is null
+            ? Result<UsuarioDetailDto>.Failure("Usuário não encontrado.")
+            : Result<UsuarioDetailDto>.Success(MapDetail(atualizado));
     }
 
     public async Task<Result<ResetSenhaResultDto>> ResetPasswordAsync(

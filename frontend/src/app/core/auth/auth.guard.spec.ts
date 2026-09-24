@@ -48,13 +48,15 @@ describe('auth guards', () => {
     expect(createUrlTree).toHaveBeenCalledWith(['/login']);
   });
 
-  it('guestGuard redireciona autenticado; prioriza trocar-senha quando obrigatorio', () => {
-    const { createUrlTree } = setup({
+  it('guestGuard encerra a sessao pendente de troca de senha e mostra o login', () => {
+    const logout = vi.fn();
+    setup({
       isAuthenticated: signal(true).asReadonly(),
       deveAlterarSenha: signal(true).asReadonly(),
+      logout,
     } as Partial<AuthService>);
-    TestBed.runInInjectionContext(() => guestGuard({} as never, {} as never));
-    expect(createUrlTree).toHaveBeenCalledWith(['/trocar-senha']);
+    expect(TestBed.runInInjectionContext(() => guestGuard({} as never, {} as never))).toBe(true);
+    expect(logout).toHaveBeenCalled();
 
     const home = setup({
       isAuthenticated: signal(true).asReadonly(),

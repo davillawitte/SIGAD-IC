@@ -257,19 +257,6 @@ pci-card-content > p {
   width: 1px;
 }
 
-.wizard-servidor-card__extra {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.5rem 0.75rem 0.75rem 3.5rem;
-}
-
-.wizard-servidor-tarde__label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--pci-color-text-secondary, #475467);
-}
-
 /* ---------- Step 3: afastamentos / home office ---------- */
 
 .wizard-table {

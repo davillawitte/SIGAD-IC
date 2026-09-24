@@ -122,8 +122,12 @@ public class CopiarEscalaAdministrativaTests(PostgresFixture fixture) : Integrat
         (await DatasAsync(ctx.EscalaId, "TL6")).ShouldBe([new DateOnly(Ano, Mes, 5)]);
     }
 
+    /// <summary>
+    /// Férias/licença não são herdadas pela cópia: elas vêm do cadastro de Afastamentos, que tem
+    /// as datas reais (ver CopiarEscalaComAfastamentoTests).
+    /// </summary>
     [Fact]
-    public async Task Ferias_lancadas_na_matriz_continuam_indo_pela_data()
+    public async Task Ferias_lancadas_na_matriz_nao_sao_copiadas()
     {
         var ctx = await PrepararAsync();
         await GerarExpedienteAsync(ctx.EscalaId, ctx.ServidorId);
@@ -131,7 +135,7 @@ public class CopiarEscalaAdministrativaTests(PostgresFixture fixture) : Integrat
 
         var copiaId = await CopiarParaOutubroAsync(ctx.EscalaId);
 
-        (await DatasAsync(copiaId, "FR")).ShouldBe([new DateOnly(Ano, Mes + 1, 8)]);
+        (await DatasAsync(copiaId, "FR")).ShouldBeEmpty();
     }
 
     /// <summary>
