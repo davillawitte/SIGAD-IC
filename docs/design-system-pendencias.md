@@ -168,10 +168,15 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
 
 - **Por quê**: ao recolher, a largura do menu anima enquanto os rótulos continuam no fluxo, então
   o texto reflui e quebra em duas linhas no meio do movimento.
+  O nome do sistema (`__brand-text`) é o caso mais visível: o template o remove de uma vez
+  (`@if (!collapsed)`), então ao expandir ele reaparece dentro do menu ainda estreito, espreme e
+  requebra até a largura terminar de animar.
 - **Onde foi contornado**: `frontend/src/styles.scss`, seção "Menu lateral (sobrescritas do design
   system)" — `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` em
-  `.pci-app-layout__nav-label`, `__brand-text`, `__nav-group > *` e `__user`, mais
-  `flex-wrap: nowrap` no item e `flex-shrink: 0` nos ícones.
+  `.pci-app-layout__nav-label`, `__nav-group > *` e `__user`; `flex-wrap: nowrap` no item e
+  `flex-shrink: 0` nos ícones; e, só no desktop (`min-width: 961px`, onde a animação existe),
+  largura fixa em `__brand-text` (a que sobra ao lado do brasão com o menu aberto), pra ele
+  deslizar recortado pelo menu em vez de refluir.
 - **Spec pra portar**: `PciAppLayoutComponent` cortar o rótulo (sem refluxo) durante a transição
   de largura, animando opacidade/largura do texto em vez de removê-lo do fluxo de uma vez.
 

@@ -219,3 +219,75 @@ não há mais nada a mudar no código:
      ```bash
      curl -i http://127.0.0.1:8080/api/setup/status
      ```
+
+## 13. Acessar o banco de produção (DBeaver / psql)
+
+O Postgres de produção **não é publicado no host** (seção 7): ele só existe dentro da rede
+Docker `sigad-ic`. Nada de abrir 5432 para a LAN — o acesso é sempre por SSH na máquina
+10.9.233.98.
+
+### Credenciais
+
+Não há credencial guardada neste repositório. Os valores em uso são os do `.env.prod` da
+máquina de produção:
+
+| Campo | Onde está |
+|-------|-----------|
+| Banco | `DB_NAME` do `.env.prod` (padrão `gestao_ic`) |
+| Usuário | `DB_USER` do `.env.prod` (padrão `postgres`) |
+| Senha | `DB_PASSWORD` do `.env.prod` — **só existe no servidor** |
+
+Para conferir, já logado na máquina de produção, no diretório do projeto:
+
+```bash
+grep -E '^DB_(NAME|USER)=' .env.prod          # banco e usuário
+docker exec sigad-ic-postgres printenv POSTGRES_PASSWORD   # senha em uso pelo contêiner
+```
+
+A senha não vai para o repositório, para e-mail nem para conversa — só do `.env.prod` para o
+gerenciador de senhas de quem opera.
+
+### Sem DBeaver: psql direto no contêiner
+
+```bash
+docker exec -it sigad-ic-postgres psql -U postgres -d gestao_ic
+```
+
+### DBeaver por túnel SSH
+
+1. **Publique a porta só no loopback** da máquina de produção (não na LAN), em
+   `docker-compose.prod.yml`, no serviço `postgres`:
+
+   ```yaml
+       ports:
+         - "127.0.0.1:5433:5432"
+   ```
+
+   Recrie o contêiner: `./scripts/docker-up-prod.sh`. O `127.0.0.1:` é o que importa — sem ele
+   o banco fica exposto na rede.
+
+2. No DBeaver, nova conexão PostgreSQL:
+   - Aba **Main**: Host `localhost`, Port `5433`, Database `gestao_ic`, usuário e senha do
+     quadro acima.
+   - Aba **SSH**: *Use SSH Tunnel* ligado, Host `10.9.233.98`, porta `22`, seu usuário do
+     servidor (chave SSH de preferência).
+
+   Pela linha de comando o equivalente é
+   `ssh -L 5433:127.0.0.1:5433 usuario@10.9.233.98` e apontar o DBeaver para `localhost:5433`
+   sem túnel.
+
+### Usuário de leitura (recomendado para consulta)
+
+Para o dia a dia de consulta, não use o superusuário. Crie um papel só de leitura (uma vez,
+conectado como `postgres`):
+
+```sql
+CREATE ROLE sigad_leitura LOGIN PASSWORD 'defina-uma-senha-forte';
+GRANT CONNECT ON DATABASE gestao_ic TO sigad_leitura;
+GRANT USAGE ON SCHEMA public TO sigad_leitura;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO sigad_leitura;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sigad_leitura;
+```
+
+Assim um engano no DBeaver não altera dado de produção. Para manutenção de verdade
+(migration, restore), aí sim o `postgres`.

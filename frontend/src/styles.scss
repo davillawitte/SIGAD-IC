@@ -257,12 +257,25 @@ app-form-section + app-form-section {
  * refluía (quebrava em duas linhas) durante o movimento. Travar o texto em uma linha e cortá-lo
  * sem reflow deixa a transição suave. */
 .pci-app-layout__nav-label,
-.pci-app-layout__brand-text,
 .pci-app-layout__nav-group > *:not(.pci-app-layout__nav-item),
 .pci-app-layout__user {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* O nome do sistema ocupa uma largura fixa — a que sobra ao lado do brasão com o menu aberto —
+ * e não encolhe junto com a coluna. Sem isso, ao expandir, o texto entra no espaço estreito,
+ * espreme e requebra enquanto a largura anima (o "sumindo aos poucos"); com largura fixa ele
+ * só desliza para dentro, recortado pelo próprio menu, sem reflow nenhum. Só no desktop: abaixo
+ * de 960px o menu vira gaveta (largura `min(300px, 88vw)`), não anima, e travar a largura ali
+ * cortaria o texto nas telas mais estreitas. */
+@media (min-width: 961px) {
+  .pci-app-layout__brand-text {
+    flex: 0 0 auto;
+    /* 280px do menu aberto − recuos do cabeçalho − brasão (40px) − espaço entre eles. */
+    width: calc(280px - 2 * var(--pci-space-4, 16px) - 40px - var(--pci-space-3, 12px));
+  }
 }
 
 /* O conteúdo do item não pode encolher junto com a coluna: sem isto o rótulo é espremido antes
