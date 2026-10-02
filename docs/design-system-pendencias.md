@@ -151,6 +151,48 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
 - **Spec pra portar**: acrescentar ao pacote `repeat` (duas setas em ciclo, como o "repeat" do
   Lucide) e `dollar-sign`/`coins`; depois trocar os dois ícones no menu.
 
+## Modal do design system não rola quando passa da altura da tela
+
+- **Por quê**: o surface do diálogo (`.pci-app-dialog-panel` / `mat-mdc-dialog-surface`) usa
+  `overflow: hidden` e o corpo (`.pci-app-dialog`) não tem altura máxima; os diálogos do app não
+  usam `mat-dialog-content`, então também não herdam a rolagem do Material. Em janela baixa, o
+  formulário de cadastro de usuário/servidor passava do fim da tela sem rolagem nenhuma.
+- **Onde foi contornado**: `frontend/src/styles.scss`, seção "Dialogs no padrão visual PCI" —
+  `max-height: 90vh` no painel e `max-height: 90vh; overflow-y: auto; overscroll-behavior: contain`
+  no corpo. Vale para os sete diálogos do app (confirmação, prompt, exportar escala, conflitos,
+  servidor, usuário e afastamento).
+- **Spec pra portar**: o componente de modal da lib definir altura máxima relativa à viewport e
+  rolagem só no corpo, mantendo cabeçalho e rodapé fixos.
+
+## Menu lateral: rótulos quebram durante a animação de recolher
+
+- **Por quê**: ao recolher, a largura do menu anima enquanto os rótulos continuam no fluxo, então
+  o texto reflui e quebra em duas linhas no meio do movimento.
+- **Onde foi contornado**: `frontend/src/styles.scss`, seção "Menu lateral (sobrescritas do design
+  system)" — `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` em
+  `.pci-app-layout__nav-label`, `__brand-text`, `__nav-group > *` e `__user`, mais
+  `flex-wrap: nowrap` no item e `flex-shrink: 0` nos ícones.
+- **Spec pra portar**: `PciAppLayoutComponent` cortar o rótulo (sem refluxo) durante a transição
+  de largura, animando opacidade/largura do texto em vez de removê-lo do fluxo de uma vez.
+
+## Marca do menu força círculo com fundo em volta do símbolo
+
+- **Por quê**: `.pci-app-layout__brand-logo` aplica `border-radius`, fundo e anel claros à imagem
+  da marca. A logo da PCI já é transparente e o símbolo aparecia dentro de um círculo claro.
+- **Onde foi contornado**: `frontend/src/styles.scss`, seção "Menu lateral (sobrescritas do design
+  system)" — zera `border-radius`, `background` e `border` da marca e da imagem.
+- **Spec pra portar**: o selo circular virar opt-in (ex.: `brandLogoShape="circle" | "bare"`), já
+  que marcas com fundo transparente não precisam dele.
+
+## `PciListPageComponent` não tem slot pra ações extras no cabeçalho
+
+- **Por quê**: a página de listagem só expõe o botão de criar (`showCreateButton`/`createLabel`) e
+  não tem `ng-content` nenhum, então não dá pra colocar outra ação ao lado do título.
+- **Onde foi contornado**: `frontend/src/app/features/escalas/pages/escala-list/escala-list.html` —
+  botão "Ver mês por mês" numa barra própria (`.escalas-toolbar`) acima do `pci-list-page`.
+- **Spec pra portar**: `PciListPageComponent` ganhar um slot `[slot=actions]` no cabeçalho (como o
+  `pci-page-header` já tem), pras ações secundárias ficarem alinhadas ao título.
+
 ## Como usar este documento
 
 Sempre que algo for implementado localmente por falta de suporte no design system, registrar

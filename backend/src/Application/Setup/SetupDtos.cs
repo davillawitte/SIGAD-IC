@@ -8,5 +8,5 @@ public record CompleteSetupRequest(
     string Nome,
     string Matricula,
     string? Email,
-    DateOnly DataNascimento,
+    DateOnly? DataNascimento,
     string Senha);

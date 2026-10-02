@@ -1,0 +1,98 @@
+.calendario-mes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-4, 16px);
+
+  &__layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: var(--pci-space-4, 16px);
+    align-items: start;
+  }
+
+  &__filtros {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pci-space-3, 12px);
+    padding: var(--pci-space-4, 16px);
+    border: 1px solid var(--pci-color-border);
+    border-radius: var(--pci-radius-xl, 12px);
+    background: var(--pci-color-surface);
+  }
+
+  &__filtros-title {
+    margin: 0;
+    font-size: var(--pci-font-size-sm);
+    font-weight: var(--pci-font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pci-color-text-secondary);
+  }
+
+  &__grupo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pci-space-2, 8px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  &__grupo-title {
+    margin: 0 0 var(--pci-space-1, 4px);
+    padding: 0;
+    font-size: var(--pci-font-size-xs);
+    font-weight: var(--pci-font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pci-color-text-secondary);
+  }
+
+  &__checkbox {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__codigos {
+    padding-left: 28px;
+    font-size: var(--pci-font-size-xs);
+    color: var(--pci-color-text-secondary);
+  }
+
+  &__escalas {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pci-space-1, 4px);
+    padding-top: var(--pci-space-2, 8px);
+    border-top: 1px solid var(--pci-color-border);
+  }
+
+  &__escala {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--pci-space-2, 8px);
+    margin: 0;
+    font-size: var(--pci-font-size-sm);
+  }
+
+  &__calendario {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pci-space-2, 8px);
+    min-width: 0;
+  }
+
+  &__resumo {
+    margin: 0;
+    font-size: var(--pci-font-size-sm);
+    color: var(--pci-color-text-secondary);
+  }
+}
+
+@media (max-width: 1024px) {
+  .calendario-mes__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

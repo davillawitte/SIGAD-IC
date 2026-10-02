@@ -1,0 +1,71 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="user" [title]="titulo()" (closed)="fechar()" />
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  @if (loading()) {
+    <div class="servidor-detail__loading">
+      <pci-spinner [size]="24" />
+      <span>Carregando dados do servidor…</span>
+    </div>
+  } @else if (servidor(); as servidor) {
+    <pci-form-card>
+      <dl class="servidor-detail">
+        <div class="servidor-detail__item">
+          <dt>Nome</dt>
+          <dd>{{ texto(servidor.nome) }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Situação</dt>
+          <dd>
+            <pci-badge [variant]="statusVariante()">{{ servidor.status }}</pci-badge>
+          </dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Matrícula</dt>
+          <dd>{{ matricula(servidor.matricula) }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>CPF</dt>
+          <dd>{{ cpf(servidor.cpf) }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Data de nascimento</dt>
+          <dd>{{ dataNascimento(servidor.dataNascimento) }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Cargo</dt>
+          <dd>{{ cargo() }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Lotação</dt>
+          <dd>{{ lotacao() }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Usuário do sistema</dt>
+          <dd>{{ usuario() }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>E-mail</dt>
+          <dd>{{ texto(servidor.email) }}</dd>
+        </div>
+        <div class="servidor-detail__item">
+          <dt>Telefone</dt>
+          <dd>{{ telefone(servidor.telefone) }}</dd>
+        </div>
+      </dl>
+    </pci-form-card>
+  }
+
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="fechar()">Fechar</pci-button>
+    @if (data.podeEditar && servidor()) {
+      <pci-button variant="primary" (clicked)="editar()">
+        <pci-icon slot="icon-left" name="edit" size="sm" />
+        Editar
+      </pci-button>
+    }
+  </pci-form-actions>
+</div>

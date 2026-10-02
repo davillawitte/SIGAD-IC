@@ -26,53 +26,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var q = db.Escalas.AsNoTracking().Include(x => x.Setor).Include(x => x.Nucleo).AsQueryable();
 
-        var escopo = (query.Escopo ?? string.Empty).Trim().ToLowerInvariant();
-        if (escopo is "setor" or "meus")
+        var filtradaPorEscopo = await AplicarEscopoVisibilidadeAsync(q, actor, query.Escopo, cancellationToken);
+        if (filtradaPorEscopo is null)
         {
-            var meusSetores = actor.SetoresGerenciadosIds
-                .Concat(actor.SetoresDosNucleosGerenciadosIds)
-                .Distinct()
-                .ToList();
-            var meusNucleos = actor.NucleosGerenciadosIds;
-            if (meusSetores.Count == 0 && meusNucleos.Count == 0)
-            {
-                return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
-            }
+            return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
+        }
 
-            q = q.Where(x =>
-                (x.SetorId != null && meusSetores.Contains(x.SetorId.Value)) ||
-                (x.NucleoId != null && meusNucleos.Contains(x.NucleoId.Value)));
-        }
-        else if (escopo is "institucional" or "outros")
-        {
-            if (!actor.TemVisaoGlobal(PermissionModules.Escalas))
-            {
-                return PagedResult<EscalaListItemDto>.Empty(normalized.Page, normalized.PageSize);
-            }
-
-            // Institucional: todos os setores, exceto a Direção do IC (gerida em Gestão do Setor).
-            // Escalas de núcleo passam direto — um núcleo nunca é a Direção do IC.
-            var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
-            if (direcaoIds.Count > 0)
-            {
-                q = q.Where(x => x.SetorId == null || !direcaoIds.Contains(x.SetorId.Value));
-            }
-        }
-        else
-        {
-            var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
-            if (setoresVisiveis is not null)
-            {
-                var setoresIncluidos = setoresVisiveis
-                    .Concat(actor.SetoresDosNucleosGerenciadosIds)
-                    .Distinct()
-                    .ToList();
-                var meusNucleos = actor.NucleosGerenciadosIds;
-                q = q.Where(x =>
-                    (x.SetorId != null && setoresIncluidos.Contains(x.SetorId.Value)) ||
-                    (x.NucleoId != null && meusNucleos.Contains(x.NucleoId.Value)));
-            }
-        }
+        q = filtradaPorEscopo;
 
         if (query.SetorId is Guid setorId)
         {
@@ -236,6 +196,152 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             detail.Value.DataInicio,
             detail.Value.DataFim,
             servidores));
+    }
+
+    public async Task<Result<EscalaCalendarioMesDto>> GetCalendarioMesAsync(
+        EscalaCalendarioMesQuery query,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        if (query.Mes is < 1 or > 12)
+        {
+            return Result<EscalaCalendarioMesDto>.Failure("Mês inválido.");
+        }
+
+        if (query.Ano is < 2000 or > 2100)
+        {
+            return Result<EscalaCalendarioMesDto>.Failure("Ano inválido.");
+        }
+
+        var inicio = new DateOnly(query.Ano, query.Mes, 1);
+        var fim = DateOnly.FromDateTime(new DateTime(query.Ano, query.Mes, 1).AddMonths(1).AddDays(-1));
+        var vazio = new EscalaCalendarioMesDto(query.Ano, query.Mes, inicio, fim, [], []);
+
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        var q = db.Escalas.AsNoTracking().Where(x => x.Ano == query.Ano && x.Mes == query.Mes);
+
+        var filtrada = await AplicarEscopoVisibilidadeAsync(q, actor, query.Escopo, cancellationToken);
+        if (filtrada is null)
+        {
+            return Result<EscalaCalendarioMesDto>.Success(vazio);
+        }
+
+        q = filtrada;
+
+        if (query.SetorId is Guid setorId)
+        {
+            q = q.Where(x => x.SetorId == setorId);
+        }
+
+        if (query.NucleoId is Guid nucleoId)
+        {
+            q = q.Where(x => x.NucleoId == nucleoId);
+        }
+
+        var candidatas = await q
+            .Select(x => new
+            {
+                x.Id,
+                x.SetorId,
+                SetorNome = x.Setor != null ? x.Setor.Nome : null,
+                SetorSigla = x.Setor != null ? x.Setor.Sigla : null,
+                x.NucleoId,
+                NucleoNome = x.Nucleo != null ? x.Nucleo.Nome : null,
+                NucleoSigla = x.Nucleo != null ? x.Nucleo.Sigla : null,
+                x.TipoFuncionamento,
+                x.Status,
+                x.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (candidatas.Count == 0)
+        {
+            return Result<EscalaCalendarioMesDto>.Success(vazio);
+        }
+
+        // Uma lotação pode ter mais de uma versão do mês (normal montar várias antes de publicar).
+        // No calendário entra só uma por lotação, senão o mesmo servidor apareceria duas vezes no
+        // mesmo dia: a publicada e, na falta dela, a mais recente.
+        var escolhidas = candidatas
+            .GroupBy(x => new { x.SetorId, x.NucleoId })
+            .Select(grupo => grupo
+                .OrderByDescending(x => x.Status == StatusEscala.Publicada)
+                .ThenByDescending(x => x.Status == StatusEscala.Finalizada)
+                .ThenByDescending(x => x.CreatedAt)
+                .First())
+            .ToList();
+
+        var escalas = escolhidas
+            .Select(x => new EscalaCalendarioMesEscalaDto(
+                x.Id,
+                Escala.FormatIdentificacao(query.Mes, query.Ano, x.SetorNome ?? x.NucleoNome ?? string.Empty),
+                x.SetorId,
+                x.SetorNome,
+                x.SetorSigla,
+                x.NucleoId,
+                x.NucleoNome,
+                x.NucleoSigla,
+                x.TipoFuncionamento,
+                x.Status))
+            .OrderBy(x => x.SetorSigla ?? x.NucleoSigla)
+            .ToList();
+
+        var escalaIds = escolhidas.Select(x => x.Id).ToList();
+        var servidorId = query.ServidorId;
+        var ocorrencias = await db.EscalaOcorrencias
+            .AsNoTracking()
+            .Where(o => escalaIds.Contains(o.EscalaServidor.EscalaId)
+                        && o.Data >= inicio
+                        && o.Data <= fim
+                        && (servidorId == null || o.EscalaServidor.ServidorId == servidorId))
+            .Select(o => new
+            {
+                o.Data,
+                o.EscalaServidor.EscalaId,
+                o.EscalaServidor.ServidorId,
+                o.EscalaServidor.ServidorNome,
+                o.EscalaServidor.Matricula,
+                o.EscalaServidor.CargoNome,
+                o.EscalaServidor.CargoCodigo,
+                o.TipoOcorrenciaCodigo,
+                TipoOcorrenciaNome = o.TipoOcorrencia.Nome,
+                o.TipoOcorrencia.Categoria,
+                o.HoraInicio,
+                o.HoraFim,
+                o.Horas,
+            })
+            .ToListAsync(cancellationToken);
+
+        var escalaPorId = escolhidas.ToDictionary(x => x.Id);
+        var itens = ocorrencias
+            .Select(o =>
+            {
+                var escala = escalaPorId[o.EscalaId];
+                return new EscalaCalendarioMesItemDto(
+                    o.Data,
+                    o.EscalaId,
+                    escala.SetorId,
+                    escala.SetorSigla,
+                    escala.NucleoId,
+                    escala.NucleoSigla,
+                    o.ServidorId,
+                    o.ServidorNome,
+                    o.Matricula,
+                    o.CargoNome,
+                    o.CargoCodigo,
+                    o.TipoOcorrenciaCodigo,
+                    o.TipoOcorrenciaNome,
+                    o.Categoria,
+                    o.HoraInicio,
+                    o.HoraFim,
+                    o.Horas);
+            })
+            .OrderBy(x => x.Data)
+            .ThenBy(x => x.ServidorNome)
+            .ToList();
+
+        return Result<EscalaCalendarioMesDto>.Success(
+            new EscalaCalendarioMesDto(query.Ano, query.Mes, inicio, fim, escalas, itens));
     }
 
     public async Task<Result<EscalaDetailDto>> CreateAsync(
@@ -2295,6 +2401,66 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);
 
+    /// <summary>
+    /// Filtro de visibilidade das escalas por escopo (<c>setor</c> / <c>institucional</c> / padrão);
+    /// <c>null</c> significa "nada visível" e quem chama devolve resultado vazio. Vive aqui, e não
+    /// dentro da listagem, pra listagem e calendário do mês enxergarem o mesmo conjunto.
+    /// </summary>
+    private async Task<IQueryable<Escala>?> AplicarEscopoVisibilidadeAsync(
+        IQueryable<Escala> q,
+        ActorContext actor,
+        string? escopoSolicitado,
+        CancellationToken cancellationToken)
+    {
+        var escopo = (escopoSolicitado ?? string.Empty).Trim().ToLowerInvariant();
+        if (escopo is "setor" or "meus")
+        {
+            var meusSetores = actor.SetoresGerenciadosIds
+                .Concat(actor.SetoresDosNucleosGerenciadosIds)
+                .Distinct()
+                .ToList();
+            var meusNucleos = actor.NucleosGerenciadosIds;
+            if (meusSetores.Count == 0 && meusNucleos.Count == 0)
+            {
+                return null;
+            }
+
+            return q.Where(x =>
+                (x.SetorId != null && meusSetores.Contains(x.SetorId.Value)) ||
+                (x.NucleoId != null && meusNucleos.Contains(x.NucleoId.Value)));
+        }
+
+        if (escopo is "institucional" or "outros")
+        {
+            if (!actor.TemVisaoGlobal(PermissionModules.Escalas))
+            {
+                return null;
+            }
+
+            // Institucional: todos os setores, exceto a Direção do IC (gerida em Gestão do Setor).
+            // Escalas de núcleo passam direto — um núcleo nunca é a Direção do IC.
+            var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
+            return direcaoIds.Count > 0
+                ? q.Where(x => x.SetorId == null || !direcaoIds.Contains(x.SetorId.Value))
+                : q;
+        }
+
+        var setoresVisiveis = actor.SetoresVisiveis(PermissionModules.Escalas);
+        if (setoresVisiveis is null)
+        {
+            return q;
+        }
+
+        var setoresIncluidos = setoresVisiveis
+            .Concat(actor.SetoresDosNucleosGerenciadosIds)
+            .Distinct()
+            .ToList();
+        var nucleosGerenciados = actor.NucleosGerenciadosIds;
+        return q.Where(x =>
+            (x.SetorId != null && setoresIncluidos.Contains(x.SetorId.Value)) ||
+            (x.NucleoId != null && nucleosGerenciados.Contains(x.NucleoId.Value)));
+    }
+
     private async Task<HashSet<Guid>> LoadDirecaoIcSetorIdsAsync(CancellationToken cancellationToken)
     {
         var setores = await db.Setores
@@ -2316,10 +2482,14 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     private static bool CanMutate(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
         IsChefiaDireta(actor, setorId, nucleoId);
 
+    /// <summary>
+    /// Pedir devolução é do mesmo grupo de quem altera a escala: exige chefia do setor (direta ou
+    /// pelo núcleo) ou do núcleo. Antes aceitava abrangência ampla como substituto de chefia — o
+    /// botão aparecia para a visão institucional em escala alheia — e, do outro lado, não aceitava
+    /// o chefe de núcleo no setor que ele engloba, embora ele possa editar e publicar a escala.
+    /// </summary>
     private static bool CanSolicitarDevolucao(ActorContext actor, Guid? setorId, Guid? nucleoId) =>
-        setorId is Guid s
-            ? actor.PodeAcessar(PermissionCodes.EscalasSolicitarDevolucao, s)
-            : nucleoId is Guid n && actor.GerenciaNucleo(n);
+        IsChefiaDireta(actor, setorId, nucleoId);
 
     /// <summary>Chefia de verdade (setor direto ou núcleo que engloba o setor) — ao contrário de
     /// <see cref="CanMutate"/>, NÃO aceita a abrangência "TodosOsSetores" de uma permissão como

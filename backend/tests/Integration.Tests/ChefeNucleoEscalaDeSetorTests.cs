@@ -92,6 +92,41 @@ public class ChefeNucleoEscalaDeSetorTests(PostgresFixture fixture) : Integratio
         exclusao.Succeeded.ShouldBeFalse();
     }
 
+    /// <summary>
+    /// Pedir devolução virou do mesmo grupo de quem altera a escala (exige chefia). Isso tirou o
+    /// botão da visão institucional em escala alheia e, do outro lado, liberou o chefe de núcleo
+    /// no setor que o núcleo engloba — que já podia editar e publicar, mas não pedir devolução.
+    /// </summary>
+    [Fact]
+    public async Task Pede_devolucao_de_escala_de_setor_do_nucleo_que_chefia()
+    {
+        var ctx = await PrepararAsync();
+        (await ExecutarAsync(s => s.FinalizarAsync(ctx.EscalaId, ChefeNucleo))).Error.ShouldBeNull();
+        (await ExecutarAsync(s => s.PublicarAsync(
+            ctx.EscalaId, new PublicarEscalaRequest(ConfirmarConflitos: true), ChefeNucleo))).Error.ShouldBeNull();
+
+        var pedido = await ExecutarAsync(s => s.SolicitarDevolucaoAsync(
+            ctx.EscalaId, new SolicitarDevolucaoEscalaRequest("Preciso corrigir o mês."), ChefeNucleo));
+
+        pedido.Error.ShouldBeNull();
+        pedido.Value!.Status.ShouldBe(StatusSolicitacaoDevolucao.Pendente);
+    }
+
+    [Fact]
+    public async Task Visao_institucional_nao_pede_devolucao_de_escala_alheia()
+    {
+        var ctx = await PrepararAsync();
+        (await ExecutarAsync(s => s.FinalizarAsync(ctx.EscalaId, ChefeNucleo))).Error.ShouldBeNull();
+        (await ExecutarAsync(s => s.PublicarAsync(
+            ctx.EscalaId, new PublicarEscalaRequest(ConfirmarConflitos: true), ChefeNucleo))).Error.ShouldBeNull();
+
+        var pedido = await ExecutarAsync(s => s.SolicitarDevolucaoAsync(
+            ctx.EscalaId, new SolicitarDevolucaoEscalaRequest("Tentativa indevida."), DirecaoInstitucional));
+
+        pedido.Succeeded.ShouldBeFalse();
+        pedido.Error.ShouldBe("Sem permissão para esta escala.");
+    }
+
     [Fact]
     public async Task Copia_escala_publicada_do_setor_do_nucleo_que_chefia()
     {

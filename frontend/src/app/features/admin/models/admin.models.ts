@@ -129,7 +129,7 @@ export interface ServidorListItem {
   cargoOutroTexto?: string | null;
   email?: string | null;
   telefone?: string | null;
-  dataNascimento: string;
+  dataNascimento: string | null;
   setorId?: string | null;
   setorNome?: string | null;
   nucleoId?: string | null;
@@ -150,7 +150,7 @@ export interface CreateServidorPayload {
   email?: string | null;
   setorId?: string | null;
   nucleoId?: string | null;
-  dataNascimento: string;
+  dataNascimento: string | null;
   telefone?: string | null;
   status?: StatusServidor | null;
   cargoOutroTexto?: string | null;
@@ -164,7 +164,7 @@ export interface UpdateServidorPayload {
   email?: string | null;
   setorId?: string | null;
   nucleoId?: string | null;
-  dataNascimento: string;
+  dataNascimento: string | null;
   telefone?: string | null;
   status: StatusServidor;
   cargoOutroTexto?: string | null;

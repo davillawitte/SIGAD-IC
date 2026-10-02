@@ -1,0 +1,95 @@
+<div class="calendario-mes">
+  <pci-page-header
+    [title]="pageTitle()"
+    description="Quem trabalha em cada dia do mês, por setor e por servidor."
+  >
+    <pci-button slot="actions" variant="ghost" icon="arrow-left" (clicked)="voltar()">
+      Voltar para a listagem
+    </pci-button>
+  </pci-page-header>
+
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  @if (!loading() && escalas().length === 0 && !error()) {
+    <pci-alert
+      variant="info"
+      title="Nenhuma escala neste mês"
+      message="Não há escala cadastrada no mês selecionado dentro do seu alcance. Use as setas do calendário para ver outro mês."
+    />
+  }
+
+  @if (escalasNaoPublicadas().length > 0) {
+    <pci-alert
+      variant="warning"
+      title="Prévia"
+      message="Há lotações cujo mês ainda não foi publicado — o que aparece aqui é a versão mais recente em preparo."
+    />
+  }
+
+  <div class="calendario-mes__layout" [formGroup]="form">
+    <aside class="calendario-mes__filtros">
+      <h2 class="calendario-mes__filtros-title">Filtros</h2>
+
+      <pci-select
+        label="Setor"
+        formControlName="lotacao"
+        [options]="lotacaoOptions()"
+        placeholder="Todos"
+      />
+
+      <pci-select
+        label="Servidor"
+        formControlName="servidorId"
+        [options]="servidorOptions()"
+        placeholder="Todos"
+      />
+
+      <fieldset class="calendario-mes__grupo">
+        <legend class="calendario-mes__grupo-title">Mostrar</legend>
+        @for (item of legenda; track item.grupo) {
+          <div class="calendario-mes__checkbox">
+            <pci-checkbox [label]="item.label" [formControlName]="item.grupo" />
+            <span class="calendario-mes__codigos">
+              {{ item.codigos }} · {{ totaisPorGrupo()[item.grupo] }}
+            </span>
+          </div>
+        }
+      </fieldset>
+
+      @if (escalas().length > 0) {
+        <section class="calendario-mes__escalas">
+          <h3 class="calendario-mes__grupo-title">Escalas do mês</h3>
+          @for (escala of escalas(); track escala.escalaId) {
+            <p class="calendario-mes__escala">
+              <span>{{ lotacaoLabel(escala) }}</span>
+              <pci-badge [variant]="escala.status === 'Publicada' ? 'success' : 'warning'">
+                {{ statusLabel(escala) }}
+              </pci-badge>
+            </p>
+          }
+        </section>
+      }
+    </aside>
+
+    <section class="calendario-mes__calendario">
+      <p class="calendario-mes__resumo">
+        @if (loading()) {
+          Carregando o mês…
+        } @else {
+          {{ itensFiltrados().length }} marcação(ões) · {{ totalServidores() }} servidor(es)
+        }
+      </p>
+
+      <pci-calendar
+        [viewDate]="viewDate()"
+        [events]="eventos()"
+        [maxEventsPerDay]="40"
+        instituteLabel="Calendário de escalas"
+        subtitle="Expediente, plantões e afastamentos do mês"
+        (viewDateChange)="onViewDateChange($event)"
+      />
+    </section>
+  </div>
+</div>

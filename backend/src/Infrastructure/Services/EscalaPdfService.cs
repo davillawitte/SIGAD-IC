@@ -259,7 +259,11 @@ public class EscalaPdfService(
                             columns.ConstantColumn(36);
                             foreach (var _ in days)
                             {
-                                columns.ConstantColumn(16);
+                                // 18pt: o código mais largo da legenda é "TL12", que não cabia nos
+                                // 16pt antigos (sobravam ~14pt úteis) e quebrava em duas linhas.
+                                // Mesmo com 31 dias ainda sobra largura para o nome do servidor,
+                                // que é a única coluna elástica.
+                                columns.ConstantColumn(18);
                             }
 
                             columns.ConstantColumn(28);
@@ -301,7 +305,8 @@ public class EscalaPdfService(
                             {
                                 var weekend = IsWeekend(day);
                                 var codigo = map.TryGetValue(day, out var oc) ? oc.TipoOcorrenciaCodigo : "";
-                                table.Cell().Element(c => DayBodyCell(c, weekend, codigo)).AlignCenter().Text(codigo);
+                                table.Cell().Element(c => DayBodyCell(c, weekend, codigo))
+                                    .AlignCenter().Text(codigo).FontSize(6.5f);
                             }
 
                             table.Cell().Element(BodyCell).AlignCenter().Text($"{chPres:0}");
@@ -452,7 +457,8 @@ public class EscalaPdfService(
     private static IContainer DayBodyCell(IContainer c, bool weekend, string codigo)
     {
         var bg = CellBackground(codigo, weekend);
-        return c.Border(0.5f).Background(bg).Padding(1);
+        // Recuo só na vertical: na horizontal ele comia a largura útil do código (ver "TL12").
+        return c.Border(0.5f).Background(bg).PaddingVertical(1);
     }
 
     private static string CellBackground(string codigo, bool weekend)

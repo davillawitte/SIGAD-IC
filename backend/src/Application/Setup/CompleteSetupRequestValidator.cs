@@ -20,10 +20,12 @@ public class CompleteSetupRequestValidator : AbstractValidator<CompleteSetupRequ
             .Must(cpf => Servidor.NormalizeCpf(cpf ?? string.Empty).Length == 11)
             .WithMessage("CPF inválido.");
 
-        RuleFor(x => x.DataNascimento)
+        // Opcional; se vier preenchida, não pode ser no futuro.
+        RuleFor(x => x.DataNascimento!.Value)
             .NotEqual(default(DateOnly))
             .LessThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow.Date))
-            .WithMessage("Data de nascimento inválida.");
+            .WithMessage("Data de nascimento inválida.")
+            .When(x => x.DataNascimento.HasValue);
 
         RuleFor(x => x.Senha).Custom((senha, context) =>
         {

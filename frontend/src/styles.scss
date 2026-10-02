@@ -112,7 +112,12 @@ app-form-section + app-form-section {
 .pci-app-dialog-panel .mdc-dialog__surface {
   padding: 0 !important;
   border-radius: var(--pci-radius-lg, 12px);
+  /* `hidden` mantém o canto arredondado; a rolagem fica no corpo (.pci-app-dialog), senão um
+   * formulário alto (cadastro de servidor/usuário) passava da tela sem como rolar. */
   overflow: hidden;
+  /* Teto do painel inteiro: o Material centraliza o diálogo, então sem isto ele cresce para
+   * fora da janela em telas baixas. */
+  max-height: 90vh;
 }
 
 .pci-app-dialog {
@@ -122,6 +127,10 @@ app-form-section + app-form-section {
   padding: var(--pci-space-6, 1.5rem);
   min-width: min(520px, 92vw);
   max-width: 100%;
+  /* Mesmo teto do painel, descontando a borda: o conteúdo rola aqui dentro. */
+  max-height: 90vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   text-align: center;
 }
@@ -230,4 +239,39 @@ app-form-section + app-form-section {
 /* Propaga restrição de largura do th (PciColumn.width) para as células do corpo */
 .pci-table thead th[style*='width'] {
   max-width: inherit;
+}
+
+/* ---------- Menu lateral (sobrescritas do design system) ---------- */
+
+/* Marca da PCI: o símbolo já é transparente — o círculo vinha do disco/anel que a lib desenha
+ * atrás dele. Fica só o símbolo, e em caixa quadrada para o escudo não ser recortado nos cantos.
+ * Ver docs/design-system-pendencias.md. */
+.pci-app-layout__brand-logo,
+.pci-app-layout__brand-logo-img {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+/* Recolher/expandir o menu: a largura anima enquanto os rótulos somem de uma vez, e o texto
+ * refluía (quebrava em duas linhas) durante o movimento. Travar o texto em uma linha e cortá-lo
+ * sem reflow deixa a transição suave. */
+.pci-app-layout__nav-label,
+.pci-app-layout__brand-text,
+.pci-app-layout__nav-group > *:not(.pci-app-layout__nav-item),
+.pci-app-layout__user {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* O conteúdo do item não pode encolher junto com a coluna: sem isto o rótulo é espremido antes
+ * de desaparecer, que é o "pulo" visto ao recolher. */
+.pci-app-layout__nav-item {
+  flex-wrap: nowrap;
+}
+
+.pci-app-layout__nav-item pci-icon,
+.pci-app-layout__nav-item .pci-icon {
+  flex-shrink: 0;
 }

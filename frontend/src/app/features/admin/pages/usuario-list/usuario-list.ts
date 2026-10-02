@@ -14,7 +14,8 @@ import {
   filterTableRowsByQuickSearch,
   sortTableRows,
 } from '@davillawitte/pci-design-system';
-import { filter } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
+import { filter, map, switchMap } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
@@ -200,26 +201,50 @@ export class UsuarioList implements OnInit {
       });
   }
 
+  /**
+   * Busca, filtros e ordenação desta tela são feitos sobre a lista carregada, então ela precisa
+   * de TODOS os usuários — carregar só a primeira página escondia quem passasse do centésimo.
+   * A API limita 100 por página, então as demais vêm em seguida, de uma vez.
+   */
   private reload(): void {
     this.loading.set(true);
-    this.api.listUsuarios({ page: 1, pageSize: 100 }).subscribe({
-      next: (result) => {
-        this.allRows.set(
-          result.items.map((u) => ({
-            id: u.id,
-            nomeServidor: u.nomeServidor,
-            matricula: maskMatricula(u.matricula),
-            cpf: formatCpfDisplay(u.cpf || u.login),
-            perfis: (u.perfis ?? []).join(', '),
-            status: u.ativo ? 'Ativo' : 'Inativo',
-          })),
-        );
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Não foi possível carregar os usuários.');
-        this.loading.set(false);
-      },
-    });
+    const porPagina = 100;
+
+    this.api
+      .listUsuarios({ page: 1, pageSize: porPagina })
+      .pipe(
+        switchMap((primeira) => {
+          const faltam = Math.ceil((primeira.totalItems ?? 0) / porPagina) - 1;
+          if (faltam <= 0) {
+            return of([primeira]);
+          }
+
+          const demais = Array.from({ length: faltam }, (_, i) =>
+            this.api.listUsuarios({ page: i + 2, pageSize: porPagina }),
+          );
+          return forkJoin(demais).pipe(map((paginas) => [primeira, ...paginas]));
+        }),
+      )
+      .subscribe({
+        next: (paginas) => {
+          this.allRows.set(
+            paginas
+              .flatMap((p) => p.items)
+              .map((u) => ({
+                id: u.id,
+                nomeServidor: u.nomeServidor,
+                matricula: maskMatricula(u.matricula),
+                cpf: formatCpfDisplay(u.cpf || u.login),
+                perfis: (u.perfis ?? []).join(', '),
+                status: u.ativo ? 'Ativo' : 'Inativo',
+              })),
+          );
+          this.loading.set(false);
+        },
+        error: () => {
+          this.error.set('Não foi possível carregar os usuários.');
+          this.loading.set(false);
+        },
+      });
   }
 }

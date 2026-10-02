@@ -278,6 +278,11 @@ export class EscalaList implements OnInit, OnDestroy {
     void this.router.navigateByUrl('/escalas/nova');
   }
 
+  /** Visão mês a mês (quem trabalha em cada dia) da mesma seção em que a pessoa está. */
+  verCalendario(): void {
+    void this.router.navigateByUrl(this.listBasePath() + '/calendario');
+  }
+
   onPageChange(page: number): void {
     this.page.set(page);
     this.reload();

@@ -15,7 +15,7 @@ export interface CompleteSetupPayload {
   nome: string;
   matricula: string;
   email?: string | null;
-  dataNascimento: string;
+  dataNascimento: string | null;
   senha: string;
 }
 

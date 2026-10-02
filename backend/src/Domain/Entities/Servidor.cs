@@ -19,7 +19,8 @@ public class Servidor : BaseEntity
     public string? CargoOutroTexto { get; private set; }
     public string Email { get; private set; } = null!;
     public string? Telefone { get; private set; }
-    public DateOnly DataNascimento { get; private set; }
+    /// <summary>Opcional: nem todo cadastro antigo tem a data, e ela não trava nada no sistema.</summary>
+    public DateOnly? DataNascimento { get; private set; }
     public Guid? SetorId { get; private set; }
     public Guid? NucleoId { get; private set; }
     public StatusServidor Status { get; private set; } = StatusServidor.Ativo;
@@ -46,7 +47,7 @@ public class Servidor : BaseEntity
         string? email,
         Guid? setorId,
         Guid? nucleoId,
-        DateOnly dataNascimento,
+        DateOnly? dataNascimento,
         string? telefone = null,
         StatusServidor status = StatusServidor.Ativo,
         string? createdBy = null,
@@ -87,7 +88,7 @@ public class Servidor : BaseEntity
         string? email,
         Guid? setorId,
         Guid? nucleoId,
-        DateOnly dataNascimento,
+        DateOnly? dataNascimento,
         string? telefone = null,
         string? updatedBy = null,
         string? cargoOutroTexto = null)

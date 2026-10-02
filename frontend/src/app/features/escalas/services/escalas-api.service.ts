@@ -10,6 +10,7 @@ import type {
   CreateEscalaPayload,
   EscalaAnteriorInfo,
   EscalaCalendario,
+  EscalaCalendarioMes,
   EscalaCobertura,
   EscalaConflitos,
   EscalaDetail,
@@ -71,6 +72,35 @@ export class EscalasApiService {
       params = params.set('servidorId', servidorId);
     }
     return this.http.get<EscalaCalendario>(`${this.base}/api/escalas/${id}/calendario`, { params });
+  }
+
+  /** Calendário do mês inteiro: uma chamada devolve as ocorrências de todas as escalas
+   * visíveis no escopo, já achatadas — a tela filtra setor/servidor/tipo em memória. */
+  getCalendarioMes(params: {
+    ano: number;
+    mes: number;
+    escopo: 'setor' | 'institucional';
+    setorId?: string;
+    nucleoId?: string;
+    servidorId?: string;
+  }): Observable<EscalaCalendarioMes> {
+    let httpParams = new HttpParams()
+      .set('ano', String(params.ano))
+      .set('mes', String(params.mes));
+    if (params.setorId) {
+      httpParams = httpParams.set('setorId', params.setorId);
+    }
+    if (params.nucleoId) {
+      httpParams = httpParams.set('nucleoId', params.nucleoId);
+    }
+    if (params.servidorId) {
+      httpParams = httpParams.set('servidorId', params.servidorId);
+    }
+    const path =
+      params.escopo === 'institucional'
+        ? 'api/escalas/institucionais/calendario'
+        : 'api/escalas/setor/calendario';
+    return this.http.get<EscalaCalendarioMes>(`${this.base}/${path}`, { params: httpParams });
   }
 
   getCobertura(id: string): Observable<EscalaCobertura> {

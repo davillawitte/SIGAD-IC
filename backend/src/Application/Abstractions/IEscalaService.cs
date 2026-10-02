@@ -9,6 +9,7 @@ public interface IEscalaService
     Task<PagedResult<EscalaListItemDto>> ListAsync(EscalaListQuery query, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> GetByIdAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaCalendarioDto>> GetCalendarioAsync(Guid id, Guid? servidorId, string actorLogin, CancellationToken cancellationToken = default);
+    Task<Result<EscalaCalendarioMesDto>> GetCalendarioMesAsync(EscalaCalendarioMesQuery query, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> CreateAsync(CreateEscalaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> UpdateAsync(Guid id, UpdateEscalaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaDetailDto>> AddServidoresAsync(Guid id, AddEscalaServidoresRequest request, string actorLogin, CancellationToken cancellationToken = default);

@@ -134,11 +134,13 @@ export class EscalaDetail implements OnInit {
     return this.podeAlterar('escalas.excluir');
   }
 
+  /** Pedir devolução é de quem chefia a escala, como editar/publicar — visão institucional não
+   * basta. Sem isto o botão aparecia em escala de núcleo alheia (a API recusava depois). */
   canSolicitarDevolucao(): boolean {
     const e = this.escala();
     if (!e || e.status !== 'Publicada') return false;
     if (isDirecaoIcSigla(e.setorSigla)) return false;
-    return this.auth.canAccessEscala('escalas.solicitar_devolucao', e.setorId, e.nucleoId);
+    return this.podeAlterar('escalas.solicitar_devolucao');
   }
 
   canDevolverDireto(): boolean {

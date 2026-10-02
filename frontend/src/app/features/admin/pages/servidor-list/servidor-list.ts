@@ -20,6 +20,10 @@ import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
+import {
+  ServidorDetailDialog,
+  type ServidorDetailDialogData,
+} from '../../components/servidor-detail-dialog/servidor-detail-dialog';
 import { maskMatricula } from '../../../../shared/input-masks';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
@@ -125,7 +129,16 @@ export class ServidorList implements OnInit {
   ];
 
   readonly rowActions = computed<PciRowAction<ServidorRow>[]>(() => {
-    const actions: PciRowAction<ServidorRow>[] = [];
+    // Olho primeiro: conferir os dados (inclusive CPF) sem passar pela tela de edição.
+    const actions: PciRowAction<ServidorRow>[] = [
+      {
+        id: 'view',
+        label: 'Visualizar',
+        icon: 'eye',
+        placement: 'inline',
+        disabled: (row) => !this.auth.canAccess('servidores.listar', row.setorId),
+      },
+    ];
     if (this.canEdit) {
       actions.push({
         id: 'edit',
@@ -182,6 +195,13 @@ export class ServidorList implements OnInit {
   }
 
   onRowAction(event: { action: string; row: ServidorRow }): void {
+    if (event.action === 'view') {
+      if (!this.auth.canAccess('servidores.listar', event.row.setorId)) {
+        return;
+      }
+      this.abrirDetalhe(event.row);
+      return;
+    }
     if (event.action === 'edit') {
       if (!this.auth.canAccess('servidores.editar', event.row.setorId)) {
         return;
@@ -220,6 +240,29 @@ export class ServidorList implements OnInit {
     const parsed = size as PageSizeOption;
     this.pageSize.set(PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PAGE_SIZE);
     this.page.set(1);
+  }
+
+  /** Abre os detalhes em leitura; o botão "Editar" do rodapé (quando a linha permite) devolve
+   * 'editar' e é aqui que a navegação acontece, pro dialog não depender do `Router`. */
+  private abrirDetalhe(row: ServidorRow): void {
+    const data: ServidorDetailDialogData = {
+      id: row.id,
+      nome: row.nome,
+      podeEditar: this.canEdit && this.auth.canAccess('servidores.editar', row.setorId),
+    };
+
+    this.dialog
+      .open(ServidorDetailDialog, {
+        width: '720px',
+        maxWidth: '95vw',
+        panelClass: 'pci-app-dialog-panel',
+        data,
+      })
+      .afterClosed()
+      .pipe(filter((result) => result === 'editar'))
+      .subscribe(() => {
+        void this.router.navigateByUrl(`/servidores/editar/${row.id}`);
+      });
   }
 
   private excluir(row: ServidorRow): void {

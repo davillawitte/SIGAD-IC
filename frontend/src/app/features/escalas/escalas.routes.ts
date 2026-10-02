@@ -25,6 +25,15 @@ export const ESCALAS_ROUTES: Routes = [
         data: { escopo: 'setor' },
       },
       {
+        // Antes de ':id', senão a rota de detalhe captura "calendario" como id.
+        path: 'calendario',
+        loadComponent: () =>
+          import('./pages/escala-calendario-mes/escala-calendario-mes').then(
+            (m) => m.EscalaCalendarioMes,
+          ),
+        data: { escopo: 'setor' },
+      },
+      {
         path: 'nova',
         canActivate: [permissionGuard('escalas.criar')],
         canDeactivate: [escalaFormCanDeactivate],
@@ -63,6 +72,14 @@ export const ESCALAS_ROUTES: Routes = [
         path: '',
         loadComponent: () =>
           import('./pages/escala-list/escala-list').then((m) => m.EscalaList),
+        data: { escopo: 'institucional' },
+      },
+      {
+        path: 'calendario',
+        loadComponent: () =>
+          import('./pages/escala-calendario-mes/escala-calendario-mes').then(
+            (m) => m.EscalaCalendarioMes,
+          ),
         data: { escopo: 'institucional' },
       },
       {

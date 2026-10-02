@@ -294,7 +294,7 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         string matricula,
         string? email,
         string? telefone,
-        DateOnly dataNascimento,
+        DateOnly? dataNascimento,
         Guid cargoId,
         Guid? setorId,
         Guid? nucleoId,
@@ -337,7 +337,9 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             }
         }
 
-        if (dataNascimento == default || dataNascimento > DateOnly.FromDateTime(DateTime.UtcNow.Date))
+        // Data de nascimento é opcional; quando informada, não pode ser no futuro.
+        if (dataNascimento is DateOnly nascimento
+            && (nascimento == default || nascimento > DateOnly.FromDateTime(DateTime.UtcNow.Date)))
         {
             return "Data de nascimento inválida.";
         }

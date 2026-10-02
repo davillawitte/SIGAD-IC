@@ -53,7 +53,7 @@ export class SetupWizard {
     cpf: ['', Validators.required],
     matricula: ['', Validators.required],
     email: [''],
-    dataNascimento: ['', Validators.required],
+    dataNascimento: [''],
   });
 
   readonly senhaForm = this.fb.nonNullable.group({

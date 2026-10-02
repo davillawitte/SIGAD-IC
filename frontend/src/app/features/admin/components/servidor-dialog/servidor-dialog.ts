@@ -120,7 +120,7 @@ export class ServidorDialog implements OnInit, OnDestroy {
     nome: ['', Validators.required],
     matricula: ['', matriculaValidator],
     cpf: ['', cpfValidator],
-    dataNascimento: ['', Validators.required],
+    dataNascimento: [''],
     email: ['', emailFormatValidator],
     telefone: ['', telefoneValidator],
     cargoId: ['', Validators.required],
@@ -218,11 +218,8 @@ export class ServidorDialog implements OnInit, OnDestroy {
     }
 
     const value = this.form.getRawValue();
-    const dataNascimento = toDateOnlyString(value.dataNascimento);
-    if (!dataNascimento) {
-      this.error.set('Informe a data de nascimento.');
-      return;
-    }
+    // Data de nascimento é opcional: vazia vai como null.
+    const dataNascimento = toDateOnlyString(value.dataNascimento) || null;
 
     this.saving.set(true);
     this.error.set(null);

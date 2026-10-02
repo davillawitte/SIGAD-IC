@@ -324,3 +324,49 @@ export interface PagedEscalas {
   totalItems: number;
   totalPages: number;
 }
+
+/** Escala considerada no calendário do mês. Quando a lotação tem mais de uma versão no mês,
+ * o backend devolve só uma (a publicada; na falta dela, a mais recente) — `status` é o que
+ * avisa na tela quando o que está sendo mostrado ainda é prévia. */
+export interface EscalaCalendarioMesEscala {
+  escalaId: string;
+  identificacao: string;
+  setorId?: string | null;
+  setorNome?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoNome?: string | null;
+  nucleoSigla?: string | null;
+  tipoFuncionamento: TipoFuncionamento;
+  status: StatusEscala;
+}
+
+/** Marcação de um servidor num dia, já achatada (sem navegar escala → servidor → ocorrência). */
+export interface EscalaCalendarioMesItem {
+  data: string;
+  escalaId: string;
+  setorId?: string | null;
+  setorSigla?: string | null;
+  nucleoId?: string | null;
+  nucleoSigla?: string | null;
+  servidorId: string;
+  servidorNome: string;
+  matricula: string;
+  cargoNome: string;
+  cargoCodigo: string;
+  tipoOcorrenciaCodigo: string;
+  tipoOcorrenciaNome: string;
+  categoria: CategoriaOcorrencia;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+  horas?: number | null;
+}
+
+export interface EscalaCalendarioMes {
+  ano: number;
+  mes: number;
+  dataInicio: string;
+  dataFim: string;
+  escalas: EscalaCalendarioMesEscala[];
+  itens: EscalaCalendarioMesItem[];
+}

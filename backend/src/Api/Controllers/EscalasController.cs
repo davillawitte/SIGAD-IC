@@ -51,6 +51,46 @@ public class EscalasController(
         CancellationToken cancellationToken = default) =>
         ListInternal("institucional", setorId, nucleoId, mes, ano, status, page, pageSize, search, sort, dir, cancellationToken);
 
+    /// <summary>Calendário do mês da Gestão do Setor — ocorrências achatadas (quem trabalha em
+    /// cada dia) das escalas dos setores/núcleos em que o usuário é chefia.</summary>
+    [HttpGet("setor/calendario")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public Task<IActionResult> CalendarioSetor(
+        [FromQuery] int ano,
+        [FromQuery] int mes,
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
+        [FromQuery] Guid? servidorId,
+        CancellationToken cancellationToken = default) =>
+        CalendarioMesInternal("setor", ano, mes, setorId, nucleoId, servidorId, cancellationToken);
+
+    /// <summary>Mesmo calendário, na visão institucional: todos os setores, exceto a Direção do
+    /// IC (que é gerida em Gestão do Setor).</summary>
+    [HttpGet("institucionais/calendario")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public Task<IActionResult> CalendarioInstitucional(
+        [FromQuery] int ano,
+        [FromQuery] int mes,
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
+        [FromQuery] Guid? servidorId,
+        CancellationToken cancellationToken = default) =>
+        CalendarioMesInternal("institucional", ano, mes, setorId, nucleoId, servidorId, cancellationToken);
+
+    private async Task<IActionResult> CalendarioMesInternal(
+        string escopo,
+        int ano,
+        int mes,
+        Guid? setorId,
+        Guid? nucleoId,
+        Guid? servidorId,
+        CancellationToken cancellationToken)
+    {
+        var query = new EscalaCalendarioMesQuery(ano, mes, setorId, nucleoId, servidorId, escopo);
+        var result = await escalaService.GetCalendarioMesAsync(query, User.GetLogin(), cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
     [HttpGet]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public Task<IActionResult> List(

@@ -34,7 +34,7 @@
           <pci-input label="CPF" formControlName="cpf" [required]="true" />
           <pci-input label="Matrícula" formControlName="matricula" placeholder="xxx.xxx-x" [required]="true" />
           <pci-input label="E-mail" type="email" formControlName="email" />
-          <pci-input label="Data de nascimento" type="date" formControlName="dataNascimento" [required]="true" />
+          <pci-input label="Data de nascimento" type="date" formControlName="dataNascimento" />
           <pci-stack gap="2" direction="horizontal">
             <pci-button variant="ghost" (clicked)="voltar()">Voltar</pci-button>
             <pci-button variant="primary" (clicked)="avancarDados()">Continuar</pci-button>

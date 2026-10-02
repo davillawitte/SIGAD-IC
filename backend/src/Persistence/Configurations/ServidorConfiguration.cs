@@ -19,7 +19,7 @@ public class ServidorConfiguration : IEntityTypeConfiguration<Servidor>
         builder.Property(x => x.CargoOutroTexto).HasMaxLength(200);
         builder.Property(x => x.Email).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Telefone).HasMaxLength(30);
-        builder.Property(x => x.DataNascimento).HasColumnType("date").IsRequired();
+        builder.Property(x => x.DataNascimento).HasColumnType("date");
         builder.Property(x => x.Status)
             .HasConversion<string>()
             .HasMaxLength(20)

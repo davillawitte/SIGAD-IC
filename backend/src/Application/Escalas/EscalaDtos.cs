@@ -317,3 +317,58 @@ public record EscalaListQuery : PaginationQuery
     /// <summary><c>asc</c> ou <c>desc</c> (padrão).</summary>
     public string? Dir { get; init; }
 }
+
+/// <summary>Consulta do calendário do mês (uma lotação ou todas as visíveis). <c>Escopo</c>
+/// segue a mesma convenção de <see cref="EscalaListQuery"/>: <c>setor</c> (só o que a pessoa
+/// chefia) ou <c>institucional</c> (todos, menos a Direção do IC).</summary>
+public record EscalaCalendarioMesQuery(
+    int Ano,
+    int Mes,
+    Guid? SetorId = null,
+    Guid? NucleoId = null,
+    Guid? ServidorId = null,
+    string? Escopo = null);
+
+/// <summary>Escala considerada no calendário do mês. Quando a mesma lotação tem mais de uma
+/// versão no mês, entra só uma (a publicada; na falta dela, a mais recente) — o
+/// <see cref="Status"/> deixa claro quando o que está na tela ainda é prévia.</summary>
+public record EscalaCalendarioMesEscalaDto(
+    Guid EscalaId,
+    string Identificacao,
+    Guid? SetorId,
+    string? SetorNome,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoNome,
+    string? NucleoSigla,
+    TipoFuncionamento TipoFuncionamento,
+    StatusEscala Status);
+
+/// <summary>Uma marcação de um servidor num dia, já achatada (sem navegar por escala →
+/// servidor → ocorrência), que é o formato que o calendário mensal consome.</summary>
+public record EscalaCalendarioMesItemDto(
+    DateOnly Data,
+    Guid EscalaId,
+    Guid? SetorId,
+    string? SetorSigla,
+    Guid? NucleoId,
+    string? NucleoSigla,
+    Guid ServidorId,
+    string ServidorNome,
+    string Matricula,
+    string CargoNome,
+    string CargoCodigo,
+    string TipoOcorrenciaCodigo,
+    string TipoOcorrenciaNome,
+    CategoriaOcorrencia Categoria,
+    TimeOnly? HoraInicio,
+    TimeOnly? HoraFim,
+    decimal? Horas);
+
+public record EscalaCalendarioMesDto(
+    int Ano,
+    int Mes,
+    DateOnly DataInicio,
+    DateOnly DataFim,
+    IReadOnlyList<EscalaCalendarioMesEscalaDto> Escalas,
+    IReadOnlyList<EscalaCalendarioMesItemDto> Itens);

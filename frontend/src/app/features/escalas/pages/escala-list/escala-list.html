@@ -33,6 +33,12 @@
   <pci-alert variant="error" title="Erro" [message]="error()!" />
 }
 
+<div class="escalas-toolbar">
+  <pci-button variant="secondary" icon="calendar" (clicked)="verCalendario()">
+    Ver mês por mês
+  </pci-button>
+</div>
+
 <pci-list-page
   [title]="pageTitle()"
   [description]="pageDescription()"
