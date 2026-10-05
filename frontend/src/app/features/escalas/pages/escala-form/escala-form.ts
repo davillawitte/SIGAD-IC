@@ -2069,7 +2069,11 @@ export class EscalaForm implements OnInit {
       if (s.servidorId !== servidorId) return s;
       const ocorrencias = [...s.ocorrencias];
       const idx = ocorrencias.findIndex((o) => o.data.slice(0, 10) === day);
-      const next = this.oc(day, code, code === 'TL6' || code === 'M' || code === 'T' ? 6 : null);
+      // Duração vem do catálogo (PT 24h, PD/PN 12h, TL12 12h…); antes só TL6/M/T recebiam horas
+      // e um plantão digitado manualmente entrava com 0h na carga horária.
+      const horas =
+        this.horasPorCodigo().get(code) ?? (code === 'TL6' || code === 'M' || code === 'T' ? 6 : null);
+      const next = this.oc(day, code, horas);
       if (idx >= 0) ocorrencias[idx] = { ...ocorrencias[idx], ...next, id: ocorrencias[idx].id };
       else ocorrencias.push(next);
       return { ...s, ocorrencias };

@@ -8,6 +8,10 @@ public class Nucleo : BaseEntity
     public string Sigla { get; private set; } = null!;
     public Guid? ChefeServidorId { get; private set; }
 
+    /// <summary>O "chefe" cadastrado só elabora a escala, não chefia de fato: na assinatura das
+    /// escalas impressas sai apenas o nome dele, sem o título "Chefe do ...".</summary>
+    public bool SomenteElaboraEscala { get; private set; }
+
     public Servidor? ChefeServidor { get; private set; }
     public ICollection<Setor> Setores { get; private set; } = [];
 
@@ -20,13 +24,15 @@ public class Nucleo : BaseEntity
         string sigla,
         Guid? chefeServidorId = null,
         string? createdBy = null,
-        Guid? id = null)
+        Guid? id = null,
+        bool somenteElaboraEscala = false)
     {
         var nucleo = new Nucleo
         {
             Nome = nome.Trim(),
             Sigla = NormalizeSigla(sigla),
             ChefeServidorId = chefeServidorId,
+            SomenteElaboraEscala = somenteElaboraEscala,
         };
 
         if (id.HasValue)
@@ -38,11 +44,17 @@ public class Nucleo : BaseEntity
         return nucleo;
     }
 
-    public void Atualizar(string nome, string sigla, Guid? chefeServidorId, string? updatedBy = null)
+    public void Atualizar(
+        string nome,
+        string sigla,
+        Guid? chefeServidorId,
+        string? updatedBy = null,
+        bool somenteElaboraEscala = false)
     {
         Nome = nome.Trim();
         Sigla = NormalizeSigla(sigla);
         ChefeServidorId = chefeServidorId;
+        SomenteElaboraEscala = somenteElaboraEscala;
         MarkUpdated(updatedBy);
     }
 

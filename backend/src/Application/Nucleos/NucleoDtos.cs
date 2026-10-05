@@ -14,8 +14,11 @@ public record NucleoDetailDto(
     string Sigla,
     Guid? ChefeServidorId,
     string? ChefeNome,
-    IReadOnlyList<Guid> SetorIds);
+    IReadOnlyList<Guid> SetorIds,
+    bool SomenteElaboraEscala);
 
-public record CreateNucleoRequest(string Nome, string Sigla, Guid? ChefeServidorId);
+public record CreateNucleoRequest(
+    string Nome, string Sigla, Guid? ChefeServidorId, bool SomenteElaboraEscala = false);
 
-public record UpdateNucleoRequest(string Nome, string Sigla, Guid? ChefeServidorId);
+public record UpdateNucleoRequest(
+    string Nome, string Sigla, Guid? ChefeServidorId, bool SomenteElaboraEscala = false);

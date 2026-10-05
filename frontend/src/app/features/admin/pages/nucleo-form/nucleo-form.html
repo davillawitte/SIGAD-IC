@@ -35,6 +35,13 @@
           </div>
         </label>
       </div>
+
+      <pci-checkbox
+        [appFormCol]="12"
+        label="Somente é responsável pela elaboração da escala"
+        [checked]="form.controls.somenteElaboraEscala.value"
+        (changed)="form.controls.somenteElaboraEscala.setValue($event)"
+      />
     </app-form-section>
   </form>
 </pci-form-page>

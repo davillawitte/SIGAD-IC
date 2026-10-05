@@ -5,6 +5,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
+  PciCheckboxComponent,
   PciFeedbackModalService,
   PciFormPageComponent,
   PciInputComponent,
@@ -23,6 +24,7 @@ import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared
     ReactiveFormsModule,
     MatSelectModule,
     PciAlertComponent,
+    PciCheckboxComponent,
     PciFormPageComponent,
     PciInputComponent,
     AppFormSectionComponent,
@@ -49,6 +51,7 @@ export class NucleoForm implements OnInit {
     nome: ['', Validators.required],
     sigla: ['', Validators.required],
     chefeServidorId: [''],
+    somenteElaboraEscala: [false],
   });
 
   readonly servidorOptions = computed<PciSelectOption[]>(() =>
@@ -77,6 +80,7 @@ export class NucleoForm implements OnInit {
             nome: nucleo.nome,
             sigla: nucleo.sigla,
             chefeServidorId: nucleo.chefeServidorId ?? '',
+            somenteElaboraEscala: nucleo.somenteElaboraEscala ?? false,
           });
         },
         error: () => this.error.set('Não foi possível carregar o núcleo.'),
@@ -98,6 +102,7 @@ export class NucleoForm implements OnInit {
       nome: value.nome.trim(),
       sigla: value.sigla.trim(),
       chefeServidorId: value.chefeServidorId || null,
+      somenteElaboraEscala: value.somenteElaboraEscala,
     };
 
     if (this.isEdit() && this.editId) {

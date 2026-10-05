@@ -232,18 +232,21 @@ export interface NucleoDetail {
   chefeServidorId?: string | null;
   chefeNome?: string | null;
   setorIds: string[];
+  somenteElaboraEscala: boolean;
 }
 
 export interface CreateNucleoPayload {
   nome: string;
   sigla: string;
   chefeServidorId?: string | null;
+  somenteElaboraEscala: boolean;
 }
 
 export interface UpdateNucleoPayload {
   nome: string;
   sigla: string;
   chefeServidorId?: string | null;
+  somenteElaboraEscala: boolean;
 }
 
 export interface NucleoComSetores {

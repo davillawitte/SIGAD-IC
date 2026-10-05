@@ -100,7 +100,9 @@ public class NucleoService(ApplicationDbContext db) : INucleoService
             }
         }
 
-        var nucleo = Nucleo.Create(request.Nome, sigla, request.ChefeServidorId, actorLogin);
+        var nucleo = Nucleo.Create(
+            request.Nome, sigla, request.ChefeServidorId, actorLogin,
+            somenteElaboraEscala: request.SomenteElaboraEscala);
         db.Nucleos.Add(nucleo);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -148,7 +150,8 @@ public class NucleoService(ApplicationDbContext db) : INucleoService
             }
         }
 
-        nucleo.Atualizar(request.Nome, sigla, request.ChefeServidorId, actorLogin);
+        nucleo.Atualizar(
+            request.Nome, sigla, request.ChefeServidorId, actorLogin, request.SomenteElaboraEscala);
         await db.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(id, cancellationToken);
     }
@@ -194,5 +197,6 @@ public class NucleoService(ApplicationDbContext db) : INucleoService
             nucleo.Sigla,
             nucleo.ChefeServidorId,
             nucleo.ChefeServidor?.Nome,
-            nucleo.Setores.Select(x => x.Id).ToList());
+            nucleo.Setores.Select(x => x.Id).ToList(),
+            nucleo.SomenteElaboraEscala);
 }
