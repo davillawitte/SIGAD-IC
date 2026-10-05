@@ -213,7 +213,7 @@ export class EscalaForm implements OnInit {
     return [...setores, ...nucleos];
   });
   readonly showSetorSelect = computed(
-    () => this.setorOptions().length > 1 || this.auth.isChefeNucleo(),
+    () => this.setorOptions().length > 1 || this.nucleosDoUsuario().length > 0,
   );
   readonly setorUnicoLabel = signal<string | null>(null);
 
@@ -527,21 +527,28 @@ export class EscalaForm implements OnInit {
   ngOnInit(): void {
     const editId = this.route.snapshot.paramMap.get('id');
 
-    if (!editId && this.auth.isChefeNucleo()) {
-      this.adminApi.listMeusNucleos().subscribe({
-        next: (items) => this.nucleosDoUsuario.set(items),
-        error: () => this.error.set('Não foi possível carregar os núcleos geridos por você.'),
-      });
-    }
-
-    this.adminApi.listMeusSetores().subscribe({
-      next: (setores) => {
+    // Núcleos vêm sempre da API (que lê a chefia no banco), não de `auth.isChefeNucleo()`: a
+    // sessão salva no navegador pode estar desatualizada (chefia de núcleo atribuída depois do
+    // login, antes do refresh em segundo plano terminar) e aí a opção do núcleo sumia do select
+    // — a API, que valida pelo banco, aceitaria a escala de núcleo normalmente.
+    forkJoin({
+      setores: this.adminApi.listMeusSetores(),
+      nucleos: this.adminApi.listMeusNucleos().pipe(
+        catchError(() => {
+          this.error.set('Não foi possível carregar os núcleos geridos por você.');
+          return of([] as NucleoListItem[]);
+        }),
+      ),
+    }).subscribe({
+      next: ({ setores, nucleos }) => {
+        this.nucleosDoUsuario.set(nucleos);
         this.setoresRaw.set(setores);
-        if (!editId && setores.length === 1 && !this.auth.isChefeNucleo()) {
+        const chefiaNucleo = nucleos.length > 0;
+        if (!editId && setores.length === 1 && !chefiaNucleo) {
           this.step1Form.controls.setorId.setValue(setores[0].id);
           this.step1Form.controls.setorId.disable({ emitEvent: false });
           this.setorUnicoLabel.set(`${setores[0].sigla} — ${setores[0].nome}`);
-        } else if (!editId && setores.length >= 1 && this.auth.isChefeNucleo()) {
+        } else if (!editId && setores.length >= 1 && chefiaNucleo) {
           this.step1Form.controls.setorId.setValue(setores[0].id);
         }
         if (!editId) {

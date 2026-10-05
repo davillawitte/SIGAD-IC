@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -11,6 +11,7 @@ import {
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 
 import { AuthService } from '../../../../core/auth/auth.service';
+import type { ServidorListItem } from '../../../admin/models/admin.models';
 import { AdminApiService } from '../../../admin/services/admin-api.service';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
 import { AFASTAMENTOS_ROUTE_PAGES } from '../../afastamentos.routes.meta';
@@ -42,7 +43,18 @@ export class AfastamentoForm implements OnInit {
   readonly isEdit = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
-  readonly servidorOptions = signal<PciSelectOption[]>([]);
+  private readonly servidores = signal<ServidorListItem[]>([]);
+  /** Computed (não calculado uma vez só na resposta da API): `canAccessLotacao` lê a sessão,
+   * que pode estar desatualizada na abertura da tela (ex.: chefia de núcleo atribuída depois
+   * do login) e só se corrige quando o refresh em segundo plano termina — aí a lista se
+   * recalcula sozinha e passa a trazer o núcleo inteiro, não só o setor chefiado. */
+  readonly servidorOptions = computed<PciSelectOption[]>(() =>
+    this.servidores()
+      .filter((s) =>
+        this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', s.setorId, s.nucleoId),
+      )
+      .map((s) => ({ label: `${s.nome} — ${s.matricula}`, value: s.id })),
+  );
   readonly currentPath = signal('/afastamentos/novo');
 
   /** setorId ou nucleoId por servidor (lotação), pra validar escopo do chefe no save. */
@@ -73,21 +85,12 @@ export class AfastamentoForm implements OnInit {
 
     this.adminApi.listMeusServidores().subscribe({
       next: (servidores) => {
-        const elegiveis = servidores.filter((s) =>
-          this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', s.setorId, s.nucleoId),
-        );
-
+        // O escopo de quem pode receber afastamento é revalidado no save (`canAccessLotacao`).
         this.servidorLotacaoById.clear();
-        for (const s of elegiveis) {
+        for (const s of servidores) {
           this.servidorLotacaoById.set(s.id, { setorId: s.setorId, nucleoId: s.nucleoId });
         }
-
-        this.servidorOptions.set(
-          elegiveis.map((s) => ({
-            label: `${s.nome} — ${s.matricula}`,
-            value: s.id,
-          })),
-        );
+        this.servidores.set(servidores);
       },
       error: () => this.error.set('Não foi possível carregar os servidores do seu setor/núcleo.'),
     });
