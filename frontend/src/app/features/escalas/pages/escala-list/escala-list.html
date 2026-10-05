@@ -33,10 +33,20 @@
   <pci-alert variant="error" title="Erro" [message]="error()!" />
 }
 
-<div class="escalas-toolbar">
+<div class="escalas-list" [class.escalas-list--com-criar]="canCreate()">
+<!--
+  pci-list-page não projeta ações extras no header (só o botão de criar), então as ações
+  ficam sobrepostas à área de ações do pci-page-header. Ver docs/design-system-pendencias.md.
+-->
+<div class="escalas-list__actions">
   <pci-button variant="secondary" icon="calendar" (clicked)="verCalendario()">
-    Ver mês por mês
+    Ver Calendário
   </pci-button>
+  @if (canCreate()) {
+    <pci-button variant="primary" icon="plus" (clicked)="onCreate()">
+      Nova escala
+    </pci-button>
+  }
 </div>
 
 <pci-list-page
@@ -53,13 +63,11 @@
   [page]="page()"
   [pageSize]="pageSize()"
   [loading]="loading()"
-  [showCreateButton]="canCreate()"
-  createLabel="Nova escala"
+  [showCreateButton]="false"
   [rowActions]="rowActions()"
   sortMode="server"
   quickSearchMode="server"
   quickSearchPlaceholder="Buscar por setor…"
-  (createClicked)="onCreate()"
   (filterApply)="onFilterApply($event)"
   (filterClear)="onFilterClear()"
   (filterValuesChange)="filterValues.set($event)"
@@ -70,3 +78,4 @@
   (pageSizeChange)="onPageSizeChange($event)"
   (rowAction)="onRowAction($event)"
 />
+</div>

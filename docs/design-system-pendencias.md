@@ -194,7 +194,10 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
 - **Por quê**: a página de listagem só expõe o botão de criar (`showCreateButton`/`createLabel`) e
   não tem `ng-content` nenhum, então não dá pra colocar outra ação ao lado do título.
 - **Onde foi contornado**: `frontend/src/app/features/escalas/pages/escala-list/escala-list.html` —
-  botão "Ver mês por mês" numa barra própria (`.escalas-toolbar`) acima do `pci-list-page`.
+  `showCreateButton` desligado e os botões "Ver Calendário" + "Nova escala" renderizados em
+  `.escalas-list__actions`, posicionados (absolute) no canto superior direito, sobre a área de
+  ações do `pci-page-header`. O texto do cabeçalho ganha `padding-right` (via `::ng-deep`) pra não
+  ficar por baixo dos botões; abaixo de 768px a barra volta ao fluxo normal, acima do título.
 - **Spec pra portar**: `PciListPageComponent` ganhar um slot `[slot=actions]` no cabeçalho (como o
   `pci-page-header` já tem), pras ações secundárias ficarem alinhadas ao título.
 

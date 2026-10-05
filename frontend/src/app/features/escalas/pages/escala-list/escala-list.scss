@@ -1,7 +1,40 @@
-.escalas-toolbar {
+// Ações alinhadas ao topo do pci-page-header (que usa align-items: flex-start).
+.escalas-list {
+  position: relative;
+}
+
+.escalas-list__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.75rem;
+  align-items: center;
+  gap: var(--pci-space-2, 0.5rem);
+}
+
+// Reserva espaço para as ações não sobreporem título/descrição.
+:host ::ng-deep .escalas-list .pci-page-header__text {
+  padding-right: 11rem;
+}
+
+:host ::ng-deep .escalas-list--com-criar .pci-page-header__text {
+  padding-right: 21rem;
+}
+
+// Mesmo breakpoint em que o pci-page-header empilha as ações.
+@media (max-width: 768px) {
+  .escalas-list__actions {
+    position: static;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: var(--pci-space-3, 0.75rem);
+  }
+
+  :host ::ng-deep .escalas-list .pci-page-header__text,
+  :host ::ng-deep .escalas-list--com-criar .pci-page-header__text {
+    padding-right: 0;
+  }
 }
 
 .escalas-devolucoes {
