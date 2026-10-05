@@ -2381,7 +2381,8 @@ export class EscalaForm implements OnInit {
       let rem = 0;
       for (const o of s.ocorrencias) {
         const code = (o.tipoOcorrenciaCodigo || '').toUpperCase();
-        const h = o.horas ?? 0;
+        // Mesmo fallback do backend (MapDetail.HorasDe): sem horas gravadas, vale a do tipo.
+        const h = o.horas ?? this.horasPorCodigo().get(code) ?? 0;
         if (code.startsWith('TL')) rem += h;
         else if (code && !folga.has(code)) pres += h;
       }

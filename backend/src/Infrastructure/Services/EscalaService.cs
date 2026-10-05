@@ -2635,7 +2635,10 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                             o.TipoOcorrencia?.Nome,
                             o.HoraInicio,
                             o.HoraFim,
-                            o.Horas,
+                            // Mesma regra de HorasDe: ocorrência gravada sem horas (ex.: plantão
+                            // digitado à mão) assume a duração do tipo — senão a tela de edição
+                            // recalcula a carga com 0h e diverge do total exibido aqui.
+                            o.Horas ?? o.TipoOcorrencia?.HorasPadrao,
                             o.Origem,
                             o.EscalaJornadaId,
                             o.Observacao))
