@@ -235,7 +235,8 @@ public class EscalaPdfService(
             .ToList();
 
         var weekLetters = days.Select(DayLetter).ToList();
-        var servidores = escala.Servidores.OrderBy(x => x.Ordem).ToList();
+        // Já vem agrupada por regime e alfabética do MapDetail (EscalaServidorOrdenacao).
+        var servidores = escala.Servidores.ToList();
 
         return Document.Create(container =>
         {
@@ -344,7 +345,8 @@ public class EscalaPdfService(
             .Range(0, escala.DataFim.DayNumber - escala.DataInicio.DayNumber + 1)
             .Select(i => escala.DataInicio.AddDays(i))
             .ToList();
-        var servidores = escala.Servidores.OrderBy(x => x.Ordem).ToList();
+        // Já vem agrupada por regime e alfabética do MapDetail (EscalaServidorOrdenacao).
+        var servidores = escala.Servidores.ToList();
 
         return Document.Create(container =>
         {

@@ -71,7 +71,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (s of escala().servidores; track s.servidorId) {
+          @for (s of servidores(); track s.servidorId) {
             <tr>
               <td class="escala-doc__sticky">{{ s.matricula }}</td>
               <td class="escala-doc__sticky escala-doc__sticky--2">{{ s.servidorNome }}</td>
@@ -110,7 +110,7 @@
         <thead>
           <tr>
             <th>Data</th>
-            @for (s of escala().servidores; track s.servidorId) {
+            @for (s of servidores(); track s.servidorId) {
               <th>
                 {{ s.cargoCodigo || s.cargoNome || '—' }}
                 <br />
@@ -127,7 +127,7 @@
               <td [class.is-weekend]="isWeekend(day)">
                 {{ formatVerticalDate(day) }}
               </td>
-              @for (s of escala().servidores; track s.servidorId) {
+              @for (s of servidores(); track s.servidorId) {
                 <td
                   [class.is-weekend]="isWeekend(day)"
                   [class.is-lm]="code(s.servidorId, day) === 'LM'"

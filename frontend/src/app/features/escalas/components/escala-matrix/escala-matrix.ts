@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, computed, input } from '@angular/core';
 
 import type { EscalaDetail } from '../../models/escalas.models';
+import { ordenarServidoresPorRegime, type GrupoRegime } from '../../utils/escala-servidor-ordem';
 
 const MES_NOMES = [
   '',
@@ -168,6 +169,9 @@ export class EscalaMatrix {
   readonly editable = input(false);
   /** When true, omits institutional header/meta (detail page already shows that). */
   readonly compactHeader = input(false);
+  /** Grupo de regime por servidorId escolhido no wizard (rascunho ainda sem jornadas); sem
+   * isso, o grupo vem das jornadas da escala salva. */
+  readonly grupoRegimePorServidor = input<ReadonlyMap<string, GrupoRegime> | null>(null);
 
   @Input() codeChange: ((servidorId: string, day: string, code: string) => void) | null = null;
   @Input() cellMouseDown: ((servidorId: string, day: string, event: MouseEvent) => void) | null =
@@ -177,6 +181,12 @@ export class EscalaMatrix {
   @Input() isCellSelected: ((servidorId: string, day: string) => boolean) | null = null;
 
   readonly legend = LEGEND;
+
+  /** Linhas (ou colunas, no vertical) agrupadas por regime — 24h, 12h, expediente — e em
+   * ordem alfabética dentro de cada grupo; mesma ordem do PDF. */
+  readonly servidores = computed(() =>
+    ordenarServidoresPorRegime(this.escala().servidores, this.grupoRegimePorServidor()),
+  );
 
   readonly days = computed(() => {
     const e = this.escala();

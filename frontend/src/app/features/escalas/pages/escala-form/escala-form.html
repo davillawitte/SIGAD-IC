@@ -492,6 +492,7 @@
             [escala]="e"
             layout="matriz"
             [editable]="true"
+            [grupoRegimePorServidor]="grupoRegimePorServidor()"
             [codeChange]="onMatrizCodeChangeBound"
             [cellMouseDown]="onCellMouseDownBound"
             [cellKeydown]="onCellKeydownBound"
@@ -568,10 +569,10 @@
         </pci-stack>
 
         @if (reviewTab() === 'matriz') {
-          <app-escala-matrix [escala]="e" layout="matriz" />
+          <app-escala-matrix [escala]="e" layout="matriz" [grupoRegimePorServidor]="grupoRegimePorServidor()" />
         }
         @if (reviewTab() === 'vertical') {
-          <app-escala-matrix [escala]="e" layout="vertical" />
+          <app-escala-matrix [escala]="e" layout="vertical" [grupoRegimePorServidor]="grupoRegimePorServidor()" />
         }
 
         <pci-card class="wizard-nav-card">

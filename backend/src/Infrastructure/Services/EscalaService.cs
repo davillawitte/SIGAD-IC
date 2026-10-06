@@ -2645,6 +2645,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                         .ToList());
             })
             .ToList();
+        // Exibição (tela e PDF) agrupada por regime e alfabética — ver EscalaServidorOrdenacao.
+        servidores = EscalaServidorOrdenacao.Ordenar(servidores).ToList();
 
         return new(
             escala.Id,

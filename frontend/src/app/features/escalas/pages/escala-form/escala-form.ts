@@ -72,6 +72,11 @@ import {
   primeiraDataParaPosicao,
   type RegimeCodigo,
 } from '../../utils/escala-ocorrencia.builder';
+import {
+  grupoDoRegime,
+  ordenarServidoresPorRegime,
+  type GrupoRegime,
+} from '../../utils/escala-servidor-ordem';
 
 type WizardStep = 'periodo' | 'servidores' | 'resumida' | 'afastamentos' | 'revisao';
 type Step3Tab = 'matriz' | 'formulario';
@@ -428,8 +433,22 @@ export class EscalaForm implements OnInit {
 
   readonly formServidorId = signal('');
   readonly formServidorControl = this.fb.nonNullable.control('');
+  /** Grupo de exibição (24h, 12h, expediente) pelo regime escolhido no passo de regimes —
+   * o rascunho ainda não tem jornadas pra matriz tirar isso sozinha. Rodízio da escala
+   * resumida é plantão 24h (PT/D). Sem regime → a matriz cai nas jornadas da escala. */
+  readonly grupoRegimePorServidor = computed(() => {
+    const map = new Map<string, GrupoRegime>();
+    const ciclosResumida = this.servidorCicloResumida();
+    for (const s of this.escala()?.servidores ?? []) {
+      const codigo = this.servidorRegimeCodigo(s.servidorId);
+      if (codigo) map.set(s.servidorId, grupoDoRegime(codigo));
+      else if (ciclosResumida.has(s.servidorId)) map.set(s.servidorId, 0);
+    }
+    return map as ReadonlyMap<string, GrupoRegime>;
+  });
+
   readonly formServidorOptions = computed<PciSelectOption[]>(() =>
-    (this.escala()?.servidores ?? []).map((s) => ({
+    ordenarServidoresPorRegime(this.escala()?.servidores ?? [], this.grupoRegimePorServidor()).map((s) => ({
       label: `${s.servidorNome} — ${s.matricula}`,
       value: s.servidorId,
     })),
@@ -443,9 +462,14 @@ export class EscalaForm implements OnInit {
     this.regimesSelected().length === 1 ? this.regimesSelected()[0] : null,
   );
 
+  /** Home office vale pra expediente administrativo, seja de manhã ou de tarde — inclusive
+   * numa escala que mistura os dois turnos. */
   readonly hoServidores = computed(() => {
     const e = this.escala();
-    if (!e || this.singleRegime() !== 'EXP_ADM') return [];
+    const regimes = this.regimesSelected();
+    const soExpediente =
+      regimes.length > 0 && regimes.every((r) => r === 'EXP_ADM' || r === 'EXP_ADM_TARDE');
+    if (!e || !soExpediente) return [];
     return e.servidores;
   });
 
