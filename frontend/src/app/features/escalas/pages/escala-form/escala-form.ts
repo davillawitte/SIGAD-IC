@@ -107,6 +107,13 @@ function lastDayOfMonth(ano: number, mes: number): string {
   return formatLocalDate(d);
 }
 
+/** Regimes de plantão com ciclo ancorado num dia de início (pedem "Início do ciclo"). */
+function isRegimeCiclico(codigo: RegimeCodigo | null): boolean {
+  return (
+    codigo === '12X36' || codigo === '24X72' || codigo === 'PT24_TL12' || codigo === 'PD12_TL12'
+  );
+}
+
 function firstDayOfMonth(ano: number, mes: number): string {
   return `${ano}-${String(mes).padStart(2, '0')}-01`;
 }
@@ -352,6 +359,7 @@ export class EscalaForm implements OnInit {
     { codigo: '12X36', label: 'Plantão 12h' },
     { codigo: '24X72', label: 'Plantão 24h' },
     { codigo: 'PT24_TL12', label: 'Plantão 24h + Laudo 12h' },
+    { codigo: 'PD12_TL12', label: 'Plantão 12h + 12h Laudo' },
   ];
   readonly regimeSelectOptions: PciSelectOption[] = this.regimeOptions.map((opt) => ({
     label: opt.label,
@@ -401,7 +409,7 @@ export class EscalaForm implements OnInit {
    * servidor individual). */
   readonly needsInicioCiclo = computed(() =>
     Array.from(this.servidorRegimes().values()).some((regs) =>
-      [...regs].some((r) => r === '12X36' || r === '24X72' || r === 'PT24_TL12'),
+      [...regs].some((r) => isRegimeCiclico(r)),
     ),
   );
 
@@ -476,9 +484,17 @@ export class EscalaForm implements OnInit {
     return e.servidores.filter((s) => this.isServidorExpediente(s.servidorId));
   });
 
+  /** Pelo regime escolhido; sem regime resolvido (ex.: escala antiga sem jornada gravada),
+   * cai na grade: quem tem expediente (M/T) lançado e não está no rodízio da resumida. */
   isServidorExpediente(servidorId: string): boolean {
     const codigo = this.servidorRegimeCodigo(servidorId);
-    return codigo === 'EXP_ADM' || codigo === 'EXP_ADM_TARDE';
+    if (codigo) return codigo === 'EXP_ADM' || codigo === 'EXP_ADM_TARDE';
+    if (this.servidorCicloResumida().has(servidorId)) return false;
+    const s = this.escala()?.servidores.find((x) => x.servidorId === servidorId);
+    return !!s?.ocorrencias.some((o) => {
+      const c = (o.tipoOcorrenciaCodigo || '').toUpperCase();
+      return c === 'M' || c === 'T';
+    });
   }
 
   readonly matrizDays = computed(() => {
@@ -686,7 +702,7 @@ export class EscalaForm implements OnInit {
 
   isServidorRegimeCiclico(servidorId: string): boolean {
     const codigo = this.servidorRegimeCodigo(servidorId);
-    return codigo === '12X36' || codigo === '24X72' || codigo === 'PT24_TL12';
+    return isRegimeCiclico(codigo);
   }
 
   /** Nomes dos servidores selecionados que ainda não têm regime de plantão escolhido. */
@@ -1258,7 +1274,8 @@ export class EscalaForm implements OnInit {
       value === 'EXP_ADM_TARDE' ||
       value === '12X36' ||
       value === '24X72' ||
-      value === 'PT24_TL12'
+      value === 'PT24_TL12' ||
+      value === 'PD12_TL12'
     );
   }
 
@@ -1274,7 +1291,8 @@ export class EscalaForm implements OnInit {
       if (diasTrabalho === 1 && diasFolga === 3) return '24X72';
     }
     if (recorrencia === 'CicloPersonalizado') {
-      return 'PT24_TL12';
+      // O ciclo de 12h começa no plantão diurno ("PD"); o de 24h, no plantão de 24h ("PT").
+      return tipoOcorrenciaCodigo?.toUpperCase() === 'PD' ? 'PD12_TL12' : 'PT24_TL12';
     }
     if (
       tipoJornada === 'Administrativo' ||
@@ -1730,7 +1748,7 @@ export class EscalaForm implements OnInit {
   }
 
   private deriveTipoFuncionamento(): TipoFuncionamento {
-    return this.regimesSelected().some((r) => r === '12X36' || r === '24X72' || r === 'PT24_TL12')
+    return this.regimesSelected().some((r) => isRegimeCiclico(r))
       ? 'VinteQuatroHoras'
       : 'Expediente';
   }

@@ -11,6 +11,7 @@ export function grupoDoRegime(codigo: RegimeCodigo | null | undefined): GrupoReg
     case 'PT24_TL12':
       return 0;
     case '12X36':
+    case 'PD12_TL12':
       return 1;
     case 'EXP_ADM':
     case 'EXP_ADM_TARDE':

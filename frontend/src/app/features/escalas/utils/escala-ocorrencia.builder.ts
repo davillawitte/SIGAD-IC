@@ -1,6 +1,12 @@
 import type { EscalaOcorrencia, PadraoEscala } from '../models/escalas.models';
 
-export type RegimeCodigo = 'EXP_ADM' | 'EXP_ADM_TARDE' | '12X36' | '24X72' | 'PT24_TL12';
+export type RegimeCodigo =
+  | 'EXP_ADM'
+  | 'EXP_ADM_TARDE'
+  | '12X36'
+  | '24X72'
+  | 'PT24_TL12'
+  | 'PD12_TL12';
 
 export interface BuildOcorrenciasInput {
   servidorId: string;

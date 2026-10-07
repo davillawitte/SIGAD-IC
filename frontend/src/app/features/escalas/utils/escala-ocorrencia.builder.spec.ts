@@ -50,6 +50,17 @@ const padraoPT24TL12: PadraoEscala = {
   sequenciaCiclo: 'PT,D,D,D,TL12,D',
 };
 
+const padraoPD12TL12: PadraoEscala = {
+  ...padrao12x36,
+  id: 'ppd12tl12',
+  codigo: 'PD12_TL12',
+  nome: 'Plantão 12h + 12h Laudo',
+  recorrenciaTipo: 'CicloPersonalizado',
+  diasTrabalho: null,
+  diasFolga: null,
+  sequenciaCiclo: 'PD,D,PD,D,TL12,D',
+};
+
 const padraoExp: PadraoEscala = {
   ...padrao12x36,
   id: 'pexp',
@@ -177,6 +188,23 @@ describe('escala-ocorrencia.builder', () => {
     });
 
     expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['D', 'PD', 'D', 'PD']);
+  });
+
+  it('PD12_TL12 segue PD, D, PD, D, TL12, D e recomeça, com 12h em cada fase de trabalho', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana,
+      regimesSelected: ['PD12_TL12'],
+      padroesByCodigo: new Map([['PD12_TL12', padraoPD12TL12]]),
+      servidorInicioCiclo: new Map([['a', '2026-07-06']]),
+      horasPorCodigo: new Map([
+        ['PD', 12],
+        ['TL12', 12],
+      ]),
+    });
+
+    expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['PD', 'D', 'PD', 'D', 'TL12', 'D', 'PD']);
+    expect(result.filter((o) => o.tipoOcorrenciaCodigo !== 'D').every((o) => o.horas === 12)).toBe(true);
   });
 
   it('PT24_TL12 expande as 6 fases da sequência (PT, folga x3, TL12, folga) e repete no 7º dia', () => {

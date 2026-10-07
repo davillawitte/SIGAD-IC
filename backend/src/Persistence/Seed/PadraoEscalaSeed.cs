@@ -147,6 +147,23 @@ public static class PadraoEscalaSeed
             sistema: true,
             createdBy: "seed"));
 
+        // Plantão diurno de 12h com um laudo remoto de 12h no ciclo: PD, folga, PD, folga, TL12,
+        // folga — e recomeça.
+        AddIfMissing(PadraoEscala.Create(
+            "PD12_TL12",
+            "Plantão 12h + 12h Laudo",
+            TipoFuncionamento.VinteQuatroHoras,
+            TipoJornada.Plantao,
+            RecorrenciaTipo.CicloPersonalizado,
+            tipoOcorrenciaTrabalho: "PD",
+            tipoOcorrenciaFolga: "D",
+            sequenciaCiclo: "PD,D,PD,D,TL12,D",
+            horaInicioPadrao: new TimeOnly(7, 0),
+            horaFimPadrao: new TimeOnly(19, 0),
+            horasPadrao: 12,
+            sistema: true,
+            createdBy: "seed"));
+
         AddIfMissing(PadraoEscala.Create(
             "PERSONALIZADO",
             "Personalizado",
