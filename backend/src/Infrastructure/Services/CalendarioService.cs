@@ -318,10 +318,10 @@ public class CalendarioService(ApplicationDbContext db) : ICalendarioService
             where m.Tipo != TipoMarcacaoCalendario.EventoInstitucional
             where m.Data <= fim && (m.DataFim ?? m.Data) >= inicio
             orderby m.Data
-            select new { m.Data, m.Tipo, m.Nome };
+            select new { m.Data, m.DataFim, m.Tipo, m.Nome };
 
         var itens = await query.ToListAsync(cancellationToken);
-        return itens.Select(x => new DiaNaoUtilDto(x.Data, x.Tipo.ToString(), x.Nome)).ToList();
+        return itens.Select(x => new DiaNaoUtilDto(x.Data, x.Tipo.ToString(), x.Nome, x.DataFim)).ToList();
     }
 
     private async Task<IReadOnlyList<MarcacaoCalendario>> MarcacoesDoAnoAsync(

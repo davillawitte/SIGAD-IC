@@ -13,6 +13,9 @@ export interface BuildOcorrenciasInput {
    * `padrao.horasPadrao` — espelha o mesmo lookup que `EscalaService.ApplyJornadaAsync` faz no
    * backend. */
   horasPorCodigo?: Map<string, number>;
+  /** Feriados do calendário institucional (YYYY-MM-DD) — viram "F" no expediente
+   * administrativo, inclusive quando caem no fim de semana. Plantão não para em feriado. */
+  feriados?: ReadonlySet<string>;
 }
 
 /** Normaliza YYYY-MM-DD (aceita ISO com horário). */
@@ -100,8 +103,15 @@ export function buildOcorrenciasFromCicloDerivado(input: BuildOcorrenciasFromCic
  * diferente do backend que não emite ocorrência nesses dias.
  */
 export function buildOcorrenciasForServidor(input: BuildOcorrenciasInput): EscalaOcorrencia[] {
-  const { servidorId, days, regimesSelected, padroesByCodigo, servidorInicioCiclo, horasPorCodigo } =
-    input;
+  const {
+    servidorId,
+    days,
+    regimesSelected,
+    padroesByCodigo,
+    servidorInicioCiclo,
+    horasPorCodigo,
+    feriados,
+  } = input;
 
   // Multi-regime: escala em branco — só seleção de servidores.
   if (regimesSelected.length !== 1) {
@@ -115,10 +125,13 @@ export function buildOcorrenciasForServidor(input: BuildOcorrenciasInput): Escal
   }
 
   // Expediente administrativo: dia útil de manhã (M) ou de tarde (T), conforme o regime do
-  // servidor; fim de semana é descanso nos dois casos.
+  // servidor; fim de semana é descanso nos dois casos e feriado é "F" (mesmo no fim de semana).
   if (regime === 'EXP_ADM' || regime === 'EXP_ADM_TARDE') {
     const tarde = regime === 'EXP_ADM_TARDE';
     return days.map((day) => {
+      if (feriados?.has(normalizeDay(day))) {
+        return oc(day, 'F');
+      }
       const wd = new Date(day + 'T00:00:00').getDay();
       if (wd === 0 || wd === 6) {
         return oc(day, 'D');

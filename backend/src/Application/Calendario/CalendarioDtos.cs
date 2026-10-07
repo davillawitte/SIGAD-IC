@@ -32,7 +32,7 @@ public record CalendarioAnoResumoDto(
     int TotalPontosFacultativos,
     int TotalEventos);
 
-public record DiaNaoUtilDto(DateOnly Data, string Tipo, string Nome);
+public record DiaNaoUtilDto(DateOnly Data, string Tipo, string Nome, DateOnly? DataFim = null);
 
 public record GerarAnoRequest(int Ano);
 

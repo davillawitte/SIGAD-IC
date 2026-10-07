@@ -39,6 +39,7 @@ import {
   AfastamentosApiService,
   AfastamentoItem,
 } from '../../../afastamentos/services/afastamentos-api.service';
+import { CalendarioApiService } from '../../../calendario-institucional/services/calendario-api.service';
 import { AppFormColDirective } from '../../../../shared/form-layout';
 import { openConfirmDialog } from '../../../../shared/dialogs/dialog.helpers';
 import { ESCALAS_ROUTE_PAGES } from '../../escalas-route-pages';
@@ -146,6 +147,7 @@ export class EscalaForm implements OnInit {
   private readonly resumidaApi = inject(EscalasResumidasApiService);
   private readonly adminApi = inject(AdminApiService);
   private readonly afastamentosApi = inject(AfastamentosApiService);
+  private readonly calendarioApi = inject(CalendarioApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -416,6 +418,9 @@ export class EscalaForm implements OnInit {
 
   readonly afastamentos = signal<AfastamentoItem[]>([]);
   readonly homeOfficeDays = signal<Map<string, Set<number>>>(new Map());
+  /** Feriados do calendário institucional publicado no período da escala (YYYY-MM-DD). */
+  readonly feriados = signal<ReadonlySet<string>>(new Set());
+  private feriadosPeriodo = '';
   readonly selectedCells = signal<SelectedCell[]>([]);
   private clipboard: string[] = [];
 
@@ -463,15 +468,18 @@ export class EscalaForm implements OnInit {
   );
 
   /** Home office vale pra expediente administrativo, seja de manhã ou de tarde — inclusive
-   * numa escala que mistura os dois turnos. */
+   * numa escala que mistura os dois turnos ou que também tem plantonistas (só os servidores
+   * de expediente aparecem no painel). */
   readonly hoServidores = computed(() => {
     const e = this.escala();
-    const regimes = this.regimesSelected();
-    const soExpediente =
-      regimes.length > 0 && regimes.every((r) => r === 'EXP_ADM' || r === 'EXP_ADM_TARDE');
-    if (!e || !soExpediente) return [];
-    return e.servidores;
+    if (!e) return [];
+    return e.servidores.filter((s) => this.isServidorExpediente(s.servidorId));
   });
+
+  isServidorExpediente(servidorId: string): boolean {
+    const codigo = this.servidorRegimeCodigo(servidorId);
+    return codigo === 'EXP_ADM' || codigo === 'EXP_ADM_TARDE';
+  }
 
   readonly matrizDays = computed(() => {
     const e = this.escala();
@@ -1118,6 +1126,7 @@ export class EscalaForm implements OnInit {
 
   private loadStep2Data(preserveSelection = false, afterLoad?: () => void): void {
     const setorId = this.step1Form.getRawValue().setorId;
+    this.loadFeriados();
     const ehNucleo = this.escalaDeNucleo();
     forkJoin({
       padroes: this.api.listPadroes(),
@@ -1864,12 +1873,71 @@ export class EscalaForm implements OnInit {
       padroesByCodigo: this.padroesByCodigo(),
       servidorInicioCiclo: this.servidorInicioCiclo(),
       horasPorCodigo: this.horasPorCodigo(),
+      feriados: this.feriados(),
     });
+  }
+
+  /** Busca os feriados do mês da escala no calendário institucional (só calendário publicado;
+   * ponto facultativo e evento não entram). Falha na consulta não bloqueia a escala. */
+  private loadFeriados(): void {
+    const v = this.step1Form.getRawValue();
+    const ano = Number(v.ano);
+    const mes = Number(v.mes);
+    if (!ano || !mes) return;
+    const inicio = firstDayOfMonth(ano, mes);
+    const fim = lastDayOfMonth(ano, mes);
+    const periodo = `${inicio}|${fim}`;
+    if (periodo === this.feriadosPeriodo) return;
+    this.feriadosPeriodo = periodo;
+    this.calendarioApi
+      .diasNaoUteis(inicio, fim)
+      .pipe(catchError(() => of([])))
+      .subscribe((dias) => {
+        if (this.feriadosPeriodo !== periodo) return;
+        const set = new Set<string>();
+        for (const d of dias) {
+          if (!d.tipo.startsWith('Feriado')) continue;
+          const de = normalizeDay(d.data);
+          const ate = normalizeDay(d.dataFim) || de;
+          for (const day of daysInRange(de < inicio ? inicio : de, ate > fim ? fim : ate)) {
+            set.add(day);
+          }
+        }
+        this.feriados.set(set);
+        this.applyFeriadosToDraft();
+      });
+  }
+
+  /** Marca "F" nos feriados dos servidores de expediente — cobre o rascunho montado antes de os
+   * feriados chegarem e escalas já salvas/copiadas. Só substitui expediente, descanso, home
+   * office ou célula vazia: afastamento e qualquer outro lançamento manual ficam como estão. */
+  private applyFeriadosToDraft(): void {
+    const e = this.escala();
+    const feriados = this.feriados();
+    if (!e || !feriados.size || e.status !== 'Rascunho') return;
+    const substituiveis = new Set(['', 'M', 'T', 'D', 'TL6']);
+    let changed = false;
+    const servidores = e.servidores.map((s) => {
+      if (!this.isServidorExpediente(s.servidorId)) return s;
+      const ocorrencias = s.ocorrencias.map((o) => {
+        const day = o.data.slice(0, 10);
+        const codigo = (o.tipoOcorrenciaCodigo || '').toUpperCase();
+        if (!feriados.has(day) || !substituiveis.has(codigo)) return o;
+        changed = true;
+        return { ...o, tipoOcorrenciaCodigo: 'F', horas: null, horaInicio: null, horaFim: null };
+      });
+      return { ...s, ocorrencias };
+    });
+    if (!changed) return;
+    this.escala.set({ ...e, servidores });
+    this.recalcCargas();
+    this.markDirty();
   }
 
   // ---------- Step 3 ----------
 
   private loadStep3Data(): void {
+    this.applyFeriadosToDraft();
     const e = this.escala();
     if (!e) return;
     const ids = e.servidores.map((s) => s.servidorId);
@@ -1985,6 +2053,9 @@ export class EscalaForm implements OnInit {
         const existing = servidor.ocorrencias.find((o) => o.data.slice(0, 10) === day);
         if (this.hasBlockingAfastamento(servidor.servidorId, day)) {
           return existing ?? this.emptyOc(day);
+        }
+        if (this.feriados().has(day)) {
+          return existing ?? this.oc(day, 'F');
         }
         const weekday = new Date(day + 'T00:00:00').getDay();
         if (hoDays.has(weekday)) {

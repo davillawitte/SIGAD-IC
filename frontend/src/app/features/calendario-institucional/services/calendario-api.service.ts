@@ -51,6 +51,7 @@ export interface CalendarioAnoResumo {
 
 export interface DiaNaoUtil {
   data: string;
+  dataFim?: string | null;
   tipo: TipoMarcacaoCalendario;
   nome: string;
 }

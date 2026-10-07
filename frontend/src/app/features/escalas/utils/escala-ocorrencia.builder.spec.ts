@@ -116,6 +116,32 @@ describe('escala-ocorrencia.builder', () => {
     ]);
   });
 
+  it('EXP_ADM emite F nos feriados, inclusive no fim de semana', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana,
+      regimesSelected: ['EXP_ADM_TARDE'],
+      padroesByCodigo: new Map([['EXP_ADM_TARDE', { ...padraoExp, codigo: 'EXP_ADM_TARDE' }]]),
+      servidorInicioCiclo: new Map(),
+      feriados: new Set([semana[2], semana[5]]),
+    });
+
+    expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['T', 'T', 'F', 'T', 'T', 'F', 'D']);
+  });
+
+  it('plantao ignora feriados', () => {
+    const result = buildOcorrenciasForServidor({
+      servidorId: 'a',
+      days: semana.slice(0, 4),
+      regimesSelected: ['12X36'],
+      padroesByCodigo: new Map([['12X36', padrao12x36]]),
+      servidorInicioCiclo: new Map([['a', semana[0]]]),
+      feriados: new Set([semana[0]]),
+    });
+
+    expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['PD', 'D', 'PD', 'D']);
+  });
+
   it('12X36 alterna a partir da ancora do servidor', () => {
     const result = buildOcorrenciasForServidor({
       servidorId: 'a',
