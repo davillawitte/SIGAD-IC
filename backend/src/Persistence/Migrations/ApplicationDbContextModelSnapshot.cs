@@ -343,6 +343,10 @@ namespace TemplateSistema.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CodigoOriginal")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -356,16 +360,29 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<Guid?>("EscalaJornadaId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("EscalaJornadaIdOriginal")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("EscalaServidorId")
                         .HasColumnType("uuid");
 
                     b.Property<TimeOnly?>("HoraFim")
                         .HasColumnType("time without time zone");
 
+                    b.Property<TimeOnly?>("HoraFimOriginal")
+                        .HasColumnType("time without time zone");
+
                     b.Property<TimeOnly?>("HoraInicio")
                         .HasColumnType("time without time zone");
 
+                    b.Property<TimeOnly?>("HoraInicioOriginal")
+                        .HasColumnType("time without time zone");
+
                     b.Property<decimal?>("Horas")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal?>("HorasOriginais")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
 
@@ -373,10 +390,24 @@ namespace TemplateSistema.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ObservacaoOriginal")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Origem")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("OrigemOriginal")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("PermutaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Permutada")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("TipoOcorrenciaCodigo")
                         .IsRequired()
@@ -395,6 +426,8 @@ namespace TemplateSistema.Persistence.Migrations
                     b.HasIndex("Data");
 
                     b.HasIndex("EscalaJornadaId");
+
+                    b.HasIndex("Permutada");
 
                     b.HasIndex("TipoOcorrenciaCodigo");
 
@@ -1082,6 +1115,55 @@ namespace TemplateSistema.Persistence.Migrations
                     b.ToTable("Permissao", "public");
                 });
 
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Permuta", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateOnly>("DataIda")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("DataVolta")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("PermutanteServidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SolicitanteServidorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataIda");
+
+                    b.HasIndex("DataVolta");
+
+                    b.HasIndex("PermutanteServidorId");
+
+                    b.HasIndex("SolicitanteServidorId");
+
+                    b.ToTable("Permuta", "public");
+                });
+
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Servidor", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1699,6 +1781,25 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Navigation("Perfil");
 
                     b.Navigation("Permissao");
+                });
+
+            modelBuilder.Entity("TemplateSistema.Domain.Entities.Permuta", b =>
+                {
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Permutante")
+                        .WithMany()
+                        .HasForeignKey("PermutanteServidorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TemplateSistema.Domain.Entities.Servidor", "Solicitante")
+                        .WithMany()
+                        .HasForeignKey("SolicitanteServidorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Permutante");
+
+                    b.Navigation("Solicitante");
                 });
 
             modelBuilder.Entity("TemplateSistema.Domain.Entities.Servidor", b =>

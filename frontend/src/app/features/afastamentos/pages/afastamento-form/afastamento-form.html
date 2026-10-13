@@ -1,6 +1,10 @@
 <pci-form-page
   [title]="isEdit() ? 'Editar afastamento' : 'Novo afastamento'"
-  description="Informe o período e o tipo de afastamento do servidor."
+  [description]="
+    isInstitucional()
+      ? 'Informe o período e o tipo de afastamento de qualquer servidor (exceto a Direção do IC).'
+      : 'Informe o período e o tipo de afastamento do servidor.'
+  "
   [currentPath]="currentPath()"
   [routePages]="routePages"
   [loading]="saving()"

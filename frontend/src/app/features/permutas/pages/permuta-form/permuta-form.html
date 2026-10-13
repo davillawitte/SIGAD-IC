@@ -1,0 +1,83 @@
+<pci-form-page
+  title="Nova permuta"
+  description="Clique no dia da escala de cada servidor ou digite a data."
+  currentPath="/permutas/nova"
+  [routePages]="routePages"
+  [loading]="saving()"
+  (cancelClicked)="cancel()"
+  (saveClicked)="save()"
+>
+  @if (error()) {
+    <pci-alert variant="error" title="Erro" [message]="error()!" />
+  }
+
+  <form [formGroup]="form" class="permuta-form">
+    <div class="permuta-form__grid">
+      <section class="permuta-form__lado" aria-label="Solicitante">
+        <h3 class="permuta-form__titulo">Solicitante</h3>
+        <pci-select
+          label="Servidor solicitante"
+          [required]="true"
+          formControlName="solicitanteServidorId"
+          [options]="solicitanteOptions()"
+          placeholder="Selecione o solicitante"
+        />
+        <app-permuta-dias
+          [ano]="lados.solicitante().ano"
+          [mes]="lados.solicitante().mes"
+          [escala]="lados.solicitante().escala"
+          [loading]="lados.solicitante().loading"
+          [semServidor]="!solicitanteId()"
+          [selecionada]="dataIda()"
+          (diaClicado)="onDia('solicitante', $event)"
+          (mesAlterado)="onMes('solicitante', $event)"
+        />
+      </section>
+
+      <div class="permuta-form__setas">
+        <div class="permuta-form__seta">
+          <span class="permuta-form__seta-icone" aria-hidden="true">
+            <pci-icon name="arrow-right" size="lg" />
+          </span>
+          <pci-datepicker label="Ida — dia do solicitante" formControlName="dataIda" [required]="true" />
+          @if (resumoIda()) {
+            <p class="permuta-form__resumo">{{ resumoIda() }}</p>
+          }
+        </div>
+
+        <div class="permuta-form__seta">
+          <span class="permuta-form__seta-icone" aria-hidden="true">
+            <pci-icon name="arrow-left" size="lg" />
+          </span>
+          <pci-datepicker label="Volta — dia do permutante" formControlName="dataVolta" [required]="true" />
+          @if (resumoVolta()) {
+            <p class="permuta-form__resumo">{{ resumoVolta() }}</p>
+          }
+        </div>
+      </div>
+
+      <section class="permuta-form__lado" aria-label="Permutante">
+        <h3 class="permuta-form__titulo">Permutante</h3>
+        <pci-select
+          label="Servidor permutante"
+          [required]="true"
+          formControlName="permutanteServidorId"
+          [options]="permutanteOptions()"
+          placeholder="Selecione o permutante"
+        />
+        <app-permuta-dias
+          [ano]="lados.permutante().ano"
+          [mes]="lados.permutante().mes"
+          [escala]="lados.permutante().escala"
+          [loading]="lados.permutante().loading"
+          [semServidor]="!permutanteId()"
+          [selecionada]="dataVolta()"
+          (diaClicado)="onDia('permutante', $event)"
+          (mesAlterado)="onMes('permutante', $event)"
+        />
+      </section>
+    </div>
+
+    <pci-input label="Observação" formControlName="observacao" placeholder="Opcional" />
+  </form>
+</pci-form-page>

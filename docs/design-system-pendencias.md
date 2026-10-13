@@ -201,6 +201,20 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
 - **Spec pra portar**: `PciListPageComponent` ganhar um slot `[slot=actions]` no cabeçalho (como o
   `pci-page-header` já tem), pras ações secundárias ficarem alinhadas ao título.
 
+## Lista de seleção única (clicável) sem componente na lib
+
+- **Por quê**: `pci-selection-list` é de múltipla escolha com `pci-checkbox`; não há lista de
+  seleção única em que a linha inteira é clicável (padrão "escolha um item").
+- **Onde foi implementado**: `frontend/src/app/features/permutas/components/permuta-dias/`
+  (`app-permuta-dias`) — dias da escala do servidor no mês, com navegação de mês
+  (`pci-icon-button` chevron), cada dia como `<button role="option">` (data, código e nome da
+  ocorrência), linha selecionada destacada com `--pci-color-accent-soft` e barra de 3px em
+  `--pci-color-primary`. Usado em `pages/permuta-form` para escolher o dia da ida e o da volta.
+- **Spec pra portar**: `pci-selection-list` ganhar `mode: 'single' | 'multiple'` (padrão
+  `multiple`); no `single`, sem checkbox, item como `role="option"` dentro de `role="listbox"`,
+  `aria-selected`, destaque da linha selecionada, `max-height` com rolagem e um slot para conteúdo
+  extra por item (ex.: código à direita).
+
 ## Como usar este documento
 
 Sempre que algo for implementado localmente por falta de suporte no design system, registrar

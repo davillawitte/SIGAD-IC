@@ -35,6 +35,13 @@ export interface CreateAfastamentoPayload {
   sei?: string | null;
 }
 
+/** Servidor elegível para afastamento cadastrado pela Gestão Institucional. */
+export interface AfastamentoServidorOpcao {
+  id: string;
+  nome: string;
+  matricula: string;
+}
+
 export type UpdateAfastamentoPayload = Omit<CreateAfastamentoPayload, 'servidorId'>;
 
 @Injectable({ providedIn: 'root' })
@@ -77,6 +84,17 @@ export class AfastamentosApiService {
 
   create(payload: CreateAfastamentoPayload): Observable<AfastamentoItem> {
     return this.http.post<AfastamentoItem>(`${this.base}/api/afastamentos`, payload);
+  }
+
+  /** Gestão Institucional: qualquer servidor, exceto os lotados na Direção do IC. */
+  createInstitucional(payload: CreateAfastamentoPayload): Observable<AfastamentoItem> {
+    return this.http.post<AfastamentoItem>(`${this.base}/api/afastamentos/institucionais`, payload);
+  }
+
+  listServidoresInstitucionais(): Observable<AfastamentoServidorOpcao[]> {
+    return this.http.get<AfastamentoServidorOpcao[]>(
+      `${this.base}/api/afastamentos/institucionais/servidores`,
+    );
   }
 
   update(id: string, payload: UpdateAfastamentoPayload): Observable<AfastamentoItem> {

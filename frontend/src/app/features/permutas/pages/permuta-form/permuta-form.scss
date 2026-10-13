@@ -1,0 +1,61 @@
+.permuta-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-4);
+}
+
+.permuta-form__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: var(--pci-space-4);
+  align-items: start;
+}
+
+.permuta-form__lado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-3);
+  min-width: 0;
+}
+
+.permuta-form__titulo {
+  margin: 0;
+  font-size: var(--pci-font-size-base);
+  font-weight: var(--pci-font-weight-semibold);
+  color: var(--pci-color-text-primary);
+}
+
+.permuta-form__setas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-6);
+  padding-top: var(--pci-space-6);
+}
+
+.permuta-form__seta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-2);
+}
+
+.permuta-form__seta-icone {
+  display: flex;
+  justify-content: center;
+  color: var(--pci-color-primary);
+}
+
+.permuta-form__resumo {
+  margin: 0;
+  font-size: var(--pci-font-size-xs);
+  color: var(--pci-color-text-secondary);
+}
+
+@media (max-width: 960px) {
+  .permuta-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .permuta-form__setas {
+    padding-top: 0;
+  }
+}

@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   PciAlertComponent,
+  PciFeedbackModalService,
   PciFormPageComponent,
   PciInputComponent,
   PciSelectComponent,
@@ -38,22 +39,29 @@ export class AfastamentoForm implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = AFASTAMENTOS_ROUTE_PAGES;
+  /** Gestão Institucional (`/afastamentos-institucionais/novo`): qualquer servidor, exceto a
+   * Direção do IC — a lista e o escopo vêm do endpoint institucional, não da chefia. */
+  readonly isInstitucional = signal(false);
   readonly isEdit = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   private readonly servidores = signal<ServidorListItem[]>([]);
+  private readonly servidoresInstitucionais = signal<PciSelectOption[]>([]);
   /** Computed (não calculado uma vez só na resposta da API): `canAccessLotacao` lê a sessão,
    * que pode estar desatualizada na abertura da tela (ex.: chefia de núcleo atribuída depois
    * do login) e só se corrige quando o refresh em segundo plano termina — aí a lista se
    * recalcula sozinha e passa a trazer o núcleo inteiro, não só o setor chefiado. */
   readonly servidorOptions = computed<PciSelectOption[]>(() =>
-    this.servidores()
-      .filter((s) =>
-        this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', s.setorId, s.nucleoId),
-      )
-      .map((s) => ({ label: `${s.nome} — ${s.matricula}`, value: s.id })),
+    this.isInstitucional()
+      ? this.servidoresInstitucionais()
+      : this.servidores()
+          .filter((s) =>
+            this.auth.canAccessLotacao('afastamentos.criar', 'afastamentos', s.setorId, s.nucleoId),
+          )
+          .map((s) => ({ label: `${s.nome} — ${s.matricula}`, value: s.id })),
   );
   readonly currentPath = signal('/afastamentos/novo');
 
@@ -81,7 +89,19 @@ export class AfastamentoForm implements OnInit {
   ngOnInit(): void {
     this.editId = this.route.snapshot.paramMap.get('id');
     this.isEdit.set(!!this.editId);
-    this.currentPath.set(this.editId ? '/afastamentos/editar/:id' : '/afastamentos/novo');
+    this.isInstitucional.set(this.route.snapshot.data['escopo'] === 'institucional');
+    this.currentPath.set(this.editId ? '/afastamentos/editar/:id' : `${this.listPath()}/novo`);
+
+    if (this.isInstitucional()) {
+      this.api.listServidoresInstitucionais().subscribe({
+        next: (servidores) =>
+          this.servidoresInstitucionais.set(
+            servidores.map((s) => ({ label: `${s.nome} — ${s.matricula}`, value: s.id })),
+          ),
+        error: () => this.error.set('Não foi possível carregar os servidores.'),
+      });
+      return;
+    }
 
     this.adminApi.listMeusServidores().subscribe({
       next: (servidores) => {
@@ -126,7 +146,7 @@ export class AfastamentoForm implements OnInit {
     }
 
     const value = this.form.getRawValue();
-    if (!this.isEdit()) {
+    if (!this.isEdit() && !this.isInstitucional()) {
       const lotacao = this.servidorLotacaoById.get(value.servidorId);
       if (
         !lotacao ||
@@ -141,17 +161,20 @@ export class AfastamentoForm implements OnInit {
     this.error.set(null);
 
     if (!this.isEdit()) {
-      this.api
-        .create({
-          servidorId: value.servidorId,
-          dataInicio: value.dataInicio,
-          dataFim: value.dataFim,
-          tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
-          observacao: value.observacao.trim() || null,
-          sei: value.sei.trim() || null,
-        })
+      const payload = {
+        servidorId: value.servidorId,
+        dataInicio: value.dataInicio,
+        dataFim: value.dataFim,
+        tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
+        observacao: value.observacao.trim() || null,
+        sei: value.sei.trim() || null,
+      };
+      (this.isInstitucional() ? this.api.createInstitucional(payload) : this.api.create(payload))
         .subscribe({
-          next: () => void this.router.navigateByUrl('/afastamentos'),
+          next: () => {
+            this.feedback.showSuccess('Afastamento cadastrado com sucesso.');
+            void this.router.navigateByUrl(this.listPath());
+          },
           error: (err: { error?: { message?: string } }) => {
             this.error.set(err.error?.message ?? 'Não foi possível salvar.');
             this.saving.set(false);
@@ -169,7 +192,10 @@ export class AfastamentoForm implements OnInit {
         sei: value.sei.trim() || null,
       })
       .subscribe({
-        next: () => void this.router.navigateByUrl('/afastamentos'),
+        next: () => {
+          this.feedback.showSuccess('Afastamento atualizado com sucesso.');
+          void this.router.navigateByUrl(this.listPath());
+        },
         error: (err: { error?: { message?: string } }) => {
           this.error.set(err.error?.message ?? 'Não foi possível salvar.');
           this.saving.set(false);
@@ -178,6 +204,10 @@ export class AfastamentoForm implements OnInit {
   }
 
   cancel(): void {
-    void this.router.navigateByUrl('/afastamentos');
+    void this.router.navigateByUrl(this.listPath());
+  }
+
+  private listPath(): string {
+    return this.isInstitucional() ? '/afastamentos-institucionais' : '/afastamentos';
   }
 }

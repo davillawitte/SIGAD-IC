@@ -22,6 +22,9 @@ public record AfastamentoDto(
     string? Sei,
     DateTime CreatedAt);
 
+/// <summary>Opção de servidor para o cadastro de afastamento pela Gestão Institucional.</summary>
+public record AfastamentoServidorOpcaoDto(Guid Id, string Nome, string Matricula);
+
 public record CreateAfastamentoRequest(
     Guid ServidorId,
     DateOnly DataInicio,

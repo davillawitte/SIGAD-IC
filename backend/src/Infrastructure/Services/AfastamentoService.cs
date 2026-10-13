@@ -4,6 +4,7 @@ using TemplateSistema.Application.Afastamentos;
 using TemplateSistema.Application.Auth;
 using TemplateSistema.Application.Common;
 using TemplateSistema.Domain.Entities;
+using TemplateSistema.Domain.Enums;
 using TemplateSistema.Infrastructure.Security;
 using TemplateSistema.Persistence;
 
@@ -176,6 +177,66 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
                 "Só é possível cadastrar afastamento para servidores do setor ou núcleo em que você é chefe.");
         }
 
+        return await PersistirNovoAsync(request, actorLogin, cancellationToken);
+    }
+
+    public async Task<Result<AfastamentoDto>> CreateInstitucionalAsync(
+        CreateAfastamentoRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        if (!actor.TemVisaoGlobal(PermissionModules.Afastamentos))
+        {
+            return Result<AfastamentoDto>.Failure(
+                "Só quem tem acesso à Gestão Institucional pode cadastrar afastamento por esta tela.");
+        }
+
+        var servidor = await db.Servidores
+            .AsNoTracking()
+            .Include(x => x.Setor)
+            .FirstOrDefaultAsync(x => x.Id == request.ServidorId, cancellationToken);
+
+        if (servidor is null)
+        {
+            return Result<AfastamentoDto>.Failure("Servidor não encontrado.");
+        }
+
+        // Mesmo recorte da listagem institucional: a Direção do IC fica com a Gestão do Setor.
+        if (SetorSiglas.IsDirecaoIc(servidor.Setor?.Sigla))
+        {
+            return Result<AfastamentoDto>.Failure(
+                "Afastamentos de servidores da Direção do IC são cadastrados pela Gestão do Setor.");
+        }
+
+        return await PersistirNovoAsync(request, actorLogin, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AfastamentoServidorOpcaoDto>> ListServidoresInstitucionaisAsync(
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        if (!actor.TemVisaoGlobal(PermissionModules.Afastamentos))
+        {
+            return [];
+        }
+
+        var direcaoIds = await LoadDirecaoIcSetorIdsAsync(cancellationToken);
+        return await db.Servidores
+            .AsNoTracking()
+            .Where(x => x.Status != StatusServidor.Aposentado)
+            .Where(x => x.SetorId == null || !direcaoIds.Contains(x.SetorId.Value))
+            .OrderBy(x => x.Nome)
+            .Select(x => new AfastamentoServidorOpcaoDto(x.Id, x.Nome, x.Matricula))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<Result<AfastamentoDto>> PersistirNovoAsync(
+        CreateAfastamentoRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken)
+    {
         Afastamento entity;
         try
         {

@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { permissionGuard } from '../../core/auth/auth.guard';
+import { permissionGuard, visaoGlobalGuard } from '../../core/auth/auth.guard';
 
 export const AFASTAMENTOS_ROUTES: Routes = [
   {
@@ -37,6 +37,13 @@ export const AFASTAMENTOS_ROUTES: Routes = [
         path: '',
         loadComponent: () =>
           import('./pages/afastamento-list/afastamento-list').then((m) => m.AfastamentoList),
+        data: { escopo: 'institucional' },
+      },
+      {
+        path: 'novo',
+        canActivate: [visaoGlobalGuard('afastamentos')],
+        loadComponent: () =>
+          import('./pages/afastamento-form/afastamento-form').then((m) => m.AfastamentoForm),
         data: { escopo: 'institucional' },
       },
     ],

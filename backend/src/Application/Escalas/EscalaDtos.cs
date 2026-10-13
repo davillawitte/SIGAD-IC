@@ -93,7 +93,9 @@ public record EscalaOcorrenciaDto(
     decimal? Horas,
     OrigemOcorrencia Origem,
     Guid? EscalaJornadaId,
-    string? Observacao);
+    string? Observacao,
+    // Célula alterada por permuta — exibida com "*".
+    bool Permuta = false);
 
 public record EscalaCalendarioDto(
     Guid EscalaId,

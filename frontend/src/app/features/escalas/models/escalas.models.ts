@@ -50,6 +50,8 @@ export interface EscalaOcorrencia {
   origem: OrigemOcorrencia;
   escalaJornadaId?: string | null;
   observacao?: string | null;
+  /** Célula alterada por permuta — exibida com "*". */
+  permuta?: boolean;
 }
 
 export interface EscalaJornada {

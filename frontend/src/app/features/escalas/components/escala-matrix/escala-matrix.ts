@@ -111,8 +111,14 @@ function codeFor(escala: EscalaDetail, servidorId: string, day: string): string 
   return ocorrenciaFor(escala, servidorId, day)?.tipoOcorrenciaCodigo ?? '';
 }
 
+function permutaFor(escala: EscalaDetail, servidorId: string, day: string): boolean {
+  return ocorrenciaFor(escala, servidorId, day)?.permuta === true;
+}
+
+/** Célula alterada por permuta sai com "*" (legenda "* Permuta" abaixo da tabela). */
 function cellLabelFor(escala: EscalaDetail, servidorId: string, day: string): string {
-  return codeFor(escala, servidorId, day);
+  const code = codeFor(escala, servidorId, day);
+  return code && permutaFor(escala, servidorId, day) ? `${code}*` : code;
 }
 
 function horasOf(
@@ -200,6 +206,10 @@ export class EscalaMatrix {
     return [...new Set(codes)].join(', ') || '—';
   });
 
+  readonly temPermuta = computed(() =>
+    this.escala().servidores.some((s) => s.ocorrencias.some((o) => o.permuta)),
+  );
+
   readonly mesNome = computed(() => MES_NOMES[this.escala().mes] ?? String(this.escala().mes));
 
   readonly titulo = computed(() => {
@@ -219,6 +229,11 @@ export class EscalaMatrix {
 
   cellLabel(servidorId: string, day: string): string {
     return cellLabelFor(this.escala(), servidorId, day);
+  }
+
+  /** Célula de permuta fica travada na edição: muda-se excluindo a permuta (tela Permutas). */
+  permuta(servidorId: string, day: string): boolean {
+    return permutaFor(this.escala(), servidorId, day);
   }
 
   chPres(servidorId: string): number {
@@ -247,7 +262,7 @@ export class EscalaMatrix {
   }
 
   onBlur(servidorId: string, day: string, event: FocusEvent): void {
-    if (!this.editable() || !this.codeChange) return;
+    if (!this.editable() || !this.codeChange || this.permuta(servidorId, day)) return;
     const input = event.target as HTMLInputElement;
     const value = input.value.trim().toUpperCase();
     input.value = value;

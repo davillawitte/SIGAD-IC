@@ -150,6 +150,25 @@
   outline: 1px solid var(--pci-color-primary, #1b3a5c);
 }
 
+/* Célula de permuta no modo editável: travada, com o "*" no canto. */
+.escala-doc__cell.is-permuta {
+  cursor: not-allowed;
+}
+
+td:has(> .escala-doc__permuta) {
+  position: relative;
+}
+
+.escala-doc__permuta {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .escala-doc__sub {
   font-size: 0.65rem;
   font-weight: 400;

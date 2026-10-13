@@ -79,4 +79,5 @@ public record ServidorExclusaoImpactoDto(
     int Chefias,
     int Usuarios,
     int NucleosComoChefe,
-    bool PodeExcluir);
+    bool PodeExcluir,
+    int Permutas = 0);

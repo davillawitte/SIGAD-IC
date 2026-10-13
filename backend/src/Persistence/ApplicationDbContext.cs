@@ -31,6 +31,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<EscalaResumidaRotacaoMembro> EscalaResumidaRotacaoMembros => Set<EscalaResumidaRotacaoMembro>();
     public DbSet<EscalaResumidaDia> EscalaResumidaDias => Set<EscalaResumidaDia>();
     public DbSet<Afastamento> Afastamentos => Set<Afastamento>();
+    public DbSet<Permuta> Permutas => Set<Permuta>();
     public DbSet<CalendarioAno> CalendariosAno => Set<CalendarioAno>();
     public DbSet<MarcacaoCalendario> MarcacoesCalendario => Set<MarcacaoCalendario>();
     public DbSet<SetupToken> SetupTokens => Set<SetupToken>();

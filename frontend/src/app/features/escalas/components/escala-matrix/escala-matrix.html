@@ -87,11 +87,17 @@
                   @if (editable()) {
                     <input
                       class="escala-doc__cell"
+                      [class.is-permuta]="permuta(s.servidorId, day)"
                       [value]="code(s.servidorId, day)"
+                      [readOnly]="permuta(s.servidorId, day)"
+                      [attr.title]="permuta(s.servidorId, day) ? 'Permuta — para alterar, exclua a permuta na tela Permutas' : null"
                       (input)="onCellInput($event)"
                       (blur)="onBlur(s.servidorId, day, $event)"
                       (keydown)="onKeydown(s.servidorId, day, $event)"
                     />
+                    @if (permuta(s.servidorId, day)) {
+                      <span class="escala-doc__permuta" aria-label="Permuta">*</span>
+                    }
                   } @else {
                     {{ cellLabel(s.servidorId, day) }}
                   }
@@ -146,6 +152,9 @@
   <ul class="escala-doc__legend">
     @for (item of legend; track item.codigo) {
       <li><strong>{{ item.codigo }}</strong>: {{ item.nome }}</li>
+    }
+    @if (temPermuta()) {
+      <li><strong>*</strong>: Permuta</li>
     }
   </ul>
 </div>

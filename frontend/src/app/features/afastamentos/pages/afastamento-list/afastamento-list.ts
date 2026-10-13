@@ -60,7 +60,7 @@ export class AfastamentoList implements OnInit {
   );
   readonly pageDescription = computed(() =>
     this.isInstitucional()
-      ? 'Consulta dos afastamentos de todos os setores (exceto a Direção do IC). Somente visualização.'
+      ? 'Consulta e cadastro de afastamentos de todos os setores (exceto a Direção do IC).'
       : 'Cadastre férias, licenças e afastamentos dos servidores do seu setor.',
   );
   readonly listPath = computed(() =>
@@ -76,8 +76,10 @@ export class AfastamentoList implements OnInit {
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
   readonly sort = signal<PciSortChange<AfastamentoRow> | null>(null);
-  readonly canCreate = computed(
-    () => !this.isInstitucional() && this.auth.hasPermission('afastamentos.criar'),
+  readonly canCreate = computed(() =>
+    this.isInstitucional()
+      ? this.auth.hasVisaoGlobal('afastamentos')
+      : this.auth.hasPermission('afastamentos.criar'),
   );
 
   readonly filterFields: PciFilterField[] = [
@@ -158,7 +160,7 @@ export class AfastamentoList implements OnInit {
   }
 
   goCreate(): void {
-    void this.router.navigateByUrl('/afastamentos/novo');
+    void this.router.navigateByUrl(`${this.listPath()}/novo`);
   }
 
   onRowAction(event: { action: string; row: AfastamentoRow }): void {

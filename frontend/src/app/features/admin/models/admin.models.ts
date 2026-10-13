@@ -97,6 +97,7 @@ export interface ServidorExclusaoImpacto {
   usuarios: number;
   nucleosComoChefe: number;
   podeExcluir: boolean;
+  permutas?: number;
 }
 
 export interface DesativarPerfilPayload {

@@ -277,7 +277,9 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
         var chefias = await db.SetorChefias.CountAsync(x => x.ServidorId == id, cancellationToken);
         var usuarios = await db.Usuarios.CountAsync(x => x.ServidorId == id, cancellationToken);
         var nucleosComoChefe = await db.Nucleos.CountAsync(x => x.ChefeServidorId == id, cancellationToken);
-        var podeExcluir = escalas == 0 && afastamentos == 0 && chefias == 0 && usuarios == 0;
+        var permutas = await db.Permutas.CountAsync(
+            x => x.SolicitanteServidorId == id || x.PermutanteServidorId == id, cancellationToken);
+        var podeExcluir = escalas == 0 && afastamentos == 0 && chefias == 0 && usuarios == 0 && permutas == 0;
 
         return new ServidorExclusaoImpactoDto(
             escalas,
@@ -285,7 +287,8 @@ public class ServidorService(ApplicationDbContext db) : IServidorService
             chefias,
             usuarios,
             nucleosComoChefe,
-            podeExcluir);
+            podeExcluir,
+            permutas);
     }
 
     private async Task<string?> ValidateAsync(

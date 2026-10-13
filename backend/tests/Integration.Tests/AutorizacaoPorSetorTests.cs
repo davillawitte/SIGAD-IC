@@ -31,6 +31,7 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
         Guid EscalaDirecaoId,
         Guid ServidorNbId,
         Guid ServidorNpId,
+        Guid ServidorDirecaoId,
         Guid AfastamentoNbId);
 
     private Task<Contexto> PrepararAsync() =>
@@ -76,6 +77,7 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
                 b.AdicionarEscala(direcao, Ano, Mes).Id,
                 servidorNb.Id,
                 servidorNp.Id,
+                diretor.Id,
                 afastamentoNb.Id);
         });
 
@@ -184,6 +186,7 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
                 b.AdicionarEscala(nb, Ano, Mes).Id,
                 Guid.Empty,
                 b.AdicionarEscala(direcao, Ano, Mes).Id,
+                Guid.Empty,
                 Guid.Empty,
                 Guid.Empty,
                 Guid.Empty);
@@ -396,5 +399,63 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
 
         resultado.Succeeded.ShouldBeFalse();
         resultado.Error.ShouldBe("Só é possível cadastrar afastamento para servidores do setor ou núcleo em que você é chefe.");
+    }
+
+    private static CreateAfastamentoRequest NovoAfastamento(Guid servidorId) =>
+        new(servidorId, new DateOnly(Ano, 8, 1), new DateOnly(Ano, 8, 5), "LM", null, Sei: "SEI-000000");
+
+    [Fact]
+    public async Task Afastamento_gestao_institucional_cria_para_servidor_de_outro_setor()
+    {
+        var ctx = await PrepararAsync();
+
+        await using var db = NewContext();
+        var resultado = await new AfastamentoService(db).CreateInstitucionalAsync(
+            NovoAfastamento(ctx.ServidorNpId), Diretor);
+
+        resultado.Succeeded.ShouldBeTrue(resultado.Error);
+        resultado.Value!.ServidorId.ShouldBe(ctx.ServidorNpId);
+    }
+
+    [Fact]
+    public async Task Afastamento_institucional_recusa_servidor_da_direcao_ic()
+    {
+        var ctx = await PrepararAsync();
+
+        await using var db = NewContext();
+        var resultado = await new AfastamentoService(db).CreateInstitucionalAsync(
+            NovoAfastamento(ctx.ServidorDirecaoId), Diretor);
+
+        resultado.Succeeded.ShouldBeFalse();
+        resultado.Error.ShouldBe("Afastamentos de servidores da Direção do IC são cadastrados pela Gestão do Setor.");
+    }
+
+    [Fact]
+    public async Task Afastamento_institucional_recusa_quem_nao_tem_gestao_institucional()
+    {
+        var ctx = await PrepararAsync();
+
+        await using var db = NewContext();
+        var resultado = await new AfastamentoService(db).CreateInstitucionalAsync(
+            NovoAfastamento(ctx.ServidorNbId), ChefeNb);
+
+        resultado.Succeeded.ShouldBeFalse();
+        resultado.Error.ShouldBe("Só quem tem acesso à Gestão Institucional pode cadastrar afastamento por esta tela.");
+    }
+
+    [Fact]
+    public async Task Afastamento_institucional_lista_servidores_exceto_direcao_ic()
+    {
+        var ctx = await PrepararAsync();
+
+        await using var db = NewContext();
+        var service = new AfastamentoService(db);
+
+        var ids = (await service.ListServidoresInstitucionaisAsync(Diretor)).Select(x => x.Id).ToList();
+        ids.ShouldContain(ctx.ServidorNbId);
+        ids.ShouldContain(ctx.ServidorNpId);
+        ids.ShouldNotContain(ctx.ServidorDirecaoId);
+
+        (await service.ListServidoresInstitucionaisAsync(ChefeNb)).ShouldBeEmpty();
     }
 }

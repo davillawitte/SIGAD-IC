@@ -17,6 +17,18 @@ public interface IAfastamentoService
         string actorLogin,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Gestão Institucional: cadastra afastamento para qualquer servidor, exceto os
+    /// lotados na Direção do IC (mesmo recorte da listagem institucional).</summary>
+    Task<Result<AfastamentoDto>> CreateInstitucionalAsync(
+        CreateAfastamentoRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Servidores que a Gestão Institucional pode escolher no cadastro de afastamento.</summary>
+    Task<IReadOnlyList<AfastamentoServidorOpcaoDto>> ListServidoresInstitucionaisAsync(
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+
     Task<Result<AfastamentoDto>> UpdateAsync(
         Guid id,
         UpdateAfastamentoRequest request,

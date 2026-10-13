@@ -145,9 +145,12 @@ export class MainLayoutComponent {
             ...(this.auth.hasPermission('afastamentos.listar')
               ? [{ id: 'afastamentos', label: 'Afastamentos', icon: 'user-x' as const }]
               : []),
-            // Sem permissão própria ainda: enquanto permutas/diárias não têm código de permissão,
-            // valem as mesmas condições da seção (ser chefia de setor ou de núcleo).
-            { id: 'permutas', label: 'Permutas', icon: 'refresh' as const },
+            // Permuta altera escala: usa a mesma permissão de listar escalas.
+            ...(this.auth.hasPermission('escalas.listar')
+              ? [{ id: 'permutas', label: 'Permutas', icon: 'refresh' as const }]
+              : []),
+            // Sem permissão própria ainda: enquanto diárias não têm código de permissão, valem as
+            // mesmas condições da seção (ser chefia de setor ou de núcleo).
             { id: 'diarias-operacionais', label: 'Diárias Operacionais', icon: 'credit-card' as const },
           ]
         : [];

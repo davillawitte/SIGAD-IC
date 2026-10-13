@@ -1,0 +1,97 @@
+.permuta-dias {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pci-space-2);
+}
+
+.permuta-dias__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pci-space-2);
+}
+
+.permuta-dias__mes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--pci-color-text-primary);
+}
+
+.permuta-dias__escala {
+  font-size: var(--pci-font-size-xs);
+  color: var(--pci-color-text-secondary);
+}
+
+.permuta-dias__vazio {
+  display: flex;
+  justify-content: center;
+  padding: var(--pci-space-4);
+  color: var(--pci-color-text-secondary);
+  font-size: var(--pci-font-size-sm);
+}
+
+.permuta-dias__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 24rem;
+  overflow-y: auto;
+  border: 1px solid var(--pci-color-border);
+  border-radius: var(--pci-radius-control);
+}
+
+.permuta-dias__lista li + li {
+  border-top: 1px solid var(--pci-color-border);
+}
+
+.permuta-dias__dia {
+  display: grid;
+  grid-template-columns: 5.5rem 4rem 1fr;
+  align-items: center;
+  gap: var(--pci-space-2);
+  width: 100%;
+  padding: var(--pci-space-1) var(--pci-space-3);
+  border: 0;
+  background: var(--pci-color-surface);
+  color: var(--pci-color-text-primary);
+  font: inherit;
+  font-size: var(--pci-font-size-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--pci-color-surface-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pci-color-primary);
+    outline-offset: -2px;
+  }
+
+  &.is-weekend .permuta-dias__data {
+    color: var(--pci-color-text-secondary);
+  }
+
+  &.is-selected {
+    background: var(--pci-color-accent-soft);
+    font-weight: var(--pci-font-weight-semibold);
+    box-shadow: inset 3px 0 0 var(--pci-color-primary);
+  }
+}
+
+.permuta-dias__codigo {
+  font-weight: var(--pci-font-weight-semibold);
+}
+
+.permuta-dias__nome {
+  color: var(--pci-color-text-secondary);
+  font-size: var(--pci-font-size-xs);
+}
+
+.permuta-dias__legenda {
+  margin: 0;
+  font-size: var(--pci-font-size-xs);
+  color: var(--pci-color-text-secondary);
+}

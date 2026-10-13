@@ -313,7 +313,7 @@ public class EscalaPdfService(
                                 var weekend = IsWeekend(day);
                                 var codigo = map.TryGetValue(day, out var oc) ? oc.TipoOcorrenciaCodigo : "";
                                 table.Cell().Element(c => DayBodyCell(c, weekend, codigo))
-                                    .AlignCenter().Text(codigo).FontSize(6.5f);
+                                    .AlignCenter().Text(ComMarcaPermuta(codigo, oc)).FontSize(6.5f);
                             }
 
                             table.Cell().Element(BodyCell).AlignCenter().Text($"{chPres:0}");
@@ -329,6 +329,10 @@ public class EscalaPdfService(
                 {
                     text.Span("Legenda: ");
                     text.Span(string.Join(" | ", tipos.Values.OrderBy(t => t.Codigo).Select(t => $"{t.Codigo}={t.Nome}")));
+                    if (TemPermuta(escala))
+                    {
+                        text.Span(" | * = Permuta");
+                    }
                 });
             });
         }).GeneratePdf();
@@ -395,7 +399,7 @@ public class EscalaPdfService(
                             foreach (var s in servidores)
                             {
                                 var oc = s.Ocorrencias.FirstOrDefault(o => o.Data == day);
-                                var codigo = oc?.TipoOcorrenciaCodigo ?? "—";
+                                var codigo = ComMarcaPermuta(oc?.TipoOcorrenciaCodigo ?? "—", oc);
                                 var weekend = IsWeekend(day);
                                 table.Cell().Element(c => DayBodyCell(c, weekend, oc?.TipoOcorrenciaCodigo ?? ""))
                                     .Text(codigo);
@@ -406,6 +410,11 @@ public class EscalaPdfService(
                     content.Item().Column(sig => ComposeSignature(
                         sig, chefe, escala.SetorNome ?? escala.NucleoNome ?? "—"));
                 });
+
+                if (TemPermuta(escala))
+                {
+                    page.Footer().PaddingTop(8).Text("* = Permuta").FontSize(7);
+                }
             });
         }).GeneratePdf();
     }
@@ -414,6 +423,13 @@ public class EscalaPdfService(
     /// horário de verão desde 2019, então um offset fixo é mais robusto do que depender do
     /// tz database do ambiente (IANA/Windows).</summary>
     private static DateTime NowBrasil() => DateTime.UtcNow.AddHours(-3);
+
+    /// <summary>Célula alterada por permuta sai com "*" (legenda "* = Permuta" no rodapé).</summary>
+    private static string ComMarcaPermuta(string codigo, EscalaOcorrenciaDto? oc) =>
+        oc is { Permuta: true } ? $"{codigo}*" : codigo;
+
+    private static bool TemPermuta(EscalaDetailDto escala) =>
+        escala.Servidores.Any(s => s.Ocorrencias.Any(o => o.Permuta));
 
     private static bool IsPresencial(string codigo) =>
         !codigo.StartsWith("TL", StringComparison.OrdinalIgnoreCase)

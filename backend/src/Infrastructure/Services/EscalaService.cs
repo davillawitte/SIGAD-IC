@@ -16,6 +16,10 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
     private static readonly HashSet<string> FolgaCodes =
         new(StringComparer.OrdinalIgnoreCase) { "D", "F", "FR", "LP", "LM", "LO" };
 
+    /// <summary>Permutas ficam por cima da base da escala: operações que reescrevem células
+    /// desaplicam antes e recalculam depois (ver <see cref="PermutaAplicador"/>).</summary>
+    private PermutaAplicador Permutas => new(db);
+
     public async Task<PagedResult<EscalaListItemDto>> ListAsync(
         EscalaListQuery query,
         string actorLogin,
@@ -573,6 +577,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escalaInfo.Ano, escalaInfo.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -596,6 +601,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         db.EscalaServidores.Remove(item);
         await db.SaveChangesAsync(cancellationToken);
+        // O outro lado de uma permuta deste servidor pode estar em outra escala.
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return Result.Success();
     }
 
@@ -668,11 +675,13 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure(ex.Message);
         }
 
+        await Permutas.DesaplicarEscalaAsync(escala.Id, actorLogin, cancellationToken);
         db.EscalaJornadas.Add(jornada);
         await db.SaveChangesAsync(cancellationToken);
 
         await ApplyJornadaAsync(escalaServidor, jornada, actorLogin, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -697,6 +706,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result.Failure("Jornada não encontrada.");
         }
 
+        await Permutas.DesaplicarEscalaAsync(id, actorLogin, cancellationToken);
         var ocorrencias = await db.EscalaOcorrencias
             .Where(x => x.EscalaJornadaId == jornadaId && x.Origem == OrigemOcorrencia.Regra)
             .ToListAsync(cancellationToken);
@@ -704,6 +714,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         db.EscalaOcorrencias.RemoveRange(ocorrencias);
         db.EscalaJornadas.Remove(jornada);
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala!.Ano, escala.Mes, actorLogin, cancellationToken);
         return Result.Success();
     }
 
@@ -736,6 +747,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Tipo de ocorrência inválido.");
         }
 
+        await Permutas.DesaplicarEscalaAsync(escala.Id, actorLogin, cancellationToken);
         var existing = escalaServidor.Ocorrencias.FirstOrDefault(x => x.Data == request.Data);
         if (existing is null)
         {
@@ -766,6 +778,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -792,6 +805,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         db.EscalaOcorrencias.Remove(ocorrencia);
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala!.Ano, escala.Mes, actorLogin, cancellationToken);
         return Result.Success();
     }
 
@@ -974,6 +988,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         db.Escalas.Remove(escala);
         await db.SaveChangesAsync(cancellationToken);
+        // O outro lado das permutas dos servidores desta escala pode estar em outra escala.
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return Result.Success();
     }
 
@@ -1355,6 +1371,11 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             db.EscalaServidores.Add(dest);
             await db.SaveChangesAsync(cancellationToken);
 
+            // A cópia parte da escala SEM as permutas: elas valem só para as datas delas, e as do
+            // mês de destino (se já cadastradas) são aplicadas no fim. Copiar as células trocadas
+            // levaria a permuta de um mês para o outro (mesmo problema que as férias já tiveram).
+            var ocorrenciasOrigem = OcorrenciasSemPermuta(src.Ocorrencias);
+
             // Preserva a âncora do ciclo (DataInicioCiclo) e o padrão de origem; a janela da
             // jornada é regenerada para cobrir integralmente o mês de destino.
             foreach (var jornadaSrc in src.Jornadas)
@@ -1401,7 +1422,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 // Afastamentos, que é reaplicado no fim (ver `ApplyAfastamentosToEscalaAsync`).
                 // Copiá-las deslocando o mês ressuscitava licença já encerrada e ignorava a
                 // continuidade de quem se afasta atravessando a virada do mês.
-                var manuais = src.Ocorrencias
+                var manuais = ocorrenciasOrigem
                     .Where(x => x.Origem == OrigemOcorrencia.Manual
                                 && categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
                                    != CategoriaOcorrencia.Afastamento)
@@ -1418,7 +1439,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     // A semana vem de TODAS as ocorrências da origem, não só das manuais: numa
                     // escala com regime gerado, as outras quartas são ocorrências de regra, e
                     // ignorá-las faria um home office avulso virar a regra daquele dia da semana.
-                    var semanais = src.Ocorrencias
+                    var semanais = ocorrenciasOrigem
                         .Where(x => categoriaPorCodigo.GetValueOrDefault(x.TipoOcorrenciaCodigo)
                                     != CategoriaOcorrencia.Afastamento)
                         .ToList();
@@ -1521,6 +1542,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         // continuidade de quem já estava afastado no mês anterior quanto a ausência de quem
         // voltou. `nova.Servidores` é preenchido pelo fixup do EF ao adicionar os EscalaServidor.
         await ApplyAfastamentosToEscalaAsync(nova, actorLogin, cancellationToken);
+        await Permutas.RecalcularMesAsync(nova.Ano, nova.Mes, actorLogin, cancellationToken);
 
         await transacao.CommitAsync(cancellationToken);
         return await GetByIdAsync(nova.Id, actorLogin, cancellationToken);
@@ -1677,8 +1699,9 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure("Há padrões de escala inválidos ou inativos.");
         }
 
+        await Permutas.DesaplicarEscalaAsync(escala!.Id, actorLogin, cancellationToken);
         var servidorIdsNecessarios = itens.Select(x => x.ServidorId).Distinct().ToList();
-        var jaNaEscala = escala!.Servidores.Select(x => x.ServidorId).ToHashSet();
+        var jaNaEscala = escala.Servidores.Select(x => x.ServidorId).ToHashSet();
         var faltantes = servidorIdsNecessarios.Where(x => !jaNaEscala.Contains(x)).ToList();
 
         if (faltantes.Count > 0)
@@ -1813,6 +1836,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         await db.SaveChangesAsync(cancellationToken);
         await ApplyAfastamentosToEscalaAsync(escala, actorLogin, cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -1827,7 +1851,9 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             return Result<EscalaDetailDto>.Failure(error);
         }
 
-        await ApplyAfastamentosToEscalaAsync(escala!, actorLogin, cancellationToken);
+        await Permutas.DesaplicarEscalaAsync(escala!.Id, actorLogin, cancellationToken);
+        await ApplyAfastamentosToEscalaAsync(escala, actorLogin, cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -1992,6 +2018,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         var codigo = request.TipoOcorrenciaCodigo.Trim().ToUpperInvariant();
+        await Permutas.DesaplicarEscalaAsync(escala.Id, actorLogin, cancellationToken);
 
         if (!request.ConfirmarSobrescrita)
         {
@@ -2036,6 +2063,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -2095,6 +2123,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                     .ExecuteDeleteAsync(cancellationToken);
             }
 
+            await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
             return await GetByIdAsync(id, actorLogin, cancellationToken);
         }
 
@@ -2131,6 +2160,20 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
 
         var touchedServidorIds = dedup.Keys.Select(k => k.ServidorId).Distinct().ToList();
         var escalaServidorIds = touchedServidorIds.Select(sid => porServidor[sid].Id).ToList();
+
+        // O wizard devolve a matriz como foi exibida, com as permutas já aplicadas. Célula
+        // permutada que volta com o mesmo código grava a BASE (o original) — a permuta é
+        // reaplicada no fim; gravar o valor trocado como base faria a permuta trocar duas vezes.
+        // Código diferente = o chefe alterou a célula, e o valor dele vira a nova base.
+        var permutadas = (await db.EscalaOcorrencias
+                .AsNoTracking()
+                .Where(x => escalaServidorIds.Contains(x.EscalaServidorId)
+                            && x.Permutada
+                            && x.Data >= escala.DataInicio
+                            && x.Data <= escala.DataFim)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(x => (x.EscalaServidorId, x.Data));
+
         await db.EscalaOcorrencias
             .Where(x => escalaServidorIds.Contains(x.EscalaServidorId)
                         && x.Data >= escala.DataInicio
@@ -2141,6 +2184,29 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         {
             var escalaServidor = porServidor[item.ServidorId];
             var codigo = item.TipoOcorrenciaCodigo.Trim().ToUpperInvariant();
+
+            if (permutadas.TryGetValue((escalaServidor.Id, item.Data), out var permutada)
+                && string.Equals(permutada.TipoOcorrenciaCodigo, codigo, StringComparison.OrdinalIgnoreCase))
+            {
+                var original = permutada.ValorBase;
+                if (original is not null)
+                {
+                    db.EscalaOcorrencias.Add(EscalaOcorrencia.Create(
+                        escalaServidor.Id,
+                        item.Data,
+                        original.Codigo,
+                        OrigemOcorrencia.Manual,
+                        original.HoraInicio,
+                        original.HoraFim,
+                        original.Horas,
+                        observacao: original.Observacao,
+                        createdBy: actorLogin));
+                }
+
+                // Célula que só existia por causa da permuta não tem base: o recálculo a recria.
+                continue;
+            }
+
             db.EscalaOcorrencias.Add(EscalaOcorrencia.Create(
                 escalaServidor.Id,
                 item.Data,
@@ -2154,6 +2220,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await Permutas.RecalcularMesAsync(escala.Ano, escala.Mes, actorLogin, cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -2311,6 +2378,31 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             }
         }
     }
+
+    /// <summary>Ocorrência da escala de origem como era antes das permutas (base da cópia).</summary>
+    private sealed record OcorrenciaCopia(
+        DateOnly Data,
+        string TipoOcorrenciaCodigo,
+        OrigemOcorrencia Origem,
+        TimeOnly? HoraInicio,
+        TimeOnly? HoraFim,
+        decimal? Horas,
+        string? Observacao);
+
+    private static List<OcorrenciaCopia> OcorrenciasSemPermuta(IEnumerable<EscalaOcorrencia> ocorrencias) =>
+        ocorrencias
+            .Select(x => (Ocorrencia: x, Base: x.ValorBase))
+            // Célula criada pela permuta não existia na escala.
+            .Where(x => x.Base is not null)
+            .Select(x => new OcorrenciaCopia(
+                x.Ocorrencia.Data,
+                x.Base!.Codigo,
+                x.Ocorrencia.Permutada ? x.Ocorrencia.OrigemOriginal ?? OrigemOcorrencia.Manual : x.Ocorrencia.Origem,
+                x.Base.HoraInicio,
+                x.Base.HoraFim,
+                x.Base.Horas,
+                x.Base.Observacao))
+            .ToList();
 
     private static DateOnly? ShiftMonth(DateOnly original, int deltaMonths, DateOnly min, DateOnly max)
     {
@@ -2641,7 +2733,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                             o.Horas ?? o.TipoOcorrencia?.HorasPadrao,
                             o.Origem,
                             o.EscalaJornadaId,
-                            o.Observacao))
+                            o.Observacao,
+                            o.Permutada))
                         .ToList());
             })
             .ToList();

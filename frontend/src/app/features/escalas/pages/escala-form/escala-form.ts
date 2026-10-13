@@ -1142,12 +1142,14 @@ export class EscalaForm implements OnInit {
 
   private loadStep2Data(preserveSelection = false, afterLoad?: () => void): void {
     const setorId = this.step1Form.getRawValue().setorId;
-    this.loadFeriados();
     const ehNucleo = this.escalaDeNucleo();
+    // Feriados entram no mesmo lote: assim já estão prontos quando o rascunho é montado e
+    // quando uma escala salva/copiada é hidratada (o "F" é aplicado em `loadStep3Data`).
     forkJoin({
       padroes: this.api.listPadroes(),
       tipos: this.api.listTiposOcorrencia(),
       servidores: this.adminApi.listMeusServidores(false),
+      feriados: this.loadFeriados$(),
     }).subscribe({
       next: ({ padroes, tipos, servidores }) => {
         this.padroes.set(padroes);
@@ -1897,21 +1899,19 @@ export class EscalaForm implements OnInit {
 
   /** Busca os feriados do mês da escala no calendário institucional (só calendário publicado;
    * ponto facultativo e evento não entram). Falha na consulta não bloqueia a escala. */
-  private loadFeriados(): void {
+  private loadFeriados$(): Observable<unknown> {
     const v = this.step1Form.getRawValue();
     const ano = Number(v.ano);
     const mes = Number(v.mes);
-    if (!ano || !mes) return;
+    if (!ano || !mes) return of(null);
     const inicio = firstDayOfMonth(ano, mes);
     const fim = lastDayOfMonth(ano, mes);
     const periodo = `${inicio}|${fim}`;
-    if (periodo === this.feriadosPeriodo) return;
-    this.feriadosPeriodo = periodo;
-    this.calendarioApi
-      .diasNaoUteis(inicio, fim)
-      .pipe(catchError(() => of([])))
-      .subscribe((dias) => {
-        if (this.feriadosPeriodo !== periodo) return;
+    if (periodo === this.feriadosPeriodo) return of(null);
+    return this.calendarioApi.diasNaoUteis(inicio, fim).pipe(
+      catchError(() => of([])),
+      tap((dias) => {
+        this.feriadosPeriodo = periodo;
         const set = new Set<string>();
         for (const d of dias) {
           if (!d.tipo.startsWith('Feriado')) continue;
@@ -1922,8 +1922,8 @@ export class EscalaForm implements OnInit {
           }
         }
         this.feriados.set(set);
-        this.applyFeriadosToDraft();
-      });
+      }),
+    );
   }
 
   /** Marca "F" nos feriados dos servidores de expediente — cobre o rascunho montado antes de os

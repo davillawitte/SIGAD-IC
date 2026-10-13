@@ -104,6 +104,25 @@ public class AfastamentosController(IAfastamentoService afastamentoService) : Co
             : BadRequest(new { message = result.Error });
     }
 
+    /// <summary>Gestão Institucional: cadastra afastamento para servidores de todos os setores,
+    /// exceto a Direção do IC. A visão global do módulo é validada no service.</summary>
+    [HttpPost("institucionais")]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public async Task<IActionResult> CreateInstitucional(
+        [FromBody] CreateAfastamentoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await afastamentoService.CreateInstitucionalAsync(request, User.GetLogin(), cancellationToken);
+        return result.Succeeded
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpGet("institucionais/servidores")]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public async Task<IActionResult> ListServidoresInstitucionais(CancellationToken cancellationToken) =>
+        Ok(await afastamentoService.ListServidoresInstitucionaisAsync(User.GetLogin(), cancellationToken));
+
     [HttpPut("{id:guid}")]
     [RequiresPermission(PermissionCodes.AfastamentosEditar)]
     public async Task<IActionResult> Update(

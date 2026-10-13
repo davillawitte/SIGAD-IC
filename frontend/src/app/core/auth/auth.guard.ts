@@ -107,6 +107,20 @@ export const permissionGuard = (code: string): CanActivateFn => {
   };
 };
 
+/** Visão global do módulo (`<modulo>.listar` em TodosOsSetores) — ex.: Gestão Institucional. */
+export const visaoGlobalGuard = (modulo: string): CanActivateFn => {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+
+    if (auth.isAuthenticated() && auth.hasVisaoGlobal(modulo)) {
+      return true;
+    }
+
+    return router.createUrlTree(['/']);
+  };
+};
+
 export const anyPermissionGuard = (...codes: string[]): CanActivateFn => {
   return () => {
     const auth = inject(AuthService);

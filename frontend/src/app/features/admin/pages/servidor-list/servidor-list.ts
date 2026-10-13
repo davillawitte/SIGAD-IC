@@ -334,6 +334,9 @@ export class ServidorList implements OnInit {
     if (impacto.afastamentos > 0) {
       linhas.push(`• Afastamentos: ${impacto.afastamentos}`);
     }
+    if ((impacto.permutas ?? 0) > 0) {
+      linhas.push(`• Permutas: ${impacto.permutas}`);
+    }
     if (impacto.chefias > 0) {
       linhas.push(`• Chefias de setor: ${impacto.chefias}`);
     }

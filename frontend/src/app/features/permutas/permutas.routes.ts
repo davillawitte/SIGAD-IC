@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard } from '../../core/auth/auth.guard';
+import { authGuard, permissionGuard } from '../../core/auth/auth.guard';
 
 export const PERMUTAS_ROUTES: Routes = [
   {
@@ -12,11 +12,23 @@ export const PERMUTAS_ROUTES: Routes = [
       import('./pages/minhas-permutas-list/minhas-permutas-list').then((m) => m.MinhasPermutasList),
   },
   {
-    // Gestão do Setor: quem chefia o setor decide as permutas dos servidores dele.
+    // Gestão do Setor: a chefia registra as permutas. Permuta altera escala, então usa as
+    // permissões de escala; a chefia da lotação é validada na API.
     path: 'permutas',
-    canActivate: [authGuard],
+    canActivate: [permissionGuard('escalas.listar')],
     data: { navId: 'permutas' },
-    loadComponent: () =>
-      import('./pages/permutas-list/permutas-list').then((m) => m.PermutasList),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/permutas-list/permutas-list').then((m) => m.PermutasList),
+      },
+      {
+        path: 'nova',
+        canActivate: [permissionGuard('escalas.editar')],
+        loadComponent: () =>
+          import('./pages/permuta-form/permuta-form').then((m) => m.PermutaForm),
+      },
+    ],
   },
 ];
