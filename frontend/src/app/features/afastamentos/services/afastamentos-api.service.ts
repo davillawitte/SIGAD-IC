@@ -91,6 +91,14 @@ export class AfastamentosApiService {
     return this.http.post<AfastamentoItem>(`${this.base}/api/afastamentos/institucionais`, payload);
   }
 
+  updateInstitucional(id: string, payload: UpdateAfastamentoPayload): Observable<AfastamentoItem> {
+    return this.http.put<AfastamentoItem>(`${this.base}/api/afastamentos/institucionais/${id}`, payload);
+  }
+
+  deleteInstitucional(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/afastamentos/institucionais/${id}`);
+  }
+
   listServidoresInstitucionais(): Observable<AfastamentoServidorOpcao[]> {
     return this.http.get<AfastamentoServidorOpcao[]>(
       `${this.base}/api/afastamentos/institucionais/servidores`,

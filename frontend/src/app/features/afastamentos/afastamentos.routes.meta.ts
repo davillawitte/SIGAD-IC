@@ -10,4 +10,9 @@ export const AFASTAMENTOS_ROUTE_PAGES: PciRoutePageMeta[] = [
     label: 'Novo',
     parentPath: '/afastamentos-institucionais',
   },
+  {
+    path: '/afastamentos-institucionais/editar/:id',
+    label: 'Editar',
+    parentPath: '/afastamentos-institucionais',
+  },
 ];

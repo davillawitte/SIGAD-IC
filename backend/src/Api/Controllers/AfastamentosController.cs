@@ -104,8 +104,8 @@ public class AfastamentosController(IAfastamentoService afastamentoService) : Co
             : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Gestão Institucional: cadastra afastamento para servidores de todos os setores,
-    /// exceto a Direção do IC. A visão global do módulo é validada no service.</summary>
+    /// <summary>Gestão Institucional: cadastra, altera e exclui afastamento de servidores de todos
+    /// os setores, exceto a Direção do IC. A visão global do módulo é validada no service.</summary>
     [HttpPost("institucionais")]
     [RequiresPermission(PermissionCodes.AfastamentosListar)]
     public async Task<IActionResult> CreateInstitucional(
@@ -116,6 +116,25 @@ public class AfastamentosController(IAfastamentoService afastamentoService) : Co
         return result.Succeeded
             ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
             : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPut("institucionais/{id:guid}")]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public async Task<IActionResult> UpdateInstitucional(
+        Guid id,
+        [FromBody] UpdateAfastamentoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await afastamentoService.UpdateInstitucionalAsync(id, request, User.GetLogin(), cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    [HttpDelete("institucionais/{id:guid}")]
+    [RequiresPermission(PermissionCodes.AfastamentosListar)]
+    public async Task<IActionResult> DeleteInstitucional(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await afastamentoService.DeleteInstitucionalAsync(id, User.GetLogin(), cancellationToken);
+        return result.Succeeded ? NoContent() : BadRequest(new { message = result.Error });
     }
 
     [HttpGet("institucionais/servidores")]

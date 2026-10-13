@@ -21,6 +21,7 @@ public class PermutaTests(PostgresFixture fixture) : IntegrationTestBase(fixture
     private const int Mes = 9;
     private const string ChefeNb = "chefe.nb.permuta";
     private const string ChefeNp = "chefe.np.permuta";
+    private const string ChefeNucleo = "chefe.nucleo.permuta";
 
     // 12x36 a partir do dia 1: PD nos dias ímpares; a partir do dia 2: PD nos pares.
     private static readonly DateOnly Dia1 = new(Ano, Mes, 1);
@@ -36,14 +37,19 @@ public class PermutaTests(PostgresFixture fixture) : IntegrationTestBase(fixture
         Guid D,
         Guid C);
 
-    /// <summary>NB: A (PD nos ímpares), B e D (PD nos pares), na mesma escala de setembro.
-    /// NP: C, de outro setor, sem escala ainda.</summary>
+    /// <summary>Núcleo NPE engloba NB e NP. NB: A (PD nos ímpares), B e D (PD nos pares), na
+    /// mesma escala de setembro. NP: C, de outro setor do núcleo, sem escala ainda.</summary>
     private async Task<Contexto> PrepararAsync(bool gerar = true)
     {
         var ctx = await SemearAsync(b =>
         {
-            var nb = b.AdicionarSetor("Núcleo de Balística", "NB");
-            var np = b.AdicionarSetor("Núcleo de Papiloscopia", "NP");
+            var administrativo = b.AdicionarSetor("Setor Administrativo", "SA");
+            var chefeNucleo = b.AdicionarServidor(administrativo, "Chefe do Núcleo");
+            b.AdicionarUsuario(chefeNucleo, ChefeNucleo, CatalogSeed.PerfilChefeSetorId);
+            var nucleo = b.AdicionarNucleo("Núcleo de Perícias Externas", "NPE", chefeNucleo.Id);
+
+            var nb = b.AdicionarSetor("Setor de Balística", "NB", nucleo);
+            var np = b.AdicionarSetor("Setor de Papiloscopia", "NP", nucleo);
 
             var chefeNb = b.AdicionarServidor(nb, "Chefe NB");
             b.AdicionarChefia(nb, chefeNb, TipoChefia.ChefiaImediata);
@@ -173,8 +179,9 @@ public class PermutaTests(PostgresFixture fixture) : IntegrationTestBase(fixture
         var escalaNbOut = await CriarEscalaAsync(ctx.SetorNbId, Mes + 1, ChefeNb, ctx.A);
         await GerarAsync(escalaNbOut, ChefeNb, (ctx.A, outubro.AddDays(1)));
 
+        // Setores diferentes: quem registra é o chefe do núcleo que engloba os dois.
         // Ida: plantão de A em 01/09. Volta: plantão de C em 01/10.
-        await PermutarAsync(ctx.A, ctx.C, Dia1, outubro);
+        await PermutarAsync(ctx.A, ctx.C, Dia1, outubro, ChefeNucleo);
 
         (await GradeAsync(ctx.EscalaNbId))[(ctx.A, Dia1)].ShouldBe(("D", true));
         (await GradeAsync(escalaNpSet))[(ctx.C, Dia1)].ShouldBe(("PD", true));
@@ -374,18 +381,55 @@ public class PermutaTests(PostgresFixture fixture) : IntegrationTestBase(fixture
     {
         var ctx = await PrepararAsync();
 
+        const string mensagem = "Só é possível registrar permuta entre servidores do setor ou núcleo em que você é chefe.";
+
         var negado = await PermutaAsync(s => s.CreateAsync(
             new CreatePermutaRequest(ctx.A, ctx.B, Dia1, Dia2), ChefeNp));
         negado.Succeeded.ShouldBeFalse();
-        negado.Error.ShouldBe("Só é possível registrar permuta de servidores do setor ou núcleo em que você é chefe.");
+        negado.Error.ShouldBe(mensagem);
+
+        // Chefe de setor não troca com servidor de outro setor, nem do mesmo núcleo.
+        var outroSetor = await PermutaAsync(s => s.CreateAsync(
+            new CreatePermutaRequest(ctx.A, ctx.C, Dia1, Dia2), ChefeNb));
+        outroSetor.Succeeded.ShouldBeFalse();
+        outroSetor.Error.ShouldBe(mensagem);
 
         await PermutarAsync(ctx.A, ctx.B, Dia1, Dia2);
         (await PermutaAsync(s => s.ListAsync(new PermutaListQuery(), ChefeNb))).Count.ShouldBe(1);
         (await PermutaAsync(s => s.ListAsync(new PermutaListQuery(), ChefeNp))).ShouldBeEmpty();
 
         // Envolvendo um servidor de NP, a permuta passa a aparecer para o chefe de NP também.
-        await PermutarAsync(ctx.A, ctx.C, Dia1.AddDays(2), Dia2.AddDays(2));
+        await PermutarAsync(ctx.A, ctx.C, Dia1.AddDays(2), Dia2.AddDays(2), ChefeNucleo);
         (await PermutaAsync(s => s.ListAsync(new PermutaListQuery(), ChefeNp))).Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Servidores_da_permuta_seguem_a_chefia_e_o_nucleo()
+    {
+        var ctx = await PrepararAsync();
+
+        var doChefeNb = await PermutaAsync(s => s.ListServidoresAsync(ChefeNb));
+        doChefeNb.Permutantes.Select(x => x.Id).ShouldContain(ctx.B);
+        doChefeNb.Permutantes.Select(x => x.Id).ShouldNotContain(ctx.C);
+        doChefeNb.Solicitantes.Select(x => x.Id).ShouldBe(doChefeNb.Permutantes.Select(x => x.Id));
+
+        // Chefe do núcleo vê os setores do núcleo inteiro.
+        var doNucleo = (await PermutaAsync(s => s.ListServidoresAsync(ChefeNucleo))).Permutantes
+            .Select(x => x.Id)
+            .ToList();
+        doNucleo.ShouldContain(ctx.A);
+        doNucleo.ShouldContain(ctx.C);
+    }
+
+    [Fact]
+    public async Task Listagem_traz_o_nome_de_quem_registrou()
+    {
+        var ctx = await PrepararAsync();
+        await PermutarAsync(ctx.A, ctx.B, Dia1, Dia2);
+
+        var item = (await PermutaAsync(s => s.ListAsync(new PermutaListQuery(), ChefeNb))).Single();
+        item.CreatedBy.ShouldBe(ChefeNb);
+        item.RegistradoPorNome.ShouldBe("CHEFE NB");
     }
 
     private async Task AfastarAsync(Guid servidorId, DateOnly dia)

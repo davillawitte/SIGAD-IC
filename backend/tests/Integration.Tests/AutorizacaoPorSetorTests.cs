@@ -458,4 +458,49 @@ public class AutorizacaoPorSetorTests(PostgresFixture fixture) : IntegrationTest
 
         (await service.ListServidoresInstitucionaisAsync(ChefeNb)).ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task Afastamento_gestao_institucional_edita_e_exclui_de_outro_setor()
+    {
+        var ctx = await PrepararAsync();
+
+        await using (var db = NewContext())
+        {
+            var editado = await new AfastamentoService(db).UpdateInstitucionalAsync(
+                ctx.AfastamentoNbId,
+                new UpdateAfastamentoRequest(new DateOnly(Ano, Mes, 11), new DateOnly(Ano, Mes, 20), "LM", null, "SEI-111"),
+                Diretor);
+            editado.Succeeded.ShouldBeTrue(editado.Error);
+            editado.Value!.TipoOcorrenciaCodigo.ShouldBe("LM");
+        }
+
+        await using (var db = NewContext())
+        {
+            (await new AfastamentoService(db).DeleteInstitucionalAsync(ctx.AfastamentoNbId, Diretor))
+                .Succeeded.ShouldBeTrue();
+        }
+
+        (await AfastamentosVisiveisAsync(Diretor, "institucional")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Afastamento_institucional_recusa_edicao_e_exclusao_sem_gestao_institucional()
+    {
+        var ctx = await PrepararAsync();
+        const string mensagem = "Só quem tem acesso à Gestão Institucional pode alterar ou excluir afastamentos por esta tela.";
+
+        await using var db = NewContext();
+        var service = new AfastamentoService(db);
+
+        var editado = await service.UpdateInstitucionalAsync(
+            ctx.AfastamentoNbId,
+            new UpdateAfastamentoRequest(new DateOnly(Ano, Mes, 11), new DateOnly(Ano, Mes, 20), "LM", null, "SEI-111"),
+            ChefeNb);
+        editado.Succeeded.ShouldBeFalse();
+        editado.Error.ShouldBe(mensagem);
+
+        var excluido = await service.DeleteInstitucionalAsync(ctx.AfastamentoNbId, ChefeNb);
+        excluido.Succeeded.ShouldBeFalse();
+        excluido.Error.ShouldBe(mensagem);
+    }
 }

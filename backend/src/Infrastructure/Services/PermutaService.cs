@@ -11,8 +11,9 @@ using TemplateSistema.Persistence;
 namespace TemplateSistema.Infrastructure.Services;
 
 /// <summary>
-/// Permutas da Gestão do Setor. Quem chefia a lotação do solicitante ou do permutante registra e
-/// exclui; a troca nas escalas é feita pelo <see cref="PermutaAplicador"/>, na mesma transação.
+/// Permutas da Gestão do Setor. Registra quem chefia a lotação dos dois servidores (chefe de
+/// núcleo: qualquer setor do núcleo); exclui quem chefia a de um deles. A troca nas escalas é feita
+/// pelo <see cref="PermutaAplicador"/>, na mesma transação.
 /// </summary>
 public class PermutaService(ApplicationDbContext db) : IPermutaService
 {
@@ -55,7 +56,8 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             .ThenByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return items.Select(Map).ToList();
+        var nomes = await NomesPorLoginAsync(items.Select(x => x.CreatedBy), cancellationToken);
+        return items.Select(x => Map(x, nomes)).ToList();
     }
 
     public async Task<Result<PermutaDto>> CreateAsync(
@@ -79,10 +81,10 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             return Result<PermutaDto>.Failure("Servidor permutante não encontrado.");
         }
 
-        if (!Chefia(actor, solicitante) && !Chefia(actor, permutante))
+        if (!Chefia(actor, solicitante) || !Chefia(actor, permutante))
         {
             return Result<PermutaDto>.Failure(
-                "Só é possível registrar permuta de servidores do setor ou núcleo em que você é chefe.");
+                "Só é possível registrar permuta entre servidores do setor ou núcleo em que você é chefe.");
         }
 
         Permuta entity;
@@ -120,7 +122,8 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             .Include(x => x.Solicitante)
             .Include(x => x.Permutante)
             .FirstAsync(x => x.Id == entity.Id, cancellationToken);
-        return Result<PermutaDto>.Success(Map(criada));
+        var nomes = await NomesPorLoginAsync([criada.CreatedBy], cancellationToken);
+        return Result<PermutaDto>.Success(Map(criada, nomes));
     }
 
     public async Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default)
@@ -181,13 +184,15 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
                 Opcao: new PermutaServidorOpcaoDto(x.Id, x.Nome, x.Matricula, x.SetorSigla ?? x.NucleoSigla)))
             .ToList();
 
-        var solicitantes = opcoes
+        // Os dois lados seguem a chefia: chefe de setor vê o setor; chefe de núcleo, todos os
+        // setores do núcleo e quem está lotado direto nele.
+        var daChefia = opcoes
             .Where(x => (x.Servidor.SetorId is Guid s && setores.Contains(s))
                         || (x.Servidor.NucleoId is Guid n && nucleos.Contains(n)))
             .Select(x => x.Opcao)
             .ToList();
 
-        return new PermutaServidoresDto(solicitantes, opcoes.Select(x => x.Opcao).ToList());
+        return new PermutaServidoresDto(daChefia, daChefia);
     }
 
     public async Task<PermutaEscalaServidorDto> GetEscalaServidorAsync(
@@ -245,7 +250,8 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             linha?.EscalaId,
             linha is null ? null : Escala.FormatIdentificacao(mes, ano, linha.SetorNome ?? linha.NucleoNome ?? string.Empty),
             linha?.Status,
-            dias);
+            dias,
+            linha?.SetorNome ?? linha?.NucleoNome);
     }
 
     /// <summary>Recusa a permuta quando um dos dois está de férias/licença numa das datas — pelo
@@ -305,7 +311,28 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             ? actor.SetoresGerenciadosIds.Contains(s) || actor.GerenciaSetorViaNucleo(s)
             : servidor.NucleoId is Guid n && actor.GerenciaNucleo(n);
 
-    private static PermutaDto Map(Permuta x) =>
+    private async Task<Dictionary<string, string>> NomesPorLoginAsync(
+        IEnumerable<string?> logins,
+        CancellationToken cancellationToken)
+    {
+        var lista = logins
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (lista.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return await db.Usuarios
+            .AsNoTracking()
+            .Where(u => lista.Contains(u.Login))
+            .Select(u => new { u.Login, u.Servidor.Nome })
+            .ToDictionaryAsync(x => x.Login, x => x.Nome, StringComparer.OrdinalIgnoreCase, cancellationToken);
+    }
+
+    private static PermutaDto Map(Permuta x, IReadOnlyDictionary<string, string> nomes) =>
         new(
             x.Id,
             x.SolicitanteServidorId,
@@ -318,7 +345,8 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             x.DataVolta,
             x.Observacao,
             x.CreatedBy,
-            x.CreatedAt);
+            x.CreatedAt,
+            x.CreatedBy is not null && nomes.TryGetValue(x.CreatedBy.Trim(), out var nome) ? nome : x.CreatedBy);
 
     private Task<ActorContext> ResolveActorAsync(string login, CancellationToken cancellationToken) =>
         ActorContextLoader.LoadAsync(db, login, cancellationToken);

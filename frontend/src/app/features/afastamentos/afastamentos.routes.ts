@@ -46,6 +46,13 @@ export const AFASTAMENTOS_ROUTES: Routes = [
           import('./pages/afastamento-form/afastamento-form').then((m) => m.AfastamentoForm),
         data: { escopo: 'institucional' },
       },
+      {
+        path: 'editar/:id',
+        canActivate: [visaoGlobalGuard('afastamentos')],
+        loadComponent: () =>
+          import('./pages/afastamento-form/afastamento-form').then((m) => m.AfastamentoForm),
+        data: { escopo: 'institucional' },
+      },
     ],
   },
 ];

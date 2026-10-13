@@ -1,14 +1,17 @@
-<div class="permuta-dias">
-  <div class="permuta-dias__nav">
-    <pci-icon-button icon="chevron-left" ariaLabel="Mês anterior" (clicked)="mudarMes(-1)" />
-    <div class="permuta-dias__mes">
-      <strong>{{ titulo() }}</strong>
-      @if (escala()?.escalaIdentificacao) {
-        <span class="permuta-dias__escala">{{ escala()?.escalaIdentificacao }}</span>
-      }
+<section class="permuta-dias" [attr.aria-label]="titulo()">
+  <header class="permuta-dias__header">
+    <span class="permuta-dias__icone" aria-hidden="true">
+      <pci-icon name="calendar" size="md" />
+    </span>
+    <div class="permuta-dias__titulos">
+      <strong class="permuta-dias__titulo">{{ titulo() }}</strong>
+      <span class="permuta-dias__subtitulo">{{ subtitulo() }}</span>
     </div>
-    <pci-icon-button icon="chevron-right" ariaLabel="Próximo mês" (clicked)="mudarMes(1)" />
-  </div>
+    <div class="permuta-dias__nav">
+      <pci-icon-button icon="chevron-left" ariaLabel="Mês anterior" (clicked)="mudarMes(-1)" />
+      <pci-icon-button icon="chevron-right" ariaLabel="Próximo mês" (clicked)="mudarMes(1)" />
+    </div>
+  </header>
 
   @if (semServidor()) {
     <p class="permuta-dias__vazio">Selecione o servidor para ver a escala.</p>
@@ -18,32 +21,51 @@
     <pci-alert
       variant="info"
       title="Sem escala neste mês"
-      message="Digite a data na caixa ao lado. A permuta fica gravada e é aplicada quando a escala deste mês for criada."
+      message="Digite a data no campo acima. A permuta fica gravada e entra na escala quando ela for criada."
     />
   } @else {
-    <ul class="permuta-dias__lista" role="listbox" [attr.aria-label]="'Dias de ' + titulo()">
-      @for (dia of dias(); track dia.data) {
-        <li>
-          <button
-            type="button"
-            role="option"
-            class="permuta-dias__dia"
-            [class.is-selected]="selecionada() === dia.data"
-            [class.is-weekend]="fimDeSemana(dia)"
-            [attr.aria-selected]="selecionada() === dia.data"
-            (click)="diaClicado.emit(dia.data)"
-          >
-            <span class="permuta-dias__data">{{ rotulo(dia) }}</span>
-            <span class="permuta-dias__codigo">
-              {{ dia.tipoOcorrenciaCodigo || '—' }}@if (dia.permuta) {<span title="Permuta">*</span>}
-            </span>
-            <span class="permuta-dias__nome">{{ dia.tipoOcorrenciaNome || '' }}</span>
-          </button>
-        </li>
-      }
-    </ul>
+    <div class="permuta-dias__scroll">
+      <table class="permuta-dias__tabela">
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">Dia da semana</th>
+            <th scope="col">Turno</th>
+            <th scope="col">Descrição</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (dia of dias(); track dia.data) {
+            <tr
+              class="permuta-dias__linha"
+              [class.is-selected]="selecionada() === dia.data"
+              [class.is-weekend]="fimDeSemana(dia)"
+              tabindex="0"
+              [attr.aria-selected]="selecionada() === dia.data"
+              (click)="diaClicado.emit(dia.data)"
+              (keydown.enter)="diaClicado.emit(dia.data)"
+              (keydown.space)="$event.preventDefault(); diaClicado.emit(dia.data)"
+            >
+              <td class="permuta-dias__data">{{ dataCurta(dia) }}</td>
+              <td>{{ nomeDiaSemana(dia) }}</td>
+              <td>
+                @if (dia.tipoOcorrenciaCodigo) {
+                  <pci-badge [variant]="variante(dia.tipoOcorrenciaCodigo)">{{ dia.tipoOcorrenciaCodigo }}</pci-badge>
+                  @if (dia.permuta) {
+                    <span class="permuta-dias__asterisco" title="Permuta">*</span>
+                  }
+                } @else {
+                  —
+                }
+              </td>
+              <td class="permuta-dias__descricao">{{ dia.tipoOcorrenciaNome || '' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
     @if (temPermuta()) {
       <p class="permuta-dias__legenda">* Permuta</p>
     }
   }
-</div>
+</section>

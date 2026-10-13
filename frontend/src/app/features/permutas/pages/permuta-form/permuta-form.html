@@ -1,8 +1,9 @@
 <pci-form-page
   title="Nova permuta"
-  description="Clique no dia da escala de cada servidor ou digite a data."
+  description="Selecione os servidores e os dias da escala que serão permutados."
   currentPath="/permutas/nova"
   [routePages]="routePages"
+  saveLabel="Salvar permuta"
   [loading]="saving()"
   (cancelClicked)="cancel()"
   (saveClicked)="save()"
@@ -13,16 +14,24 @@
 
   <form [formGroup]="form" class="permuta-form">
     <div class="permuta-form__grid">
-      <section class="permuta-form__lado" aria-label="Solicitante">
-        <h3 class="permuta-form__titulo">Solicitante</h3>
-        <pci-select
-          label="Servidor solicitante"
-          [required]="true"
-          formControlName="solicitanteServidorId"
-          [options]="solicitanteOptions()"
-          placeholder="Selecione o solicitante"
-        />
+      <section class="permuta-lado" aria-label="Solicitante">
+        <header class="permuta-lado__header">
+          <span class="permuta-lado__avatar" aria-hidden="true"><pci-icon name="user" size="md" /></span>
+          <h3 class="permuta-lado__titulo">Solicitante</h3>
+        </header>
+        <div class="permuta-lado__campos">
+          <pci-select
+            class="permuta-lado__servidor"
+            label="Servidor solicitante"
+            [required]="true"
+            formControlName="solicitanteServidorId"
+            [options]="solicitanteOptions()"
+            placeholder="Selecione o solicitante"
+          />
+          <pci-datepicker class="permuta-lado__data" label="Data" formControlName="dataIda" [required]="true" />
+        </div>
         <app-permuta-dias
+          titulo="Escala do solicitante"
           [ano]="lados.solicitante().ano"
           [mes]="lados.solicitante().mes"
           [escala]="lados.solicitante().escala"
@@ -34,38 +43,33 @@
         />
       </section>
 
-      <div class="permuta-form__setas">
-        <div class="permuta-form__seta">
-          <span class="permuta-form__seta-icone" aria-hidden="true">
-            <pci-icon name="arrow-right" size="lg" />
-          </span>
-          <pci-datepicker label="Ida — dia do solicitante" formControlName="dataIda" [required]="true" />
-          @if (resumoIda()) {
-            <p class="permuta-form__resumo">{{ resumoIda() }}</p>
-          }
-        </div>
-
-        <div class="permuta-form__seta">
-          <span class="permuta-form__seta-icone" aria-hidden="true">
-            <pci-icon name="arrow-left" size="lg" />
-          </span>
-          <pci-datepicker label="Volta — dia do permutante" formControlName="dataVolta" [required]="true" />
-          @if (resumoVolta()) {
-            <p class="permuta-form__resumo">{{ resumoVolta() }}</p>
-          }
-        </div>
+      <div class="permuta-form__troca" aria-hidden="true">
+        <span class="permuta-form__setas">
+          <pci-icon name="arrow-right" size="md" />
+          <pci-icon name="arrow-left" size="md" />
+        </span>
       </div>
 
-      <section class="permuta-form__lado" aria-label="Permutante">
-        <h3 class="permuta-form__titulo">Permutante</h3>
-        <pci-select
-          label="Servidor permutante"
-          [required]="true"
-          formControlName="permutanteServidorId"
-          [options]="permutanteOptions()"
-          placeholder="Selecione o permutante"
-        />
+      <section class="permuta-lado" aria-label="Permutante">
+        <header class="permuta-lado__header">
+          <span class="permuta-lado__avatar permuta-lado__avatar--permutante" aria-hidden="true">
+            <pci-icon name="user" size="md" />
+          </span>
+          <h3 class="permuta-lado__titulo">Permutante</h3>
+        </header>
+        <div class="permuta-lado__campos">
+          <pci-select
+            class="permuta-lado__servidor"
+            label="Servidor permutante"
+            [required]="true"
+            formControlName="permutanteServidorId"
+            [options]="permutanteOptions()"
+            placeholder="Selecione o permutante"
+          />
+          <pci-datepicker class="permuta-lado__data" label="Data" formControlName="dataVolta" [required]="true" />
+        </div>
         <app-permuta-dias
+          titulo="Escala do permutante"
           [ano]="lados.permutante().ano"
           [mes]="lados.permutante().mes"
           [escala]="lados.permutante().escala"
@@ -78,6 +82,11 @@
       </section>
     </div>
 
-    <pci-input label="Observação" formControlName="observacao" placeholder="Opcional" />
+    <pci-textarea
+      label="Observação"
+      formControlName="observacao"
+      placeholder="Informe alguma observação (opcional)..."
+      [rows]="2"
+    />
   </form>
 </pci-form-page>

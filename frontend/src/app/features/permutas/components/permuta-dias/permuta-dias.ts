@@ -1,5 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { PciAlertComponent, PciIconButtonComponent, PciSpinnerComponent } from '@davillawitte/pci-design-system';
+import {
+  PciAlertComponent,
+  PciBadgeComponent,
+  PciIconButtonComponent,
+  PciIconComponent,
+  PciSpinnerComponent,
+} from '@davillawitte/pci-design-system';
+import type { PciBadgeVariant } from '@davillawitte/pci-design-system';
 
 import type { PermutaDia, PermutaEscalaServidor } from '../../models/permutas.models';
 
@@ -7,21 +14,35 @@ const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
-const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DIAS_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DIAS_NOME = [
+  'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado',
+];
+
+const AFASTAMENTO = new Set(['FR', 'LP', 'LM', 'LO']);
+const FOLGA = new Set(['D', 'F', 'R']);
+const EXPEDIENTE = new Set(['M', 'T']);
+
+function diaDaSemana(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
 
 /**
- * Dias da escala de um servidor no mês, em lista clicável (seleção única) — escolhe o dia da
- * permuta. Implementado aqui porque o `pci-selection-list` do design system é de múltipla escolha
- * com checkbox (ver docs/design-system-pendencias.md).
+ * Escala de um servidor no mês, em tabela clicável (seleção única) — escolhe o dia da permuta.
+ * Implementado aqui porque o design system não tem lista/tabela de seleção única: o
+ * `pci-selection-list` é de múltipla escolha com checkbox (ver docs/design-system-pendencias.md).
  */
 @Component({
   selector: 'app-permuta-dias',
-  imports: [PciAlertComponent, PciIconButtonComponent, PciSpinnerComponent],
+  imports: [PciAlertComponent, PciBadgeComponent, PciIconButtonComponent, PciIconComponent, PciSpinnerComponent],
   templateUrl: './permuta-dias.html',
   styleUrl: './permuta-dias.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PermutaDias {
+  /** Ex.: "Escala do solicitante". */
+  readonly titulo = input.required<string>();
   readonly ano = input.required<number>();
   readonly mes = input.required<number>();
   readonly escala = input<PermutaEscalaServidor | null>(null);
@@ -34,21 +55,36 @@ export class PermutaDias {
   readonly diaClicado = output<string>();
   readonly mesAlterado = output<{ ano: number; mes: number }>();
 
-  readonly titulo = computed(() => `${MESES[this.mes() - 1]}/${this.ano()}`);
+  readonly subtitulo = computed(() => {
+    const mes = `${MESES[this.mes() - 1]}/${this.ano()}`;
+    const lotacao = this.escala()?.lotacaoNome;
+    return lotacao ? `${mes} • ${lotacao}` : mes;
+  });
   readonly temEscala = computed(() => !!this.escala()?.escalaId);
   readonly dias = computed(() => this.escala()?.dias ?? []);
   readonly temPermuta = computed(() => this.dias().some((d) => d.permuta));
 
-  rotulo(dia: PermutaDia): string {
-    const [y, m, d] = dia.data.split('-').map(Number);
-    const semana = DIAS_SEMANA[new Date(y, m - 1, d).getDay()];
-    return `${semana} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  dataCurta(dia: PermutaDia): string {
+    const [, m, d] = dia.data.split('-');
+    return `${DIAS_ABREV[diaDaSemana(dia.data)]} ${d}/${m}`;
+  }
+
+  nomeDiaSemana(dia: PermutaDia): string {
+    return DIAS_NOME[diaDaSemana(dia.data)];
   }
 
   fimDeSemana(dia: PermutaDia): boolean {
-    const [y, m, d] = dia.data.split('-').map(Number);
-    const semana = new Date(y, m - 1, d).getDay();
+    const semana = diaDaSemana(dia.data);
     return semana === 0 || semana === 6;
+  }
+
+  variante(codigo: string | null | undefined): PciBadgeVariant {
+    const c = (codigo ?? '').toUpperCase();
+    if (EXPEDIENTE.has(c)) return 'success';
+    if (c.startsWith('TL')) return 'info';
+    if (FOLGA.has(c)) return 'secondary';
+    if (AFASTAMENTO.has(c)) return 'warning';
+    return 'primary';
   }
 
   mudarMes(delta: number): void {

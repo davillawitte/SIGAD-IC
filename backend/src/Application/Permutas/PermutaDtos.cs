@@ -14,7 +14,9 @@ public record PermutaDto(
     DateOnly DataVolta,
     string? Observacao,
     string? CreatedBy,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    // Nome do servidor de quem registrou (o login é o CPF).
+    string? RegistradoPorNome = null);
 
 /// <summary><c>DataIda</c>: dia do solicitante que passa ao permutante. <c>DataVolta</c>: dia do
 /// permutante que volta ao solicitante.</summary>
@@ -29,8 +31,8 @@ public record PermutaListQuery(int? Ano = null, int? Mes = null, Guid? ServidorI
 
 public record PermutaServidorOpcaoDto(Guid Id, string Nome, string Matricula, string? Lotacao);
 
-/// <summary>Solicitante: servidores da chefia do usuário. Permutante: qualquer servidor ativo
-/// (pode ser de outro setor).</summary>
+/// <summary>Solicitante e permutante: servidores da chefia do usuário — chefe de núcleo vê todos
+/// os setores do núcleo (mesmo recorte da tela de Afastamentos).</summary>
 public record PermutaServidoresDto(
     IReadOnlyList<PermutaServidorOpcaoDto> Solicitantes,
     IReadOnlyList<PermutaServidorOpcaoDto> Permutantes);
@@ -43,4 +45,5 @@ public record PermutaEscalaServidorDto(
     Guid? EscalaId,
     string? EscalaIdentificacao,
     StatusEscala? Status,
-    IReadOnlyList<PermutaDiaDto> Dias);
+    IReadOnlyList<PermutaDiaDto> Dias,
+    string? LotacaoNome = null);

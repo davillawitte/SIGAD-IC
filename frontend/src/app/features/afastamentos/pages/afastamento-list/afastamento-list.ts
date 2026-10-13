@@ -25,6 +25,28 @@ import { AfastamentosApiService } from '../../services/afastamentos-api.service'
 
 type AfastamentoEscopo = 'setor' | 'institucional';
 
+const MESES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+/** Meses (`aaaa-mm`) por que o período passa — um afastamento pode atravessar a virada do mês. */
+function mesesDoPeriodo(inicioIso: string, fimIso: string): string[] {
+  const fim = fimIso.slice(0, 7);
+  let [ano, mes] = inicioIso.slice(0, 7).split('-').map(Number);
+  const meses: string[] = [];
+  for (let atual = inicioIso.slice(0, 7); atual <= fim; ) {
+    meses.push(atual);
+    mes++;
+    if (mes > 12) {
+      mes = 1;
+      ano++;
+    }
+    atual = `${ano}-${String(mes).padStart(2, '0')}`;
+  }
+  return meses;
+}
+
 type AfastamentoRow = {
   id: string;
   servidor: string;
@@ -33,6 +55,8 @@ type AfastamentoRow = {
   nucleoId?: string | null;
   setor: string;
   periodo: string;
+  /** Meses (`aaaa-mm`) cobertos pelo período — usados no filtro por mês. */
+  meses: string[];
   tipo: string;
   sei: string;
   observacao: string;
@@ -60,7 +84,7 @@ export class AfastamentoList implements OnInit {
   );
   readonly pageDescription = computed(() =>
     this.isInstitucional()
-      ? 'Consulta e cadastro de afastamentos de todos os setores (exceto a Direção do IC).'
+      ? 'Cadastro, edição e exclusão de afastamentos de todos os setores (exceto a Direção do IC).'
       : 'Cadastre férias, licenças e afastamentos dos servidores do seu setor.',
   );
   readonly listPath = computed(() =>
@@ -82,7 +106,27 @@ export class AfastamentoList implements OnInit {
       : this.auth.hasPermission('afastamentos.criar'),
   );
 
-  readonly filterFields: PciFilterField[] = [
+  /** Filtro por mês (Gestão Institucional): opções com os meses dos afastamentos carregados,
+   * do mais recente ao mais antigo. O design system não tem campo de mês no painel de filtros. */
+  private readonly mesOptions = computed(() =>
+    [...new Set(this.allRows().flatMap((r) => r.meses))]
+      .sort()
+      .reverse()
+      .map((valor) => {
+        const [ano, mes] = valor.split('-').map(Number);
+        return { label: `${MESES[mes - 1]}/${ano}`, value: valor };
+      }),
+  );
+
+  readonly filterFields = computed<PciFilterField[]>(() => [
+    ...(this.isInstitucional()
+      ? [{ key: 'mes', label: 'Mês', type: 'select' as const, options: this.mesOptions() }]
+      : []),
+    ...this.camposDeColuna,
+  ]);
+
+  /** Campos que filtram por coluna da tabela (o de mês é aplicado à parte, pelo período). */
+  private readonly camposDeColuna: PciFilterField[] = [
     { key: 'servidor', label: 'Servidor', type: 'text', columnKey: 'servidor' },
     { key: 'matricula', label: 'Matrícula', type: 'text', columnKey: 'matricula' },
     {
@@ -111,7 +155,13 @@ export class AfastamentoList implements OnInit {
 
   readonly rowActions = computed<PciRowAction<AfastamentoRow>[]>(() => {
     if (this.isInstitucional()) {
-      return [];
+      // A listagem institucional já deixa de fora a Direção do IC, único recorte da API.
+      return this.auth.hasVisaoGlobal('afastamentos')
+        ? [
+            { id: 'edit', label: 'Editar', icon: 'edit', placement: 'inline' },
+            { id: 'delete', label: 'Excluir', icon: 'trash', placement: 'inline' },
+          ]
+        : [];
     }
     const actions: PciRowAction<AfastamentoRow>[] = [];
     if (this.auth.hasPermission('afastamentos.editar')) {
@@ -138,11 +188,9 @@ export class AfastamentoList implements OnInit {
   });
 
   readonly filteredRows = computed(() => {
-    const byPanel = filterRowsByPanelValues(
-      this.allRows(),
-      this.filterValues(),
-      this.filterFields,
-    );
+    const mes = this.filterValues()['mes'];
+    const doMes = mes ? this.allRows().filter((r) => r.meses.includes(mes)) : this.allRows();
+    const byPanel = filterRowsByPanelValues(doMes, this.filterValues(), this.camposDeColuna);
     const searched = filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
     const sort = this.sort();
     return sort ? sortTableRows(searched, sort, this.columns) : searched;
@@ -164,21 +212,23 @@ export class AfastamentoList implements OnInit {
   }
 
   onRowAction(event: { action: string; row: AfastamentoRow }): void {
-    if (this.isInstitucional()) {
+    const institucional = this.isInstitucional();
+    if (institucional && !this.auth.hasVisaoGlobal('afastamentos')) {
       return;
     }
     const { setorId, nucleoId } = event.row;
     if (
-      (event.action === 'edit' &&
+      !institucional &&
+      ((event.action === 'edit' &&
         !this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', setorId, nucleoId)) ||
       (event.action === 'delete' &&
-        !this.auth.canAccessLotacao('afastamentos.excluir', 'afastamentos', setorId, nucleoId))
+        !this.auth.canAccessLotacao('afastamentos.excluir', 'afastamentos', setorId, nucleoId)))
     ) {
       this.error.set('Sem permissão para alterar afastamentos de outra lotação.');
       return;
     }
     if (event.action === 'edit') {
-      void this.router.navigateByUrl(`/afastamentos/editar/${event.row.id}`);
+      void this.router.navigateByUrl(`${this.listPath()}/editar/${event.row.id}`);
       return;
     }
     if (event.action === 'delete') {
@@ -190,7 +240,10 @@ export class AfastamentoList implements OnInit {
       })
         .pipe(filter(Boolean))
         .subscribe(() => {
-          this.api.delete(event.row.id).subscribe({
+          const exclusao = institucional
+            ? this.api.deleteInstitucional(event.row.id)
+            : this.api.delete(event.row.id);
+          exclusao.subscribe({
             next: () => {
               this.feedback.showSuccess('Afastamento excluído com sucesso.');
               this.reload();
@@ -239,6 +292,7 @@ export class AfastamentoList implements OnInit {
                 ? `${a.nucleoSigla} — ${a.nucleoNome}`
                 : '—',
             periodo: `${this.fmt(a.dataInicio)} a ${this.fmt(a.dataFim)}`,
+            meses: mesesDoPeriodo(a.dataInicio, a.dataFim),
             tipo: `${a.tipoOcorrenciaCodigo} — ${a.tipoOcorrenciaNome}`,
             sei: a.sei || '—',
             observacao: a.observacao || '—',

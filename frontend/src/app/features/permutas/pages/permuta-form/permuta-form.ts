@@ -8,8 +8,8 @@ import {
   PciFeedbackModalService,
   PciFormPageComponent,
   PciIconComponent,
-  PciInputComponent,
   PciSelectComponent,
+  PciTextareaComponent,
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 
@@ -33,15 +33,9 @@ function mesAtual(): { ano: number; mes: number } {
   return { ano: d.getFullYear(), mes: d.getMonth() + 1 };
 }
 
-/** dd/mm, para o resumo da troca. */
-function fmtDiaMes(iso: string): string {
-  const [, m, d] = iso.slice(0, 10).split('-');
-  return `${d}/${m}`;
-}
-
 /**
- * Cadastro de permuta: à esquerda a escala do solicitante (clique no dia = ida), à direita a do
- * permutante (clique no dia = volta). As datas também podem ser digitadas — inclusive de mês que
+ * Cadastro de permuta: à esquerda o solicitante e o dia que ele passa, à direita o permutante e o
+ * dia que ele passa de volta — clicando na escala de cada um. As datas também podem ser digitadas — inclusive de mês que
  * ainda não tem escala; a permuta é aplicada quando a escala for criada.
  */
 @Component({
@@ -52,8 +46,8 @@ function fmtDiaMes(iso: string): string {
     PciDatepickerComponent,
     PciFormPageComponent,
     PciIconComponent,
-    PciInputComponent,
     PciSelectComponent,
+    PciTextareaComponent,
     PermutaDias,
   ],
   templateUrl: './permuta-form.html',
@@ -97,13 +91,6 @@ export class PermutaForm implements OnInit {
     this.toOptions(this.permutantes().filter((s) => s.id !== this.solicitanteId())),
   );
 
-  readonly resumoIda = computed(() =>
-    this.resumo('solicitante', this.solicitanteId(), this.permutanteId(), this.dataIda()),
-  );
-  readonly resumoVolta = computed(() =>
-    this.resumo('permutante', this.permutanteId(), this.solicitanteId(), this.dataVolta()),
-  );
-
   ngOnInit(): void {
     this.api.servidores().subscribe({
       next: (r) => {
@@ -143,7 +130,7 @@ export class PermutaForm implements OnInit {
   save(): void {
     this.form.markAllAsTouched();
     if (this.form.invalid) {
-      this.error.set('Informe o solicitante, o permutante, a data da ida e a data da volta.');
+      this.error.set('Informe os dois servidores e a data de cada um.');
       return;
     }
 
@@ -210,17 +197,6 @@ export class PermutaForm implements OnInit {
     if (atual.ano !== ano || atual.mes !== mes) {
       this.onMes(lado, { ano, mes });
     }
-  }
-
-  /** Ex.: "FULANO (01/09 PD) → BELTRANO". A sigla vem da escala de quem passa o dia; sem
-   * escala no mês, sai só a data. */
-  private resumo(lado: Lado, deId: string, paraId: string, data: string | null): string {
-    if (!deId || !paraId || !data) return '';
-    const todos = [...this.solicitantes(), ...this.permutantes()];
-    const nome = (id: string) => todos.find((s) => s.id === id)?.nome ?? '';
-    const codigo = this.lados[lado]().escala?.dias.find((d) => d.data === data)?.tipoOcorrenciaCodigo;
-    const dia = codigo ? `${fmtDiaMes(data)} ${codigo}` : fmtDiaMes(data);
-    return `${nome(deId)} (${dia}) → ${nome(paraId)}`;
   }
 
   private toOptions(servidores: PermutaServidorOpcao[]): PciSelectOption[] {

@@ -39,7 +39,7 @@ public class Permuta : BaseEntity
 
         if (dataIda == dataVolta)
         {
-            throw new ArgumentException("A data da ida e a data da volta devem ser diferentes.");
+            throw new ArgumentException("As datas do solicitante e do permutante devem ser diferentes.");
         }
 
         var entity = new Permuta

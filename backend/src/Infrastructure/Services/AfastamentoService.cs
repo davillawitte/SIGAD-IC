@@ -188,8 +188,7 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         if (!actor.TemVisaoGlobal(PermissionModules.Afastamentos))
         {
-            return Result<AfastamentoDto>.Failure(
-                "Só quem tem acesso à Gestão Institucional pode cadastrar afastamento por esta tela.");
+            return Result<AfastamentoDto>.Failure(SemGestaoInstitucional);
         }
 
         var servidor = await db.Servidores
@@ -202,11 +201,10 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Servidor não encontrado.");
         }
 
-        // Mesmo recorte da listagem institucional: a Direção do IC fica com a Gestão do Setor.
-        if (SetorSiglas.IsDirecaoIc(servidor.Setor?.Sigla))
+        var erro = ValidarInstitucional(actor, servidor);
+        if (erro is not null)
         {
-            return Result<AfastamentoDto>.Failure(
-                "Afastamentos de servidores da Direção do IC são cadastrados pela Gestão do Setor.");
+            return Result<AfastamentoDto>.Failure(erro);
         }
 
         return await PersistirNovoAsync(request, actorLogin, cancellationToken);
@@ -259,15 +257,30 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         return await GetByIdAsync(entity.Id, actorLogin, cancellationToken);
     }
 
-    public async Task<Result<AfastamentoDto>> UpdateAsync(
+    public Task<Result<AfastamentoDto>> UpdateAsync(
         Guid id,
         UpdateAfastamentoRequest request,
         string actorLogin,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(id, request, actorLogin, institucional: false, cancellationToken);
+
+    public Task<Result<AfastamentoDto>> UpdateInstitucionalAsync(
+        Guid id,
+        UpdateAfastamentoRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default) =>
+        UpdateCoreAsync(id, request, actorLogin, institucional: true, cancellationToken);
+
+    private async Task<Result<AfastamentoDto>> UpdateCoreAsync(
+        Guid id,
+        UpdateAfastamentoRequest request,
+        string actorLogin,
+        bool institucional,
+        CancellationToken cancellationToken)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var entity = await db.Afastamentos
-            .Include(x => x.Servidor)
+            .Include(x => x.Servidor).ThenInclude(x => x.Setor)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (entity is null)
@@ -275,7 +288,15 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result<AfastamentoDto>.Failure("Afastamento não encontrado.");
         }
 
-        if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosEditar, entity.Servidor.SetorId, entity.Servidor.NucleoId))
+        if (institucional)
+        {
+            var erro = ValidarInstitucional(actor, entity.Servidor);
+            if (erro is not null)
+            {
+                return Result<AfastamentoDto>.Failure(erro);
+            }
+        }
+        else if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosEditar, entity.Servidor.SetorId, entity.Servidor.NucleoId))
         {
             return Result<AfastamentoDto>.Failure("Sem permissão para alterar afastamento desta lotação.");
         }
@@ -299,11 +320,21 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
-    public async Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default)
+    public Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default) =>
+        DeleteCoreAsync(id, actorLogin, institucional: false, cancellationToken);
+
+    public Task<Result> DeleteInstitucionalAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default) =>
+        DeleteCoreAsync(id, actorLogin, institucional: true, cancellationToken);
+
+    private async Task<Result> DeleteCoreAsync(
+        Guid id,
+        string actorLogin,
+        bool institucional,
+        CancellationToken cancellationToken)
     {
         var actor = await ResolveActorAsync(actorLogin, cancellationToken);
         var entity = await db.Afastamentos
-            .Include(x => x.Servidor)
+            .Include(x => x.Servidor).ThenInclude(x => x.Setor)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (entity is null)
@@ -311,7 +342,15 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
             return Result.Failure("Afastamento não encontrado.");
         }
 
-        if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosExcluir, entity.Servidor.SetorId, entity.Servidor.NucleoId))
+        if (institucional)
+        {
+            var erro = ValidarInstitucional(actor, entity.Servidor);
+            if (erro is not null)
+            {
+                return Result.Failure(erro);
+            }
+        }
+        else if (!PodeAcessarLotacao(actor, PermissionCodes.AfastamentosExcluir, entity.Servidor.SetorId, entity.Servidor.NucleoId))
         {
             return Result.Failure("Sem permissão para excluir afastamento desta lotação.");
         }
@@ -319,6 +358,25 @@ public class AfastamentoService(ApplicationDbContext db) : IAfastamentoService
         db.Afastamentos.Remove(entity);
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+
+    private const string SemGestaoInstitucional =
+        "Só quem tem acesso à Gestão Institucional pode cadastrar afastamento por esta tela.";
+
+    /// <summary>Gestão Institucional (visão global de afastamentos) cadastra, altera e exclui
+    /// afastamento de qualquer servidor, exceto os da Direção do IC — mesmo recorte da listagem
+    /// institucional; a Direção do IC fica com a Gestão do Setor. <c>servidor.Setor</c> precisa
+    /// estar carregado.</summary>
+    private static string? ValidarInstitucional(ActorContext actor, Servidor servidor)
+    {
+        if (!actor.TemVisaoGlobal(PermissionModules.Afastamentos))
+        {
+            return "Só quem tem acesso à Gestão Institucional pode alterar ou excluir afastamentos por esta tela.";
+        }
+
+        return SetorSiglas.IsDirecaoIc(servidor.Setor?.Sigla)
+            ? "Afastamentos de servidores da Direção do IC são cadastrados pela Gestão do Setor."
+            : null;
     }
 
     private static AfastamentoDto Map(Afastamento x, IReadOnlyDictionary<string, string> tipoNomes) =>

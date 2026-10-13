@@ -36,4 +36,14 @@ public interface IAfastamentoService
         CancellationToken cancellationToken = default);
 
     Task<Result> DeleteAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
+
+    /// <summary>Gestão Institucional: altera afastamento de qualquer servidor, exceto da Direção do IC.</summary>
+    Task<Result<AfastamentoDto>> UpdateInstitucionalAsync(
+        Guid id,
+        UpdateAfastamentoRequest request,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Gestão Institucional: exclui afastamento de qualquer servidor, exceto da Direção do IC.</summary>
+    Task<Result> DeleteInstitucionalAsync(Guid id, string actorLogin, CancellationToken cancellationToken = default);
 }

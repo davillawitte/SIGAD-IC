@@ -6,56 +6,110 @@
 
 .permuta-form__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1fr);
   gap: var(--pci-space-4);
-  align-items: start;
+  align-items: stretch;
 }
 
-.permuta-form__lado {
+/* Meio: só as duas setas (uma indo, outra voltando), centralizadas entre os dois lados. */
+.permuta-form__troca {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1px solid var(--pci-color-border);
+  }
+}
+
+.permuta-form__setas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--pci-color-accent-soft);
+  color: var(--pci-color-primary);
+  line-height: 0;
+}
+
+.permuta-lado {
   display: flex;
   flex-direction: column;
   gap: var(--pci-space-3);
   min-width: 0;
+  padding: var(--pci-space-4);
+  border: 1px solid var(--pci-color-border);
+  border-radius: var(--pci-radius-xl);
+  background: var(--pci-color-surface-muted);
 }
 
-.permuta-form__titulo {
+.permuta-lado__header {
+  display: flex;
+  align-items: center;
+  gap: var(--pci-space-3);
+}
+
+.permuta-lado__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--pci-color-primary);
+  color: var(--pci-color-surface);
+
+  &--permutante {
+    background: var(--pci-navy-800);
+  }
+}
+
+.permuta-lado__titulo {
   margin: 0;
-  font-size: var(--pci-font-size-base);
+  font-size: var(--pci-font-size-md, 1.125rem);
   font-weight: var(--pci-font-weight-semibold);
   color: var(--pci-color-text-primary);
 }
 
-.permuta-form__setas {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pci-space-6);
-  padding-top: var(--pci-space-6);
+/* Servidor à esquerda, data à direita. */
+.permuta-lado__campos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 11rem;
+  gap: var(--pci-space-3);
+  align-items: end;
 }
 
-.permuta-form__seta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pci-space-2);
-}
-
-.permuta-form__seta-icone {
-  display: flex;
-  justify-content: center;
-  color: var(--pci-color-primary);
-}
-
-.permuta-form__resumo {
-  margin: 0;
-  font-size: var(--pci-font-size-xs);
-  color: var(--pci-color-text-secondary);
-}
-
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .permuta-form__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .permuta-form__troca {
+    min-height: 3.5rem;
+
+    &::before {
+      display: none;
+    }
+  }
+
   .permuta-form__setas {
-    padding-top: 0;
+    flex-direction: row;
+    gap: 2px;
+  }
+}
+
+@media (max-width: 600px) {
+  .permuta-lado__campos {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

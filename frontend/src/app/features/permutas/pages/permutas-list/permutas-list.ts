@@ -26,8 +26,8 @@ type PermutaRow = {
   id: string;
   solicitante: string;
   permutante: string;
-  ida: string;
-  volta: string;
+  /** "dd/mm/aaaa ⇄ dd/mm/aaaa": dia do solicitante ⇄ dia do permutante. */
+  datas: string;
   observacao: string;
   registro: string;
 };
@@ -66,10 +66,9 @@ export class PermutasList implements OnInit {
   readonly columns: PciColumn<PermutaRow>[] = [
     { key: 'solicitante', label: 'Solicitante', sortable: true },
     { key: 'permutante', label: 'Permutante', sortable: true },
-    { key: 'ida', label: 'Ida (solicitante → permutante)' },
-    { key: 'volta', label: 'Volta (permutante → solicitante)' },
+    { key: 'datas', label: 'Datas' },
     { key: 'observacao', label: 'Observação' },
-    { key: 'registro', label: 'Registrada por' },
+    { key: 'registro', label: 'Registrado por' },
   ];
 
   readonly rowActions = computed<PciRowAction<PermutaRow>[]>(() =>
@@ -106,7 +105,7 @@ export class PermutasList implements OnInit {
       title: 'Excluir permuta',
       message:
         `Excluir a permuta entre ${event.row.solicitante} e ${event.row.permutante}? ` +
-        'As células das escalas nas datas da ida e da volta voltam ao que eram antes.',
+        'As células das escalas nas datas da permuta voltam ao que eram antes.',
       confirmLabel: 'Excluir',
       danger: true,
     })
@@ -152,10 +151,9 @@ export class PermutasList implements OnInit {
             id: p.id,
             solicitante: `${p.solicitanteNome} — ${maskMatricula(p.solicitanteMatricula)}`,
             permutante: `${p.permutanteNome} — ${maskMatricula(p.permutanteMatricula)}`,
-            ida: this.fmt(p.dataIda),
-            volta: this.fmt(p.dataVolta),
+            datas: `${this.fmt(p.dataIda)} ⇄ ${this.fmt(p.dataVolta)}`,
             observacao: p.observacao || '—',
-            registro: `${p.createdBy || '—'} em ${this.fmt(p.createdAt)}`,
+            registro: `${p.registradoPorNome || p.createdBy || '—'} em ${this.fmt(p.createdAt)}`,
           })),
         );
         this.loading.set(false);

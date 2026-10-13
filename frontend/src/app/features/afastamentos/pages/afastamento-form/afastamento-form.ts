@@ -90,7 +90,7 @@ export class AfastamentoForm implements OnInit {
     this.editId = this.route.snapshot.paramMap.get('id');
     this.isEdit.set(!!this.editId);
     this.isInstitucional.set(this.route.snapshot.data['escopo'] === 'institucional');
-    this.currentPath.set(this.editId ? '/afastamentos/editar/:id' : `${this.listPath()}/novo`);
+    this.currentPath.set(this.editId ? `${this.listPath()}/editar/:id` : `${this.listPath()}/novo`);
 
     if (this.isInstitucional()) {
       this.api.listServidoresInstitucionais().subscribe({
@@ -100,26 +100,38 @@ export class AfastamentoForm implements OnInit {
           ),
         error: () => this.error.set('Não foi possível carregar os servidores.'),
       });
-      return;
+    } else {
+      this.adminApi.listMeusServidores().subscribe({
+        next: (servidores) => {
+          // O escopo de quem pode receber afastamento é revalidado no save (`canAccessLotacao`).
+          this.servidorLotacaoById.clear();
+          for (const s of servidores) {
+            this.servidorLotacaoById.set(s.id, { setorId: s.setorId, nucleoId: s.nucleoId });
+          }
+          this.servidores.set(servidores);
+        },
+        error: () => this.error.set('Não foi possível carregar os servidores do seu setor/núcleo.'),
+      });
     }
-
-    this.adminApi.listMeusServidores().subscribe({
-      next: (servidores) => {
-        // O escopo de quem pode receber afastamento é revalidado no save (`canAccessLotacao`).
-        this.servidorLotacaoById.clear();
-        for (const s of servidores) {
-          this.servidorLotacaoById.set(s.id, { setorId: s.setorId, nucleoId: s.nucleoId });
-        }
-        this.servidores.set(servidores);
-      },
-      error: () => this.error.set('Não foi possível carregar os servidores do seu setor/núcleo.'),
-    });
 
     if (this.editId) {
       this.form.controls.servidorId.disable();
       this.api.get(this.editId).subscribe({
         next: (item) => {
-          if (!this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', item.setorId, item.nucleoId)) {
+          if (
+            this.isInstitucional() &&
+            !this.servidoresInstitucionais().some((o) => o.value === item.servidorId)
+          ) {
+            this.servidoresInstitucionais.update((opts) => [
+              ...opts,
+              { label: `${item.servidorNome} — ${item.matricula}`, value: item.servidorId },
+            ]);
+          }
+          // Na Gestão Institucional a visão global basta (a API recusa a Direção do IC).
+          if (
+            !this.isInstitucional() &&
+            !this.auth.canAccessLotacao('afastamentos.editar', 'afastamentos', item.setorId, item.nucleoId)
+          ) {
             this.error.set('Sem permissão para alterar afastamento desta lotação.');
             this.form.disable();
             return;
@@ -183,14 +195,17 @@ export class AfastamentoForm implements OnInit {
       return;
     }
 
-    this.api
-      .update(this.editId!, {
-        dataInicio: value.dataInicio,
-        dataFim: value.dataFim,
-        tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
-        observacao: value.observacao.trim() || null,
-        sei: value.sei.trim() || null,
-      })
+    const alteracao = {
+      dataInicio: value.dataInicio,
+      dataFim: value.dataFim,
+      tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
+      observacao: value.observacao.trim() || null,
+      sei: value.sei.trim() || null,
+    };
+    (this.isInstitucional()
+      ? this.api.updateInstitucional(this.editId!, alteracao)
+      : this.api.update(this.editId!, alteracao)
+    )
       .subscribe({
         next: () => {
           this.feedback.showSuccess('Afastamento atualizado com sucesso.');

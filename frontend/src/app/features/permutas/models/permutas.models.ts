@@ -13,6 +13,8 @@ export interface Permuta {
   observacao?: string | null;
   createdBy?: string | null;
   createdAt: string;
+  /** Nome de quem registrou (o login é o CPF). */
+  registradoPorNome?: string | null;
 }
 
 export interface CreatePermutaPayload {
@@ -30,7 +32,7 @@ export interface PermutaServidorOpcao {
   lotacao?: string | null;
 }
 
-/** Solicitante: servidores da chefia. Permutante: qualquer servidor ativo. */
+/** Solicitante e permutante: servidores da chefia (chefe de núcleo: o núcleo inteiro). */
 export interface PermutaServidores {
   solicitantes: PermutaServidorOpcao[];
   permutantes: PermutaServidorOpcao[];
@@ -49,4 +51,6 @@ export interface PermutaEscalaServidor {
   escalaIdentificacao?: string | null;
   status?: string | number | null;
   dias: PermutaDia[];
+  /** Setor ou núcleo da escala. */
+  lotacaoNome?: string | null;
 }
