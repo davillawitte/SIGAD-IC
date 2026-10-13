@@ -13,7 +13,9 @@ namespace TemplateSistema.Infrastructure.Services;
 /// </summary>
 /// <remarks>
 /// Regras: numa data, as permutas daquele dia são simuladas em ordem de cadastro, trocando o
-/// conteúdo das células do solicitante e do permutante. A base de um servidor vem da escala dele
+/// conteúdo das células do solicitante e do permutante. Quem RECEBE o dia (o permutante na data
+/// do solicitante; o solicitante na data do permutante) fica com a célula marcada com "*"; numa
+/// permuta da permuta, a marca fica com quem recebeu por último. A base de um servidor vem da escala dele
 /// naquele mês (havendo mais de uma: publicada &gt; finalizada &gt; rascunho, a mais recente). Quem
 /// recebe de alguém sem escala/célula no dia fica com descanso ("D") até a escala do outro existir.
 /// Data em que um dos dois está de férias/licença não é trocada. O resultado é gravado em todas
@@ -158,6 +160,7 @@ public sealed class PermutaAplicador(ApplicationDbContext db)
         }
 
         var ultimaPermuta = new Dictionary<Guid, Guid>();
+        var recebeu = new Dictionary<Guid, bool>();
         foreach (var permuta in permutas)
         {
             var solicitante = estado[permuta.SolicitanteServidorId];
@@ -171,6 +174,10 @@ public sealed class PermutaAplicador(ApplicationDbContext db)
             estado[permuta.PermutanteServidorId] = solicitante;
             ultimaPermuta[permuta.SolicitanteServidorId] = permuta.Id;
             ultimaPermuta[permuta.PermutanteServidorId] = permuta.Id;
+            // Na data do solicitante quem recebe o dia é o permutante; na do permutante, o solicitante.
+            var permutanteRecebe = permuta.DataIda == data;
+            recebeu[permuta.PermutanteServidorId] = permutanteRecebe;
+            recebeu[permuta.SolicitanteServidorId] = !permutanteRecebe;
         }
 
         foreach (var linha in linhas)
@@ -185,11 +192,12 @@ public sealed class PermutaAplicador(ApplicationDbContext db)
                     if (celula is null)
                     {
                         db.EscalaOcorrencias.Add(
-                            EscalaOcorrencia.CriarPorPermuta(linha.Id, data, final, permutaId, actorLogin));
+                            EscalaOcorrencia.CriarPorPermuta(
+                                linha.Id, data, final, permutaId, recebeu[linha.ServidorId], actorLogin));
                     }
                     else
                     {
-                        celula.AplicarPermuta(final, permutaId, actorLogin);
+                        celula.AplicarPermuta(final, permutaId, recebeu[linha.ServidorId], actorLogin);
                     }
 
                     continue;

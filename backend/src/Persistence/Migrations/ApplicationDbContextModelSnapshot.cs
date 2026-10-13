@@ -406,6 +406,9 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<Guid?>("PermutaId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("PermutaRecebida")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("Permutada")
                         .HasColumnType("boolean");
 

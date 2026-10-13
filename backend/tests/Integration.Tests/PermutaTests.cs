@@ -158,11 +158,42 @@ public class PermutaTests(PostgresFixture fixture) : IntegrationTestBase(fixture
             depois[chave].ShouldBe((valor.Codigo, false));
         }
 
-        // A visualização da escala recebe a marca da permuta.
-        var detalhe = await EscalaAsync(s => s.GetByIdAsync(ctx.EscalaNbId, ChefeNb));
-        detalhe.Value!.Servidores
-            .Single(x => x.ServidorId == ctx.A)
-            .Ocorrencias.Single(x => x.Data == Dia1).Permuta.ShouldBeTrue();
+        // O "*" fica só no dia final de cada um: B no dia 1 (recebeu o plantão de A) e A no
+        // dia 2 (recebeu o de B). Quem cedeu o dia não tem a marca.
+        (await MarcasAsync(ctx.EscalaNbId)).ShouldBe(
+            [(ctx.A, Dia2), (ctx.B, Dia1)], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task Na_permuta_da_permuta_o_asterisco_fica_com_quem_recebeu_por_ultimo()
+    {
+        var ctx = await PrepararAsync();
+
+        // A passa o dia 1 para B; B repassa esse dia 1 para D.
+        await PermutarAsync(ctx.A, ctx.B, Dia1, Dia2);
+        await PermutarAsync(ctx.B, ctx.D, Dia1, Dia4);
+
+        var marcas = await MarcasAsync(ctx.EscalaNbId);
+        marcas.ShouldContain((ctx.D, Dia1));
+        marcas.ShouldNotContain((ctx.A, Dia1));
+        marcas.ShouldNotContain((ctx.B, Dia1));
+        marcas.ShouldContain((ctx.A, Dia2));
+        marcas.ShouldNotContain((ctx.B, Dia2));
+
+        // Na tela de cadastro a lista de dias também só marca o dia recebido.
+        var diasB = await PermutaAsync(s => s.GetEscalaServidorAsync(ctx.B, Ano, Mes));
+        diasB.Dias.Where(x => x.Permuta).ShouldBeEmpty();
+        var diasD = await PermutaAsync(s => s.GetEscalaServidorAsync(ctx.D, Ano, Mes));
+        diasD.Dias.Where(x => x.Permuta).Select(x => x.Data).ShouldBe([Dia1]);
+    }
+
+    /// <summary>Células exibidas com "*" na visualização da escala.</summary>
+    private async Task<List<(Guid Servidor, DateOnly Data)>> MarcasAsync(Guid escalaId)
+    {
+        var detalhe = (await EscalaAsync(s => s.GetByIdAsync(escalaId, ChefeNb))).Value!;
+        return detalhe.Servidores
+            .SelectMany(s => s.Ocorrencias.Where(o => o.Permuta).Select(o => (s.ServidorId, o.Data)))
+            .ToList();
     }
 
     [Fact]

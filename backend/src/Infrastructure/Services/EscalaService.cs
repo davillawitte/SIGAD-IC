@@ -2734,7 +2734,8 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                             o.Origem,
                             o.EscalaJornadaId,
                             o.Observacao,
-                            o.Permutada))
+                            // "*" só onde o servidor recebeu o dia (ver EscalaOcorrencia.PermutaRecebida).
+                            o.Permutada && o.PermutaRecebida))
                         .ToList());
             })
             .ToList();

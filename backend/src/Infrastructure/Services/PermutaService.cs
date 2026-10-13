@@ -234,7 +234,13 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
             : await db.EscalaOcorrencias
                 .AsNoTracking()
                 .Where(x => x.EscalaServidorId == linha.Id)
-                .Select(x => new { x.Data, x.TipoOcorrenciaCodigo, Nome = x.TipoOcorrencia.Nome, x.Permutada })
+                .Select(x => new
+                {
+                    x.Data,
+                    x.TipoOcorrenciaCodigo,
+                    Nome = x.TipoOcorrencia.Nome,
+                    Marca = x.Permutada && x.PermutaRecebida,
+                })
                 .ToListAsync(cancellationToken);
         var porData = celulas.ToDictionary(x => x.Data);
 
@@ -242,7 +248,7 @@ public class PermutaService(ApplicationDbContext db) : IPermutaService
         for (var data = inicio; data <= fim; data = data.AddDays(1))
         {
             dias.Add(porData.TryGetValue(data, out var c)
-                ? new PermutaDiaDto(data, c.TipoOcorrenciaCodigo, c.Nome, c.Permutada)
+                ? new PermutaDiaDto(data, c.TipoOcorrenciaCodigo, c.Nome, c.Marca)
                 : new PermutaDiaDto(data, null, null, false));
         }
 

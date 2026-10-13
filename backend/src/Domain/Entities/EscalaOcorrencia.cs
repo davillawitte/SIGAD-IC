@@ -20,6 +20,10 @@ public class EscalaOcorrencia : BaseEntity
     /// célula permutada = a célula não existia e foi criada pela permuta.</summary>
     public bool Permutada { get; private set; }
     public Guid? PermutaId { get; private set; }
+
+    /// <summary>O servidor desta célula RECEBEU o dia na permuta (é onde ele passou a ficar) — só
+    /// aqui aparece o "*". Quem cedeu o dia tem a célula trocada também, mas sem a marca.</summary>
+    public bool PermutaRecebida { get; private set; }
     public string? CodigoOriginal { get; private set; }
     public TimeOnly? HoraInicioOriginal { get; private set; }
     public TimeOnly? HoraFimOriginal { get; private set; }
@@ -121,6 +125,7 @@ public class EscalaOcorrencia : BaseEntity
         DateOnly data,
         CelulaEscala valor,
         Guid permutaId,
+        bool recebida,
         string? createdBy = null)
     {
         var ocorrencia = Create(
@@ -135,12 +140,13 @@ public class EscalaOcorrencia : BaseEntity
             createdBy: createdBy);
         ocorrencia.Permutada = true;
         ocorrencia.PermutaId = permutaId;
+        ocorrencia.PermutaRecebida = recebida;
         return ocorrencia;
     }
 
     /// <summary>Grava o valor resultante da permuta, guardando o original só na primeira vez (numa
     /// permuta da permuta o original continua sendo o de antes de qualquer troca).</summary>
-    public void AplicarPermuta(CelulaEscala valor, Guid permutaId, string? updatedBy = null)
+    public void AplicarPermuta(CelulaEscala valor, Guid permutaId, bool recebida, string? updatedBy = null)
     {
         if (!Permutada)
         {
@@ -155,6 +161,7 @@ public class EscalaOcorrencia : BaseEntity
         }
 
         PermutaId = permutaId;
+        PermutaRecebida = recebida;
         TipoOcorrenciaCodigo = valor.Codigo.Trim().ToUpperInvariant();
         HoraInicio = valor.HoraInicio;
         HoraFim = valor.HoraFim;
@@ -195,6 +202,7 @@ public class EscalaOcorrencia : BaseEntity
     {
         Permutada = false;
         PermutaId = null;
+        PermutaRecebida = false;
         CodigoOriginal = null;
         HoraInicioOriginal = null;
         HoraFimOriginal = null;
