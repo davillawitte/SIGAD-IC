@@ -10,6 +10,18 @@ public interface IEscalaResumidaService
     Task<Result<EscalaResumidaDetailDto>> CreateAsync(CreateEscalaResumidaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaResumidaDetailDto>> UpdateAsync(Guid id, UpdateEscalaResumidaRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaResumidaDetailDto>> ConfigurarSetoresAsync(Guid id, ConfigurarSetoresRequest request, string actorLogin, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EscalaResumidaSetorOpcaoDto>> ListSetoresDoNucleoAsync(
+        Guid nucleoId,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Inclui o grupo de um setor numa resumida de núcleo já existente.</summary>
+    Task<Result<EscalaResumidaDetailDto>> IncluirSetorAsync(
+        Guid id,
+        Guid setorId,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+
     Task<Result<EscalaResumidaDetailDto>> ConfigurarEquipeAsync(Guid id, ConfigurarEquipeRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaResumidaDetailDto>> AtualizarEquipeAsync(Guid id, Guid equipeId, AtualizarEquipeRequest request, string actorLogin, CancellationToken cancellationToken = default);
     Task<Result<EscalaResumidaDetailDto>> RemoverEquipeAsync(Guid id, Guid equipeId, string actorLogin, CancellationToken cancellationToken = default);

@@ -32,6 +32,8 @@ export interface EscalaResumidaRotacaoMembro {
   servidorNome?: string | null;
   servidorId2?: string | null;
   servidorNome2?: string | null;
+  /** Segunda função em aberto ("DO") nesta posição do rodízio. */
+  isFolga2?: boolean;
 }
 
 export interface EscalaResumidaDia {
@@ -146,10 +148,19 @@ export interface AtualizarEquipePayload {
   ordem: number;
 }
 
+export interface EscalaResumidaSetorOpcao {
+  id: string;
+  nome: string;
+  sigla: string;
+  nucleoId: string;
+}
+
 export interface RotacaoMembroItem {
   posicao: number;
   servidorId?: string | null;
   servidorId2?: string | null;
+  /** Segunda função em aberto ("DO") — vale quando `servidorId2` é nulo. */
+  isFolga2?: boolean;
 }
 
 export interface ConfigurarRotacaoPayload {

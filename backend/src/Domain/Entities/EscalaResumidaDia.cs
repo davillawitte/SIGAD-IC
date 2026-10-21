@@ -15,10 +15,9 @@ public class EscalaResumidaDia : BaseEntity
     public DateOnly Data { get; private set; }
     public Guid? ServidorId { get; private set; }
     public string? ServidorNomeSnapshot { get; private set; }
-    /// <summary>Reforço opcional na mesma vaga/dia (ex.: Agentes com duas pessoas). Nulo
-    /// simplesmente significa "sem reforço" — só <see cref="IsFolga2"/> marca "DO" explícito
-    /// pra esse segundo lugar (usado só em override manual; dia de regra nunca marca DO2
-    /// automaticamente, já que "sem reforço" e "reforço é DO" têm o mesmo efeito visual).</summary>
+    /// <summary>Segunda função opcional na mesma vaga/dia (ex.: Agentes com motorista +
+    /// fotógrafo). Nula simplesmente significa "sem segunda função"; <see cref="IsFolga2"/> marca
+    /// "DO" (Diária Operacional disponível) pra ela — vindo do rodízio ou de override manual.</summary>
     public Guid? ServidorId2 { get; private set; }
     public string? ServidorNomeSnapshot2 { get; private set; }
     public bool IsFolga2 { get; private set; }
@@ -67,7 +66,8 @@ public class EscalaResumidaDia : BaseEntity
         Guid? servidorId2,
         string? servidorNome2,
         Guid rotacaoMembroId,
-        string? createdBy = null)
+        string? createdBy = null,
+        bool isFolga2 = false)
     {
         var dia = new EscalaResumidaDia
         {
@@ -77,7 +77,7 @@ public class EscalaResumidaDia : BaseEntity
             ServidorNomeSnapshot = servidorNome,
             ServidorId2 = servidorId2,
             ServidorNomeSnapshot2 = servidorNome2,
-            IsFolga2 = false,
+            IsFolga2 = servidorId2 is null && isFolga2,
             TextoLivre = null,
             IsFolga = servidorId is null,
             Origem = OrigemOcorrencia.Regra,
@@ -125,13 +125,14 @@ public class EscalaResumidaDia : BaseEntity
         Guid? servidorId2,
         string? servidorNome2,
         Guid rotacaoMembroId,
-        string? updatedBy = null)
+        string? updatedBy = null,
+        bool isFolga2 = false)
     {
         ServidorId = servidorId;
         ServidorNomeSnapshot = servidorNome;
         ServidorId2 = servidorId2;
         ServidorNomeSnapshot2 = servidorNome2;
-        IsFolga2 = false;
+        IsFolga2 = servidorId2 is null && isFolga2;
         TextoLivre = null;
         IsFolga = servidorId is null;
         Origem = OrigemOcorrencia.Regra;

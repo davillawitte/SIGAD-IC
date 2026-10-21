@@ -33,12 +33,25 @@
   <pci-alert variant="error" title="Erro" [message]="error()!" />
 }
 
-<div class="escalas-list" [class.escalas-list--com-criar]="canCreate()">
+<div class="escalas-list" [class.escalas-list--com-criar]="canCreate() || isInstitucional()">
 <!--
   pci-list-page não projeta ações extras no header (só o botão de criar), então as ações
   ficam sobrepostas à área de ações do pci-page-header. Ver docs/design-system-pendencias.md.
 -->
 <div class="escalas-list__actions">
+  @if (isInstitucional()) {
+    <pci-tooltip text="Baixar todas as escalas da listagem" position="bottom">
+      <pci-icon-button
+        pciTooltipChild
+        icon="download"
+        size="md"
+        ariaLabel="Baixar todas as escalas da listagem"
+        [loading]="baixandoLote()"
+        [disabled]="totalItems() === 0"
+        (clicked)="baixarTodas()"
+      />
+    </pci-tooltip>
+  }
   <pci-button variant="secondary" icon="calendar" (clicked)="verCalendario()">
     Ver Calendário
   </pci-button>

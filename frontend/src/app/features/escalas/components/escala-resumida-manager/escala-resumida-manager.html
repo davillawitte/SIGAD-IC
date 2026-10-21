@@ -99,16 +99,16 @@
                               @if (temSegundaPosicaoAberta(equipe.id, $index)) {
                                 <pci-select
                                   class="rotacao-editor__select"
-                                  label="Reforço (opcional)"
+                                  label="2ª função (opcional)"
                                   [formControl]="pos.segunda"
-                                  [options]="opcoesDoSetorSemDo(setor)"
+                                  [options]="opcoesDoSetor(setor)"
                                 />
                                 <pci-icon-button
                                   icon="x"
                                   variant="outline"
                                   tone="danger"
                                   size="sm"
-                                  ariaLabel="Remover reforço"
+                                  ariaLabel="Remover 2ª função"
                                   (clicked)="removerSegundaPosicao(equipe.id, $index)"
                                 />
                               } @else {
@@ -118,7 +118,7 @@
                                   icon="plus"
                                   (clicked)="abrirSegundaPosicao(equipe.id, $index)"
                                 >
-                                  Reforço
+                                  2ª função
                                 </pci-button>
                               }
                             }

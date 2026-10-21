@@ -62,6 +62,33 @@ export class EscalasApiService {
     return this.http.get<PagedEscalas>(`${this.base}/${path}`, { params: httpParams });
   }
 
+  /** Baixa num .zip todas as escalas da lista com os filtros informados (todas as páginas).
+   * `tipo`: PDF → `definitiva` ou `resumida`; Excel → `resumida`. */
+  downloadLote(params: {
+    formato: 'pdf' | 'excel';
+    tipo: 'definitiva' | 'resumida';
+    escopo?: 'setor' | 'institucional';
+    setorId?: string;
+    nucleoId?: string;
+    mes?: number;
+    ano?: number;
+    status?: string;
+    search?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  }): Observable<Blob> {
+    let httpParams = new HttpParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    });
+    return this.http.get(`${this.base}/api/escalas/exportar-lote`, {
+      params: httpParams,
+      responseType: 'blob',
+    });
+  }
+
   get(id: string): Observable<EscalaDetail> {
     return this.http.get<EscalaDetail>(`${this.base}/api/escalas/${id}`);
   }

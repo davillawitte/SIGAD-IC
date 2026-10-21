@@ -133,6 +133,18 @@ public sealed class CenarioBuilder(ApplicationDbContext db, Cargo cargo)
         return escala;
     }
 
+    /// <summary>Escala de um setor já gravado em outro cenário (só o id em mãos).</summary>
+    public Escala AdicionarEscalaDoSetor(
+        Guid setorId,
+        int ano,
+        int mes,
+        TipoFuncionamento tipoFuncionamento = TipoFuncionamento.Expediente)
+    {
+        var escala = Escala.Create(setorId, null, ano, mes, tipoFuncionamento, observacao: null, createdBy: "teste");
+        db.Escalas.Add(escala);
+        return escala;
+    }
+
     public Escala AdicionarEscalaDeNucleo(
         Nucleo nucleo,
         int ano,

@@ -10,12 +10,15 @@ import {
   PciFeedbackModalService,
   PciFilterField,
   PciFilterValues,
+  PciIconButtonComponent,
   PciLayoutBreadcrumbService,
   PciListPageComponent,
   PciRowAction,
   PciSortChange,
   PciStackComponent,
   PciToastService,
+  PciTooltipChildDirective,
+  PciTooltipComponent,
 } from '@davillawitte/pci-design-system';
 import { forkJoin, of } from 'rxjs';
 import { catchError, filter } from 'rxjs/operators';
@@ -27,6 +30,7 @@ import {
   openExportEscalaDialog,
 } from '../../../../shared/dialogs/dialog.helpers';
 import { AdminApiService } from '../../../admin/services/admin-api.service';
+import { MES_NOMES } from '../../components/escala-matrix/escala-matrix';
 import { ESCALAS_ROUTE_PAGES } from '../../escalas-route-pages';
 import { EscalasApiService } from '../../services/escalas-api.service';
 import { EscalasResumidasApiService } from '../../services/escalas-resumidas-api.service';
@@ -60,8 +64,11 @@ type EscalaRow = {
     MatDialogModule,
     PciAlertComponent,
     PciButtonComponent,
+    PciIconButtonComponent,
     PciListPageComponent,
     PciStackComponent,
+    PciTooltipChildDirective,
+    PciTooltipComponent,
   ],
   templateUrl: './escala-list.html',
   styleUrl: './escala-list.scss',
@@ -101,6 +108,7 @@ export class EscalaList implements OnInit, OnDestroy {
   readonly rows = signal<EscalaRow[]>([]);
   readonly sort = signal<PciSortChange<EscalaRow> | null>(null);
   readonly totalItems = signal(0);
+  readonly baixandoLote = signal(false);
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
   readonly searchTerm = signal('');
@@ -566,24 +574,87 @@ export class EscalaList implements OnInit, OnDestroy {
     });
   }
 
-  private reload(): void {
-    this.loading.set(true);
-    this.error.set(null);
+  /** Filtros, busca e ordenação atuais da lista — usados na consulta e no "Baixar todas". */
+  private consultaAtual() {
     const filters = this.filterValues();
     const ano = Number(filters['ano'] || '');
     const mes = Number(filters['mes'] || '');
+    return {
+      search: this.searchTerm() || undefined,
+      status: (filters['status'] as string) || undefined,
+      ano: Number.isFinite(ano) && ano > 0 ? ano : undefined,
+      mes: Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined,
+      ...this.lotacaoParams(filters['setorId'] as string | undefined),
+      escopo: this.escopo(),
+      ...this.sortParams(),
+    };
+  }
+
+  /** Baixa todas as escalas da lista (com os filtros aplicados, todas as páginas) num .zip, no
+   * formato escolhido. Cada arquivo sai como "SIGLA-Mês-Ano". */
+  baixarTodas(): void {
+    const total = this.totalItems();
+    if (!total) return;
+    openExportEscalaDialog(this.dialog, {
+      title: `Baixar ${total} ${total === 1 ? 'escala' : 'escalas'}`,
+      temEscalaResumida: true,
+    }).subscribe((resultado) => {
+      if (!resultado) return;
+      if (resultado.formato === 'excel' && resultado.opcao !== 'resumida') {
+        this.toast.showInfo('Exportação em Excel completa será implementada em breve.', 'Em desenvolvimento');
+        return;
+      }
+      const consulta = this.consultaAtual();
+      const tipo = resultado.formato === 'pdf' ? resultado.pdfTipo : 'resumida';
+      this.baixandoLote.set(true);
+      this.api.downloadLote({ ...consulta, formato: resultado.formato, tipo }).subscribe({
+        next: (blob) => {
+          this.baixandoLote.set(false);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download =
+            consulta.ano && consulta.mes
+              ? `Escalas-${MES_NOMES[consulta.mes]}-${consulta.ano}.zip`
+              : 'Escalas.zip';
+          a.click();
+          URL.revokeObjectURL(url);
+          this.feedback.showSuccess('Escalas baixadas com sucesso.');
+        },
+        error: (err: unknown) => {
+          this.baixandoLote.set(false);
+          // A resposta de erro vem como Blob (responseType blob): lê a mensagem do JSON.
+          const blobErro = (err as { error?: unknown }).error;
+          const fallback = 'Não foi possível baixar as escalas.';
+          if (blobErro instanceof Blob) {
+            void blobErro.text().then((texto) => {
+              let msg = fallback;
+              try {
+                msg = (JSON.parse(texto) as { message?: string }).message ?? fallback;
+              } catch {
+                // corpo não é JSON: fica a mensagem padrão
+              }
+              this.error.set(msg);
+              this.toast.showError(msg);
+            });
+            return;
+          }
+          this.error.set(fallback);
+          this.toast.showError(fallback);
+        },
+      });
+    });
+  }
+
+  private reload(): void {
+    this.loading.set(true);
+    this.error.set(null);
 
     this.api
       .list({
         page: this.page(),
         pageSize: this.pageSize(),
-        search: this.searchTerm() || undefined,
-        status: (filters['status'] as string) || undefined,
-        ano: Number.isFinite(ano) && ano > 0 ? ano : undefined,
-        mes: Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined,
-        ...this.lotacaoParams(filters['setorId'] as string | undefined),
-        escopo: this.escopo(),
-        ...this.sortParams(),
+        ...this.consultaAtual(),
       })
       .subscribe({
         next: (result) => {

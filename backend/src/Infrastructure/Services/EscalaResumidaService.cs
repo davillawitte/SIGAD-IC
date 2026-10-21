@@ -24,7 +24,13 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
 
         if (!actor.TemVisaoGlobal(PermissionModules.Escalas))
         {
-            var meusNucleos = actor.NucleosGerenciadosIds;
+            // A resumida de núcleo é compartilhada pelos setores que ele engloba: o chefe de um
+            // desses setores também a enxerga. Sem isso o chefe do SELMA não achava a resumida já
+            // criada pelo SCCV, tentava criar outra e travava em "Já existe escala resumida".
+            var meusNucleos = actor.NucleosGerenciadosIds
+                .Concat(actor.NucleosDosSetoresGerenciadosIds)
+                .Distinct()
+                .ToList();
             var meusSetores = actor.SetoresGerenciadosIds
                 .Concat(actor.SetoresDosNucleosGerenciadosIds)
                 .Distinct()
@@ -286,7 +292,7 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
         CancellationToken cancellationToken = default)
     {
         var (escala, actor, error) = await LoadEditableAsync(
-            id, actorLogin, cancellationToken, x => x.Include(e => e.Setores));
+            id, actorLogin, cancellationToken, x => x.Include(e => e.Setores).ThenInclude(s => s.Equipes));
         if (escala is null)
         {
             return Result<EscalaResumidaDetailDto>.Failure(error!);
@@ -303,32 +309,19 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             return Result<EscalaResumidaDetailDto>.Failure("Só pode haver um grupo de Agentes.");
         }
 
-        // Só o chefe do núcleo escolhe os setores participantes. O chefe de setor pode mexer no
-        // grupo do próprio setor e no de Agentes; os grupos dos outros setores ficam como estão.
-        if (escala.NucleoId is Guid nucleoDaEscala && !actor.GerenciaNucleo(nucleoDaEscala))
+        // Aberto: quem pode mexer na resumida do núcleo (chefe do núcleo ou de qualquer setor
+        // dele) escolhe os setores participantes. Um grupo de outro setor que JÁ TEM equipes não
+        // some só porque não veio na requisição — evita apagar, sem querer, o trabalho já feito
+        // por outro setor do núcleo.
+        var preservados = escala.Setores
+            .Where(x => x.SetorId is not null
+                        && request.Setores.All(r => r.SetorId != x.SetorId)
+                        && x.Equipes.Count > 0)
+            .Select(x => new ConfigurarSetorItem(x.SetorId, x.Ordem))
+            .ToList();
+        if (preservados.Count > 0)
         {
-            var alheios = escala.Setores
-                .Where(x => x.SetorId is Guid outro && !actor.SetoresGerenciadosIds.Contains(outro))
-                .ToList();
-
-            var mexeuEmSetorAlheio = request.Setores.Any(
-                x => x.SetorId is Guid pedido
-                     && !actor.SetoresGerenciadosIds.Contains(pedido)
-                     && alheios.All(a => a.SetorId != pedido));
-
-            if (mexeuEmSetorAlheio)
-            {
-                return Result<EscalaResumidaDetailDto>.Failure(
-                    "Só o chefe do núcleo pode incluir outros setores nesta escala resumida.");
-            }
-
-            // Preserva os grupos alheios que não vieram na requisição, em vez de removê-los.
-            var pedidos = request.Setores.ToList();
-            pedidos.AddRange(
-                alheios
-                    .Where(a => request.Setores.All(x => x.SetorId != a.SetorId))
-                    .Select(a => new ConfigurarSetorItem(a.SetorId, a.Ordem)));
-            request = new ConfigurarSetoresRequest(pedidos);
+            request = new ConfigurarSetoresRequest([.. request.Setores, .. preservados]);
         }
 
         var setorIdsRequisitados = request.Setores
@@ -386,6 +379,53 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(id, actorLogin, cancellationToken);
+    }
+
+    /// <summary>Inclui o grupo de um setor numa resumida de núcleo que já existe — é o caso do
+    /// segundo setor a montar a escala no mês (o primeiro criou a resumida só com o grupo dele).
+    /// Aberto a quem pode mexer na resumida do núcleo; se o grupo já existe, não faz nada.
+    /// Agentes continuam por último.</summary>
+    public async Task<Result<EscalaResumidaDetailDto>> IncluirSetorAsync(
+        Guid id,
+        Guid setorId,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var (escala, actor, error) = await LoadEditableAsync(
+            id, actorLogin, cancellationToken, x => x.Include(e => e.Setores));
+        if (escala is null)
+        {
+            return Result<EscalaResumidaDetailDto>.Failure(error!);
+        }
+
+        if (escala.NucleoId is not Guid nucleoId)
+        {
+            return Result<EscalaResumidaDetailDto>.Failure(
+                "Escala resumida de setor único não usa configuração de setores participantes.");
+        }
+
+        var setor = await db.Setores.FirstOrDefaultAsync(
+            x => x.Id == setorId && x.NucleoId == nucleoId, cancellationToken);
+        if (setor is null)
+        {
+            return Result<EscalaResumidaDetailDto>.Failure("Setor inválido ou que não pertence a este núcleo.");
+        }
+
+        if (escala.Setores.All(x => x.SetorId != setorId))
+        {
+            var agentes = escala.Setores.FirstOrDefault(x => x.SetorId is null);
+            var ultimaOrdemDeSetor = escala.Setores.Where(x => x.SetorId is not null).Select(x => x.Ordem).DefaultIfEmpty(0).Max();
+            db.EscalaResumidaSetores.Add(EscalaResumidaSetor.Create(
+                escala.Id, setor.Id, ultimaOrdemDeSetor + 1, setor.Nome, setor.Sigla, actorLogin));
+            if (agentes is not null && agentes.Ordem <= ultimaOrdemDeSetor + 1)
+            {
+                agentes.AtualizarOrdem(ultimaOrdemDeSetor + 2, actorLogin);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return await GetByIdAsync(id, actorLogin, cancellationToken);
     }
 
@@ -556,7 +596,7 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
         foreach (var item in request.Membros.OrderBy(x => x.Posicao))
         {
             var membro = EscalaResumidaRotacaoMembro.Create(
-                equipe.Id, item.Posicao, item.ServidorId, item.ServidorId2, actorLogin);
+                equipe.Id, item.Posicao, item.ServidorId, item.ServidorId2, actorLogin, item.IsFolga2);
             // Só Add no DbSet: como `equipe` já está rastreado pelo EF, o fixup automático
             // já inclui `membro` em equipe.Rotacao — adicionar aqui também duplicaria o item
             // na coleção em memória e quebraria o ToDictionary por Posicao no expander.
@@ -678,9 +718,32 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             ? await db.Servidores.Where(x => x.Id == servidorId2).Select(x => x.Nome).FirstOrDefaultAsync(cancellationToken)
             : null;
 
-        dia.AtualizarPorRegra(regra.ServidorId, nome, regra.ServidorId2, nome2, regra.RotacaoMembroId, actorLogin);
+        dia.AtualizarPorRegra(
+            regra.ServidorId, nome, regra.ServidorId2, nome2, regra.RotacaoMembroId, actorLogin, regra.IsFolga2);
         await db.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(id, actorLogin, cancellationToken);
+    }
+
+    /// <summary>Setores do núcleo, pra escolher os participantes da resumida — para qualquer um
+    /// que pode ver a resumida do núcleo (o chefe de um setor não recebe os outros setores em
+    /// "meus setores").</summary>
+    public async Task<IReadOnlyList<EscalaResumidaSetorOpcaoDto>> ListSetoresDoNucleoAsync(
+        Guid nucleoId,
+        string actorLogin,
+        CancellationToken cancellationToken = default)
+    {
+        var actor = await ResolveActorAsync(actorLogin, cancellationToken);
+        if (!CanView(actor, nucleoId, null))
+        {
+            return [];
+        }
+
+        return await db.Setores
+            .AsNoTracking()
+            .Where(x => x.NucleoId == nucleoId)
+            .OrderBy(x => x.Sigla)
+            .Select(x => new EscalaResumidaSetorOpcaoDto(x.Id, x.Nome, x.Sigla, nucleoId))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<EscalaResumidaServidorElegivelDto>> ListServidoresElegiveisAsync(
@@ -817,7 +880,8 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                 foreach (var membroOrigem in equipeOrigem.Rotacao.OrderBy(x => x.Posicao))
                 {
                     var membroNovo = EscalaResumidaRotacaoMembro.Create(
-                        equipeNova.Id, membroOrigem.Posicao, membroOrigem.ServidorId, membroOrigem.ServidorId2, actorLogin);
+                        equipeNova.Id, membroOrigem.Posicao, membroOrigem.ServidorId, membroOrigem.ServidorId2,
+                        actorLogin, membroOrigem.IsFolga2);
                     // Só Add no DbSet — ver comentário equivalente em ConfigurarRotacaoAsync
                     // (fixup automático do EF já popula equipeNova.Rotacao).
                     db.EscalaResumidaRotacaoMembros.Add(membroNovo);
@@ -942,6 +1006,24 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             return Result.Failure("Escala resumida já vinculada a uma escala salva — não pode ser excluída.");
         }
 
+        // Resumida de núcleo é compartilhada: quem chefia só um setor não apaga, junto com a dele,
+        // as equipes que outro setor do núcleo já montou ali.
+        if (escala.NucleoId is Guid nucleoDaEscala && !actor.GerenciaNucleo(nucleoDaEscala))
+        {
+            var meusSetores = actor.SetoresGerenciadosIds;
+            var temEquipeDeOutroSetor = await db.EscalaResumidaSetores.AnyAsync(
+                s => s.EscalaResumidaId == id
+                     && s.SetorId != null
+                     && !meusSetores.Contains(s.SetorId.Value)
+                     && s.Equipes.Any(),
+                cancellationToken);
+            if (temEquipeDeOutroSetor)
+            {
+                return Result.Failure(
+                    "Esta escala resumida já tem equipes de outros setores do núcleo — só o chefe do núcleo pode excluí-la.");
+            }
+        }
+
         db.EscalasResumidas.Remove(escala);
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
@@ -982,7 +1064,7 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
             .Where(x => equipeIds.Contains(x.EscalaResumidaEquipeId) && x.Data >= inicio && x.Data <= fim)
             .ToDictionaryAsync(x => (x.EscalaResumidaEquipeId, x.Data), cancellationToken);
 
-        foreach (var (equipeId, data, servidorId, servidorId2, rotacaoMembroId) in expandido)
+        foreach (var (equipeId, data, servidorId, servidorId2, rotacaoMembroId, isFolga2) in expandido)
         {
             var nome = servidorId.HasValue && nomes.TryGetValue(servidorId.Value, out var n) ? n : null;
             var nome2 = servidorId2.HasValue && nomes.TryGetValue(servidorId2.Value, out var n2) ? n2 : null;
@@ -994,12 +1076,12 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                     continue;
                 }
 
-                dia.AtualizarPorRegra(servidorId, nome, servidorId2, nome2, rotacaoMembroId, actorLogin);
+                dia.AtualizarPorRegra(servidorId, nome, servidorId2, nome2, rotacaoMembroId, actorLogin, isFolga2);
             }
             else
             {
-                db.EscalaResumidaDias.Add(
-                    EscalaResumidaDia.CriarPorRegra(equipeId, data, servidorId, nome, servidorId2, nome2, rotacaoMembroId, actorLogin));
+                db.EscalaResumidaDias.Add(EscalaResumidaDia.CriarPorRegra(
+                    equipeId, data, servidorId, nome, servidorId2, nome2, rotacaoMembroId, actorLogin, isFolga2));
             }
         }
     }
@@ -1155,7 +1237,7 @@ public class EscalaResumidaService(ApplicationDbContext db) : IEscalaResumidaSer
                             e.Rotacao
                                 .OrderBy(m => m.Posicao)
                                 .Select(m => new EscalaResumidaRotacaoMembroDto(
-                                    m.Id, m.Posicao, m.ServidorId, m.Servidor?.Nome, m.ServidorId2, m.Servidor2?.Nome))
+                                    m.Id, m.Posicao, m.ServidorId, m.Servidor?.Nome, m.ServidorId2, m.Servidor2?.Nome, m.IsFolga2))
                                 .ToList(),
                             e.Dias
                                 .OrderBy(d => d.Data)

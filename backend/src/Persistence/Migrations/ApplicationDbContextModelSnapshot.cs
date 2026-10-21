@@ -634,6 +634,9 @@ namespace TemplateSistema.Persistence.Migrations
                     b.Property<Guid>("EscalaResumidaEquipeId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsFolga2")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Posicao")
                         .HasColumnType("integer");
 

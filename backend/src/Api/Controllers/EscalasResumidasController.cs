@@ -67,6 +67,11 @@ public class EscalasResumidasController(
         return Ok(result);
     }
 
+    [HttpGet("setores-do-nucleo/{nucleoId:guid}")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> ListSetoresDoNucleo(Guid nucleoId, CancellationToken cancellationToken) =>
+        Ok(await escalaResumidaService.ListSetoresDoNucleoAsync(nucleoId, User.GetLogin(), cancellationToken));
+
     [HttpGet("servidores-elegiveis")]
     [RequiresPermission(PermissionCodes.EscalasListar)]
     public async Task<IActionResult> ServidoresElegiveis(
@@ -108,6 +113,15 @@ public class EscalasResumidasController(
     public async Task<IActionResult> ConfigurarSetores(Guid id, [FromBody] ConfigurarSetoresRequest request, CancellationToken cancellationToken)
     {
         var result = await escalaResumidaService.ConfigurarSetoresAsync(id, request, User.GetLogin(), cancellationToken);
+        return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Inclui o grupo do setor numa resumida de núcleo já criada por outro setor.</summary>
+    [HttpPost("{id:guid}/setores/{setorId:guid}")]
+    [RequiresPermission(PermissionCodes.EscalasEditar)]
+    public async Task<IActionResult> IncluirSetor(Guid id, Guid setorId, CancellationToken cancellationToken)
+    {
+        var result = await escalaResumidaService.IncluirSetorAsync(id, setorId, User.GetLogin(), cancellationToken);
         return result.Succeeded ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 

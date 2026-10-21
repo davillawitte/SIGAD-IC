@@ -68,7 +68,9 @@ public record EscalaResumidaRotacaoMembroDto(
     Guid? ServidorId,
     string? ServidorNome,
     Guid? ServidorId2,
-    string? ServidorNome2);
+    string? ServidorNome2,
+    // Segunda função em aberto ("DO") nesta posição do rodízio.
+    bool IsFolga2 = false);
 
 public record EscalaResumidaDiaDto(
     Guid Id,
@@ -121,7 +123,8 @@ public record ConfigurarEquipeRequest(Guid EscalaResumidaSetorId);
 
 public record AtualizarEquipeRequest(string Nome, int Ordem);
 
-public record RotacaoMembroItem(int Posicao, Guid? ServidorId, Guid? ServidorId2 = null);
+/// <summary><c>IsFolga2</c>: segunda função em aberto ("DO") — vale quando <c>ServidorId2</c> é nulo.</summary>
+public record RotacaoMembroItem(int Posicao, Guid? ServidorId, Guid? ServidorId2 = null, bool IsFolga2 = false);
 
 public record ConfigurarRotacaoRequest(DateOnly DataInicioCiclo, IReadOnlyList<RotacaoMembroItem> Membros);
 
@@ -134,6 +137,9 @@ public record UpsertDiaRequest(
     bool IsFolga2 = false);
 
 public record CopiarEscalaResumidaRequest(int Ano, int Mes);
+
+/// <summary>Setor do núcleo oferecido como participante da escala resumida.</summary>
+public record EscalaResumidaSetorOpcaoDto(Guid Id, string Nome, string Sigla, Guid NucleoId);
 
 public record VincularEscalaRequest(Guid EscalaId);
 

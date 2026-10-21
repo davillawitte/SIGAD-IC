@@ -18,7 +18,7 @@ namespace TemplateSistema.Infrastructure.Services;
 /// </summary>
 public static class EscalaResumidaRotacaoExpander
 {
-    public static IEnumerable<(Guid EquipeId, DateOnly Data, Guid? ServidorId, Guid? ServidorId2, Guid RotacaoMembroId)> ExpandSetor(
+    public static IEnumerable<(Guid EquipeId, DateOnly Data, Guid? ServidorId, Guid? ServidorId2, Guid RotacaoMembroId, bool IsFolga2)> ExpandSetor(
         IReadOnlyList<EscalaResumidaEquipe> equipesDoSetor,
         DateOnly inicio,
         DateOnly fim)
@@ -53,7 +53,7 @@ public static class EscalaResumidaRotacaoExpander
                         continue;
                     }
 
-                    yield return (equipesDoGrupo[i].Id, d, membro.ServidorId, membro.ServidorId2, membro.Id);
+                    yield return (equipesDoGrupo[i].Id, d, membro.ServidorId, membro.ServidorId2, membro.Id, membro.IsFolga2);
                 }
             }
         }

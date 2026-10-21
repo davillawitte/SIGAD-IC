@@ -12,6 +12,7 @@ import type {
   CopiarEscalaResumidaPayload,
   CreateEscalaResumidaPayload,
   EscalaResumidaAnteriorInfo,
+  EscalaResumidaSetorOpcao,
   EscalaResumidaDetail,
   EscalaResumidaServidorElegivel,
   PagedEscalasResumidas,
@@ -98,6 +99,21 @@ export class EscalasResumidasApiService {
   update(id: string, payload: UpdateEscalaResumidaPayload): Observable<EscalaResumidaDetail> {
     return this.http
       .put<EscalaResumidaDetail>(`${this.base}/api/escalas-resumidas/${id}`, payload)
+      .pipe(map(normalizeEscalaResumidaDetail));
+  }
+
+  /** Setores do núcleo, pra escolher os participantes da resumida (o chefe de um setor não os
+   * recebe em "meus setores"). */
+  listSetoresDoNucleo(nucleoId: string): Observable<EscalaResumidaSetorOpcao[]> {
+    return this.http.get<EscalaResumidaSetorOpcao[]>(
+      `${this.base}/api/escalas-resumidas/setores-do-nucleo/${nucleoId}`,
+    );
+  }
+
+  /** Inclui o grupo do setor numa resumida de núcleo já criada por outro setor (sem duplicar). */
+  incluirSetor(id: string, setorId: string): Observable<EscalaResumidaDetail> {
+    return this.http
+      .post<EscalaResumidaDetail>(`${this.base}/api/escalas-resumidas/${id}/setores/${setorId}`, {})
       .pipe(map(normalizeEscalaResumidaDetail));
   }
 

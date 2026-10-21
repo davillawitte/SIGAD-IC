@@ -15,7 +15,8 @@ namespace TemplateSistema.Api.Controllers;
 public class EscalasController(
     IEscalaService escalaService,
     IEscalaPdfService escalaPdfService,
-    IEscalaCsvService escalaCsvService) : ControllerBase
+    IEscalaCsvService escalaCsvService,
+    IEscalaLoteExportService escalaLoteExportService) : ControllerBase
 {
     /// <summary>Gestão do Setor: só escalas dos setores em que o usuário é chefia.</summary>
     [HttpGet("setor")]
@@ -399,6 +400,47 @@ public class EscalasController(
         var result = await escalaService.CopiarAsync(id, request, User.GetLogin(), cancellationToken);
         return result.Succeeded
             ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
+            : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Baixa num .zip todas as escalas da lista com os mesmos filtros (todas as páginas).
+    /// Cada arquivo sai como "SIGLA-Mês-Ano".</summary>
+    [HttpGet("exportar-lote")]
+    [RequiresPermission(PermissionCodes.EscalasListar)]
+    public async Task<IActionResult> ExportarLote(
+        [FromQuery] string formato,
+        [FromQuery] string tipo,
+        [FromQuery] string? escopo,
+        [FromQuery] Guid? setorId,
+        [FromQuery] Guid? nucleoId,
+        [FromQuery] int? mes,
+        [FromQuery] int? ano,
+        [FromQuery] StatusEscala? status,
+        [FromQuery] string? search = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await escalaLoteExportService.GerarAsync(
+            new EscalaListQuery
+            {
+                SetorId = setorId,
+                NucleoId = nucleoId,
+                Mes = mes,
+                Ano = ano,
+                Status = status,
+                Search = search,
+                Escopo = escopo,
+                Sort = sort,
+                Dir = dir,
+            },
+            formato,
+            tipo,
+            User.GetLogin(),
+            cancellationToken);
+
+        return result.Succeeded
+            ? File(result.Value.Content, "application/zip", result.Value.FileName)
             : BadRequest(new { message = result.Error });
     }
 

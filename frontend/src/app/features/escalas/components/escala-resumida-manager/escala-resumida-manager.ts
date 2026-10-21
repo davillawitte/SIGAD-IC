@@ -21,8 +21,6 @@ import {
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 
-import { AdminApiService } from '../../../admin/services/admin-api.service';
-import type { SetorListItem } from '../../../admin/models/admin.models';
 import { AppFormColDirective } from '../../../../shared/form-layout';
 import { EscalaResumidaGrid } from '../escala-resumida-grid/escala-resumida-grid';
 import { EscalasResumidasApiService } from '../../services/escalas-resumidas-api.service';
@@ -31,14 +29,16 @@ import type {
   EscalaResumidaEquipe,
   EscalaResumidaServidorElegivel,
   EscalaResumidaSetor,
+  EscalaResumidaSetorOpcao,
 } from '../../models/escalas-resumidas.models';
 import { httpErrorMessage } from '../../../../shared/http-error';
 
 const DO_VALUE = '__DO__';
 
-/** Uma posição do pool de rodízio: `segunda` é um reforço opcional (vazio = sem reforço) —
- * oferecido só pra Agentes. Ao contrário da posição principal, não tem opção "DO": reforço
- * marcado como folga equivale a não ter reforço nenhum, então não faz sentido oferecer. */
+/** Uma posição do pool de rodízio: `segunda` é a segunda função opcional (vazio = sem segunda
+ * função) — oferecida só pra Agentes (ex.: motorista + fotógrafo). Como na principal, aceita
+ * "DO" (Diária Operacional disponível): a segunda função fica em aberto mesmo com a primeira
+ * ocupada. */
 interface PosicaoDraft {
   principal: FormControl<string>;
   segunda: FormControl<string>;
@@ -85,7 +85,6 @@ function errMsg(err: unknown, fallback: string): string {
 })
 export class EscalaResumidaManager implements OnInit {
   private readonly api = inject(EscalasResumidasApiService);
-  private readonly adminApi = inject(AdminApiService);
   private readonly toast = inject(PciToastService);
   private readonly feedback = inject(PciFeedbackModalService);
 
@@ -114,7 +113,7 @@ export class EscalaResumidaManager implements OnInit {
   readonly working = signal(false);
   readonly error = signal<string | null>(null);
   readonly escala = signal<EscalaResumidaDetail | null>(null);
-  readonly setoresDoNucleo = signal<SetorListItem[]>([]);
+  readonly setoresDoNucleo = signal<EscalaResumidaSetorOpcao[]>([]);
   readonly elegiveis = signal<EscalaResumidaServidorElegivel[]>([]);
   readonly rotacaoAberta = signal<Record<string, RotacaoDraft>>({});
 
@@ -188,12 +187,6 @@ export class EscalaResumidaManager implements OnInit {
     })),
   ]);
 
-  /** Opções pra segunda pessoa de uma posição — sem "DO" (reforço em folga equivale a não ter
-   * reforço, então a opção não agrega nada aqui). */
-  readonly elegiveisOptionsSemDo = computed<PciSelectOption[]>(() =>
-    this.elegiveisOptions().filter((o) => o.value !== DO_VALUE),
-  );
-
   /** Opções do rodízio de um grupo. No grupo "Agentes" entram só os servidores que NÃO são
    * peritos — é o que define o grupo. Quem já está no rodízio continua listado, mesmo perito,
    * pra um cadastro anterior não perder o nome da vaga. */
@@ -228,11 +221,6 @@ export class EscalaResumidaManager implements OnInit {
     return ids;
   }
 
-  /** Mesma lista de `opcoesDoSetor`, sem "DO" — usada no reforço da posição. */
-  opcoesDoSetorSemDo(setor: { setorId: string | null }): PciSelectOption[] {
-    return this.opcoesDoSetor(setor).filter((o) => o.value !== DO_VALUE);
-  }
-
   readonly isRascunhoOuFinalizada = computed(() => {
     const status = this.escala()?.status;
     return status === 'Rascunho' || status === 'Finalizada';
@@ -240,11 +228,14 @@ export class EscalaResumidaManager implements OnInit {
 
   ngOnInit(): void {
     this.escala.set(this.escalaInicial());
-    this.adminApi.listMeusSetores().subscribe({
-      next: (items) => this.setoresDoNucleo.set(items),
-      error: () => this.error.set('Não foi possível carregar os setores do núcleo.'),
-    });
     const inicial = this.escalaInicial();
+    // Todos os setores do núcleo (não só os que o usuário chefia): a resumida é aberta.
+    if (inicial.nucleoId) {
+      this.api.listSetoresDoNucleo(inicial.nucleoId).subscribe({
+        next: (items) => this.setoresDoNucleo.set(items),
+        error: () => this.error.set('Não foi possível carregar os setores do núcleo.'),
+      });
+    }
     if (inicial.nucleoId) {
       this.loadElegiveis({ nucleoId: inicial.nucleoId });
     } else if (inicial.setorId) {
@@ -354,7 +345,10 @@ export class EscalaResumidaManager implements OnInit {
   abrirRotacao(equipe: EscalaResumidaEquipe): void {
     const membrosOrdenados = [...equipe.rotacao].sort((a, b) => a.posicao - b.posicao);
     const base = membrosOrdenados.length > 0
-      ? membrosOrdenados.map((m) => ({ principal: m.servidorId ?? DO_VALUE, segunda: m.servidorId2 ?? '' }))
+      ? membrosOrdenados.map((m) => ({
+          principal: m.servidorId ?? DO_VALUE,
+          segunda: m.servidorId2 ?? (m.isFolga2 ? DO_VALUE : ''),
+        }))
       : [{ principal: DO_VALUE, segunda: '' }];
     const membros = base.map((v) => this.novaPosicaoDraft(v.principal, v.segunda));
 
@@ -451,7 +445,8 @@ export class EscalaResumidaManager implements OnInit {
           const membros = draft.membros.map((pos, index) => ({
             posicao: index,
             servidorId: pos.principal.value === DO_VALUE || !pos.principal.value ? null : pos.principal.value,
-            servidorId2: pos.segunda.value || null,
+            servidorId2: pos.segunda.value === DO_VALUE || !pos.segunda.value ? null : pos.segunda.value,
+            isFolga2: pos.segunda.value === DO_VALUE,
           }));
           return this.api.configurarRotacao(escala.id, equipeId, {
             dataInicioCiclo: draft.dataInicioCiclo.value,

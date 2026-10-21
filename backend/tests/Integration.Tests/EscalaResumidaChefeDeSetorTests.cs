@@ -7,9 +7,9 @@ using TemplateSistema.Integration.Tests.Infra;
 namespace TemplateSistema.Integration.Tests;
 
 /// <summary>
-/// Escala resumida de núcleo montada por quem chefia só um setor dele: pode criar e mexer no
-/// grupo do próprio setor e no de Agentes, mas não escolhe os setores participantes — isso
-/// continua sendo do chefe de núcleo.
+/// Escala resumida de núcleo montada por quem chefia só um setor dele: é aberta — cria, mexe no
+/// grupo do próprio setor, no de Agentes e escolhe os setores participantes. Só não apaga, sem
+/// querer, o grupo de outro setor que já tem equipes.
 /// </summary>
 public class EscalaResumidaChefeDeSetorTests(PostgresFixture fixture) : IntegrationTestBase(fixture)
 {
@@ -80,7 +80,7 @@ public class EscalaResumidaChefeDeSetorTests(PostgresFixture fixture) : Integrat
     }
 
     [Fact]
-    public async Task Chefe_de_setor_nao_inclui_outro_setor_do_nucleo()
+    public async Task Chefe_de_setor_inclui_outro_setor_do_nucleo()
     {
         var ctx = await PrepararAsync();
         var criada = await CriarAsync(ctx.NucleoId, ChefeSccv);
@@ -94,9 +94,9 @@ public class EscalaResumidaChefeDeSetorTests(PostgresFixture fixture) : Integrat
             ]),
             ChefeSccv));
 
-        configurado.Succeeded.ShouldBeFalse();
-        configurado.Error.ShouldBe(
-            "Só o chefe do núcleo pode incluir outros setores nesta escala resumida.");
+        configurado.Error.ShouldBeNull();
+        configurado.Value!.Setores.Select(x => x.SetorId).ShouldBe(
+            new List<Guid?> { ctx.SetorId, ctx.OutroSetorId }, ignoreOrder: true);
     }
 
     [Fact]
@@ -115,7 +115,14 @@ public class EscalaResumidaChefeDeSetorTests(PostgresFixture fixture) : Integrat
             ]),
             ChefeNucleo))).Error.ShouldBeNull();
 
-        // ...e o chefe do SCCV manda só o dele: o do outro setor continua na escala resumida.
+        // ...o chefe do núcleo monta uma equipe no outro setor...
+        var grupoOutro = criada.Value!.Id;
+        var detalhe = await ExecutarAsync(s => s.GetByIdAsync(grupoOutro, ChefeNucleo));
+        var outroGrupoId = detalhe.Value!.Setores.Single(x => x.SetorId == ctx.OutroSetorId).Id;
+        (await ExecutarAsync(s => s.ConfigurarEquipeAsync(
+            grupoOutro, new ConfigurarEquipeRequest(outroGrupoId), ChefeNucleo))).Error.ShouldBeNull();
+
+        // ...e o chefe do SCCV manda só o dele: o do outro setor, que já tem equipe, continua.
         var configurado = await ExecutarAsync(s => s.ConfigurarSetoresAsync(
             criada.Value!.Id,
             new ConfigurarSetoresRequest([new ConfigurarSetorItem(ctx.SetorId, 1)]),

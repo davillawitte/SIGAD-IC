@@ -285,12 +285,9 @@ export class EscalaForm implements OnInit {
     return this.auth.canAccessEscala('escalas.criar', setorId, null);
   });
 
-  /** Só quem também chefia o núcleo (não só este setor) vê a seção de incluir outros setores
-   * do núcleo dentro do painel de escala resumida. */
-  readonly podeGerenciarOutrosSetoresDoNucleo = computed(() => {
-    const nucleoId = this.nucleoIdDoSetor();
-    return !!nucleoId && this.auth.isChefeNucleo(nucleoId);
-  });
+  /** Resumida aberta: todo mundo que monta a escala de um setor do núcleo vê a seção de
+   * setores participantes (não só o chefe do núcleo). */
+  readonly podeGerenciarOutrosSetoresDoNucleo = computed(() => !!this.nucleoIdDoSetor());
 
   /** Chefe de setor numa resumida de núcleo: não escolhe os setores participantes, mas pode
    * incluir o grupo "Agentes" (servidores lotados direto no núcleo). Quem chefia o núcleo já vê
@@ -1119,7 +1116,7 @@ export class EscalaForm implements OnInit {
             // Precisa estar marcado pra `resumidaAtiva()` ficar true — senão a aba "Escala
             // Resumida" nem aparece na barra do stepper, mesmo com o passo aberto.
             this.step1Form.controls.usarEscalaResumida.setValue(true);
-            this.resumidaEscala.set(e);
+            this.usarResumida(e);
             this.resumidaHandled.set(true);
             this.setStep('resumida');
           },
@@ -1442,7 +1439,7 @@ export class EscalaForm implements OnInit {
               this.substituirResumidaSolta(detalhe.id, origem.id);
               return;
             }
-            this.resumidaEscala.set(detalhe);
+            this.usarResumida(detalhe);
             this.manterResumidaNoWizard();
           },
           error: () => this.resumidaWorking.set(false),
@@ -1487,7 +1484,7 @@ export class EscalaForm implements OnInit {
         this.resumidaWorking.set(false);
         this.resumidaApi.get(soltaId).subscribe({
           next: (e) => {
-            this.resumidaEscala.set(e);
+            this.usarResumida(e);
             this.manterResumidaNoWizard();
           },
         });
@@ -1500,7 +1497,7 @@ export class EscalaForm implements OnInit {
     this.resumidaWorking.set(true);
     this.resumidaApi.copiar(origemId, { ano: Number(v.ano), mes: Number(v.mes) }).subscribe({
       next: (escala) => {
-        this.resumidaEscala.set(escala);
+        this.usarResumida(escala);
         this.manterResumidaNoWizard();
         this.resumidaCriadaNestaSessao.set(true);
         this.resumidaWorking.set(false);
@@ -1532,7 +1529,7 @@ export class EscalaForm implements OnInit {
     this.resumidaWorking.set(true);
     this.resumidaApi.create({ ...container, ano: Number(v.ano), mes: Number(v.mes) }).subscribe({
       next: (escala) => {
-        this.resumidaEscala.set(escala);
+        this.usarResumida(escala);
         this.manterResumidaNoWizard();
         this.resumidaCriadaNestaSessao.set(true);
         this.resumidaWorking.set(false);
@@ -1552,6 +1549,37 @@ export class EscalaForm implements OnInit {
 
   voltarResumida(): void {
     this.voltarStep('servidores');
+  }
+
+  /** Põe a resumida no passo do wizard, antes incluindo nela o grupo do setor desta escala
+   * quando ainda não existe. A resumida de núcleo é uma só por mês, compartilhada pelos setores:
+   * se outro setor (ou o chefe do núcleo) a criou primeiro, o grupo deste setor não estava lá e
+   * não havia como incluí-lo — foi o que travou o SELMA. O painel lê a resumida uma vez só ao
+   * abrir, por isso a inclusão vem antes de exibir. */
+  private usarResumida(escala: EscalaResumidaDetail): void {
+    const setorId = this.setorIdValue();
+    const faltaOSetor =
+      !!escala.nucleoId &&
+      !!setorId &&
+      !this.isNucleoOption(setorId) &&
+      !escala.setores.some((s) => s.setorId === setorId);
+    if (!faltaOSetor) {
+      this.resumidaEscala.set(escala);
+      return;
+    }
+
+    this.resumidaWorking.set(true);
+    this.resumidaApi.incluirSetor(escala.id, setorId).subscribe({
+      next: (atualizada) => {
+        this.resumidaWorking.set(false);
+        this.resumidaEscala.set(atualizada);
+      },
+      error: (err: unknown) => {
+        this.resumidaWorking.set(false);
+        this.resumidaEscala.set(escala);
+        this.error.set(httpErrorMessage(err, 'Não foi possível incluir o setor na escala resumida.'));
+      },
+    });
   }
 
   /** A escala resumida em uso mantém o checkbox do passo 1 marcado — é ele que sustenta

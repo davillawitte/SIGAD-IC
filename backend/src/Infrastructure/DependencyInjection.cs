@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IEscalaCsvService, EscalaCsvService>();
         services.AddScoped<IEscalaResumidaService, EscalaResumidaService>();
         services.AddScoped<IEscalaResumidaPdfService, EscalaResumidaPdfService>();
+        services.AddScoped<IEscalaLoteExportService, EscalaLoteExportService>();
         services.AddScoped<IAfastamentoService, AfastamentoService>();
         services.AddScoped<IPermutaService, PermutaService>();
         services.AddScoped<ICalendarioService, CalendarioService>();

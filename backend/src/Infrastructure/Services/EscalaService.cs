@@ -88,6 +88,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 x.SetorId,
                 SetorNome = x.Setor != null ? x.Setor.Nome : null,
                 SetorSigla = x.Setor != null ? x.Setor.Sigla : null,
+                SetorNucleoId = x.Setor != null ? x.Setor.NucleoId : null,
                 x.NucleoId,
                 NucleoNome = x.Nucleo != null ? x.Nucleo.Nome : null,
                 NucleoSigla = x.Nucleo != null ? x.Nucleo.Sigla : null,
@@ -117,6 +118,40 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
             .Select(r => new { r.EscalaId, r.Id })
             .ToDictionaryAsync(r => r.EscalaId!.Value, r => (Guid?)r.Id, cancellationToken);
 
+        // A resumida de núcleo é uma só por mês, compartilhada pelos setores do núcleo — só a
+        // primeira escala fica "vinculada" a ela. As demais (e o chefe do núcleo, que vê as escalas
+        // dos setores) chegam nela pelo núcleo + período; setor sem núcleo, pelo próprio setor.
+        var nucleosDaPagina = pageItems
+            .Select(x => x.NucleoId ?? x.SetorNucleoId)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToList();
+        var setoresDaPagina = pageItems
+            .Where(x => x.SetorId.HasValue && !x.SetorNucleoId.HasValue)
+            .Select(x => x.SetorId!.Value)
+            .Distinct()
+            .ToList();
+        var resumidasDoPeriodo = await db.EscalasResumidas
+            .AsNoTracking()
+            .Where(r => (r.NucleoId != null && nucleosDaPagina.Contains(r.NucleoId.Value))
+                        || (r.SetorId != null && setoresDaPagina.Contains(r.SetorId.Value)))
+            .Select(r => new { r.Id, r.NucleoId, r.SetorId, r.Ano, r.Mes })
+            .ToListAsync(cancellationToken);
+
+        Guid? ResumidaDa(Guid escalaId, Guid? setorId, Guid? nucleoId, int ano, int mes)
+        {
+            if (resumidaIdByEscalaId.TryGetValue(escalaId, out var vinculada) && vinculada is not null)
+            {
+                return vinculada;
+            }
+
+            return resumidasDoPeriodo
+                .FirstOrDefault(r => r.Ano == ano && r.Mes == mes
+                                     && (nucleoId.HasValue ? r.NucleoId == nucleoId : r.SetorId == setorId))
+                ?.Id;
+        }
+
         var items = pageItems.Select(x =>
         {
             var inicio = new DateOnly(x.Ano, x.Mes, 1);
@@ -141,7 +176,7 @@ public class EscalaService(ApplicationDbContext db) : IEscalaService
                 x.PublicadaPor,
                 x.CreatedAt,
                 responsavelNome,
-                resumidaIdByEscalaId.GetValueOrDefault(x.Id));
+                ResumidaDa(x.Id, x.SetorId, x.NucleoId ?? x.SetorNucleoId, x.Ano, x.Mes));
         }).ToList();
 
         return PagedResult<EscalaListItemDto>.Create(items, normalized.Page, normalized.PageSize, totalItems);

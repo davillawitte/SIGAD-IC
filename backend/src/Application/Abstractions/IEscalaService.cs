@@ -49,6 +49,19 @@ public interface IEscalaPdfService
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Download em lote das escalas de uma consulta da lista (todas as páginas), em .zip.</summary>
+public interface IEscalaLoteExportService
+{
+    /// <param name="formato"><c>pdf</c> ou <c>excel</c>.</param>
+    /// <param name="tipo">PDF: <c>definitiva</c> ou <c>resumida</c>; Excel: <c>resumida</c>.</param>
+    Task<Result<(byte[] Content, string FileName)>> GerarAsync(
+        EscalaListQuery query,
+        string formato,
+        string tipo,
+        string actorLogin,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IEscalaCsvService
 {
     Task<Result<(byte[] Content, string FileName)>> GenerateResumidoAsync(
