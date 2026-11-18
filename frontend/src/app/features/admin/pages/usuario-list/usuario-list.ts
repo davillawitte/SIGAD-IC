@@ -5,6 +5,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
   PciAlertComponent,
   PciColumn,
+  PciFeedbackModalService,
   PciFilterField,
   PciFilterValues,
   PciListPageComponent,
@@ -43,13 +44,13 @@ export class UsuarioList implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  private readonly feedback = inject(PciFeedbackModalService);
 
   readonly routePages = ADMIN_ROUTE_PAGES;
   readonly page = signal(1);
   readonly pageSize = signal<PageSizeOption>(DEFAULT_PAGE_SIZE);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly successMessage = signal<string | null>(null);
   readonly allRows = signal<UsuarioRow[]>([]);
   readonly filterValues = signal<PciFilterValues>({});
   readonly filtersExpanded = signal(true);
@@ -177,7 +178,7 @@ export class UsuarioList implements OnInit {
   private resetSenha(row: UsuarioRow): void {
     openConfirmDialog(this.dialog, {
       title: 'Resetar senha',
-      message: `Resetar a senha de ${row.nomeServidor}?`,
+      message: `Resetar a senha de ${row.nomeServidor}? A senha volta a ser o CPF do servidor e ele deverá criar uma nova no próximo acesso.`,
       confirmLabel: 'Resetar',
       danger: true,
     })
@@ -185,13 +186,12 @@ export class UsuarioList implements OnInit {
       .subscribe(() => {
         this.loading.set(true);
         this.error.set(null);
-        this.successMessage.set(null);
         this.api.resetUsuarioSenha(row.id).subscribe({
           next: (result) => {
-            this.successMessage.set(
-              `Senha resetada para ${result.nomeServidor}. Nova senha temporária: ${result.senhaTemporaria}`,
-            );
             this.loading.set(false);
+            this.feedback.showSuccess(
+              `Senha de ${result.nomeServidor} resetada: agora é o CPF do servidor (somente números). No próximo acesso ele deverá criar uma nova senha.`,
+            );
           },
           error: (err: { error?: { message?: string } }) => {
             this.error.set(err.error?.message ?? 'Não foi possível resetar a senha.');

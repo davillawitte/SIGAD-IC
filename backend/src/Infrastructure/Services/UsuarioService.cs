@@ -204,7 +204,11 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             return Result<ResetSenhaResultDto>.Failure("Usuário não encontrado.");
         }
 
-        var senhaTemporaria = SenhaTemporaria.Gerar();
+        // Igual ao primeiro acesso (ver CreateAsync): a senha volta a ser o CPF do servidor e a
+        // troca é obrigatória no próximo login. Antes o reset gerava uma senha aleatória mostrada
+        // só uma vez na tela de quem resetou — o servidor tentava o CPF e caía em "Usuário ou
+        // senha inválidos". Servidor sem CPF válido usa o login (que nasce do CPF).
+        var senhaTemporaria = SenhaInicialDoUsuario(usuario);
         usuario.AlterarSenha(passwordHasher.Hash(senhaTemporaria), exigirTrocaNoProximoLogin: true, actorLogin);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -214,6 +218,9 @@ public class UsuarioService(ApplicationDbContext db, IPasswordHasherService pass
             usuario.Servidor.Nome,
             senhaTemporaria));
     }
+
+    private static string SenhaInicialDoUsuario(Usuario usuario) =>
+        usuario.Servidor.Cpf is { Length: 11 } cpf ? cpf : usuario.Login;
 
     private async Task<Usuario?> LoadAsync(Guid id, CancellationToken cancellationToken) =>
         await db.Usuarios

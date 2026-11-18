@@ -2,10 +2,6 @@
   <pci-alert variant="error" title="Erro" [message]="error()!" />
 }
 
-@if (successMessage()) {
-  <pci-alert variant="success" title="Senha resetada" [message]="successMessage()!" />
-}
-
 <pci-list-page
   title="Usuários"
   description="Gerencie contas de acesso vinculadas a servidores."
