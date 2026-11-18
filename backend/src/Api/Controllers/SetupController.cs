@@ -20,7 +20,10 @@ public class SetupController(
     ISetupService setupService,
     IValidator<CompleteSetupRequest> completeValidator) : ControllerBase
 {
+    /// <summary>Consultado a cada abertura da tela de login — fica fora do limite de tentativas,
+    /// senão cada visita ao login gastava a cota de quem ia entrar.</summary>
     [HttpGet("status")]
+    [DisableRateLimiting]
     public async Task<IActionResult> Status(CancellationToken cancellationToken)
     {
         var status = await setupService.GetStatusAsync(cancellationToken);

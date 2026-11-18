@@ -50,6 +50,15 @@ try
             options.KnownProxies.Clear();
         }
 
+        // Em produção há DOIS proxies (nginx de borda → nginx do frontend → API). Com o padrão
+        // (1), a API só lia o último salto e via o IP do nginx de borda para todo mundo: o
+        // instituto inteiro dividia o mesmo limite de tentativas de login.
+        var forwardLimit = builder.Configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit");
+        if (forwardLimit is > 0)
+        {
+            options.ForwardLimit = forwardLimit;
+        }
+
         foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
         {
             if (IPAddress.TryParse(proxy, out var ip))
@@ -128,11 +137,22 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        // Mensagem própria: sem corpo, a tela de login mostrava "Usuário ou senha inválidos"
+        // também para o bloqueio por excesso de tentativas — parecia senha errada.
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.HttpContext.Response.WriteAsJsonAsync(
+                new { message = "Muitas tentativas seguidas. Aguarde 1 minuto e tente novamente." },
+                cancellationToken);
+        };
+        // Por IP do cliente (ver ForwardLimit acima). Usuários na VPN podem sair pelo mesmo IP,
+        // por isso o limite é de 20 por minuto — ainda trava tentativa em massa de senhas.
         options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = 20,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));

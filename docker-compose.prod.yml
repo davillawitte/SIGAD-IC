@@ -66,6 +66,8 @@ services:
       AllowedHosts: ${ALLOWED_HOSTS:-10.9.233.98;localhost;127.0.0.1}
       ForwardedHeaders__ClearKnownNetworks: "true"
       ForwardedHeaders__ClearKnownProxies: "true"
+      # Dois saltos: nginx de borda → nginx do frontend → API.
+      ForwardedHeaders__ForwardLimit: "2"
     depends_on:
       postgres:
         condition: service_healthy

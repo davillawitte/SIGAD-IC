@@ -17,7 +17,11 @@ public class AuthService(
     {
         var login = SenhaTemporaria.NormalizeLoginCpf(request.Login);
 
-        var usuario = await LoadUsuarioComPerfisAsync(login, cancellationToken);
+        var usuario = await LoadUsuarioComPerfisAsync(login, cancellationToken)
+            // O login nasce do CPF do servidor, mas o CPF pode ter sido corrigido depois no cadastro
+            // do servidor: quem digita o CPF atual (e é o que aparece na tela de Usuários e vira a
+            // senha no reset) também entra.
+            ?? await LoadUsuarioPeloCpfDoServidorAsync(login, cancellationToken);
         if (usuario is null || !passwordHasher.Verify(usuario.SenhaHash, request.Senha))
         {
             return Result<LoginResponse>.Failure("Usuário ou senha inválidos.");
@@ -111,6 +115,22 @@ public class AuthService(
                     .ThenInclude(x => x.PerfilPermissoes)
                         .ThenInclude(x => x.Permissao)
             .FirstOrDefaultAsync(x => x.Login == login, cancellationToken);
+
+    private async Task<Domain.Entities.Usuario?> LoadUsuarioPeloCpfDoServidorAsync(
+        string cpf,
+        CancellationToken cancellationToken)
+    {
+        if (cpf.Length != 11 || !cpf.All(char.IsDigit))
+        {
+            return null;
+        }
+
+        var login = await db.Usuarios
+            .Where(x => x.Servidor.Cpf == cpf)
+            .Select(x => x.Login)
+            .FirstOrDefaultAsync(cancellationToken);
+        return login is null ? null : await LoadUsuarioComPerfisAsync(login, cancellationToken);
+    }
 
     private async Task<LoginResponse?> BuildLoginResponseAsync(
         Domain.Entities.Usuario usuario,

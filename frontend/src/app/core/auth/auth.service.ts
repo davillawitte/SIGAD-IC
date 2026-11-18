@@ -13,6 +13,23 @@ import {
 
 const SESSION_KEY = 'sigad-ic.auth.session';
 
+/** Mensagem do login a partir da resposta da API. Só 401/400 com a mensagem da API é senha
+ * errada; bloqueio por excesso de tentativas (429/503) e erro de servidor têm mensagem própria —
+ * antes tudo virava "Usuário ou senha inválidos" e parecia senha errada. */
+export function loginErrorMessage(error: {
+  error?: { message?: string; errors?: string[] } | null;
+  status?: number;
+}): string {
+  if (error?.status === 0) return 'Não foi possível conectar à API.';
+  if (error?.status === 429 || error?.status === 503) {
+    return error?.error?.message ?? 'Muitas tentativas seguidas. Aguarde 1 minuto e tente novamente.';
+  }
+  const message = error?.error?.message ?? error?.error?.errors?.[0];
+  if (message) return message;
+  if ((error?.status ?? 0) >= 500) return 'Erro no servidor. Tente novamente em instantes.';
+  return 'Usuário ou senha inválidos.';
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -36,14 +53,9 @@ export class AuthService {
       .pipe(
         tap((response) => this.persistSession(response)),
         map(() => ({ ok: true as const })),
-        catchError((error: { error?: { message?: string }; status?: number }) => {
-          const message =
-            error?.error?.message ??
-            (error?.status === 0
-              ? 'Não foi possível conectar à API.'
-              : 'Usuário ou senha inválidos.');
-          return of({ ok: false as const, message });
-        }),
+        catchError((error: { error?: { message?: string; errors?: string[] }; status?: number }) =>
+          of({ ok: false as const, message: loginErrorMessage(error) }),
+        ),
       );
   }
 

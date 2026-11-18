@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using TemplateSistema.Application.Auth;
@@ -72,6 +73,37 @@ public class UsuarioResetSenhaTests(PostgresFixture fixture) : IntegrationTestBa
             var login = await auth.LoginAsync(new LoginRequest(ctx.Cpf, ctx.Cpf));
             login.Error.ShouldBeNull();
             login.Value!.Usuario.DeveAlterarSenha.ShouldBeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task Cpf_corrigido_depois_de_criar_o_usuario_tambem_entra_apos_o_reset()
+    {
+        var ctx = await PrepararAsync();
+        const string cpfCorrigido = "09678916479";
+
+        Guid usuarioId;
+        await using (var db = NewContext())
+        {
+            usuarioId = (await new UsuarioService(db, new PasswordHasherService()).CreateAsync(
+                new CreateUsuarioRequest(ctx.ServidorId, [CatalogSeed.PerfilServidorId]), Admin)).Value!.Id;
+        }
+
+        // CPF do servidor corrigido no cadastro depois: o login continua o CPF antigo.
+        await using (var db = NewContext())
+        {
+            await db.Servidores
+                .Where(x => x.Id == ctx.ServidorId)
+                .ExecuteUpdateAsync(x => x.SetProperty(s => s.Cpf, cpfCorrigido));
+            (await new UsuarioService(db, new PasswordHasherService()).ResetPasswordAsync(usuarioId, Admin))
+                .Error.ShouldBeNull();
+        }
+
+        await using (var db = NewContext())
+        {
+            var login = await Auth(db).LoginAsync(new LoginRequest(cpfCorrigido, cpfCorrigido));
+            login.Error.ShouldBeNull();
+            login.Value!.Usuario.Login.ShouldBe(ctx.Cpf);
         }
     }
 }

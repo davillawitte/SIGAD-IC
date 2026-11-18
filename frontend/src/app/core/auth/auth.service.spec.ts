@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AuthService } from './auth.service';
+import { AuthService, loginErrorMessage } from './auth.service';
 
 const SESSION_KEY = 'sigad-ic.auth.session';
 
@@ -59,5 +59,31 @@ describe('AuthService — sessão restaurada', () => {
 
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.deveAlterarSenha()).toBe(false);
+  });
+});
+
+describe('loginErrorMessage', () => {
+  it('senha errada (401 com mensagem da API) mostra a mensagem da API', () => {
+    expect(loginErrorMessage({ status: 401, error: { message: 'Usuário ou senha inválidos.' } })).toBe(
+      'Usuário ou senha inválidos.',
+    );
+  });
+
+  it('bloqueio por excesso de tentativas não é confundido com senha errada', () => {
+    expect(loginErrorMessage({ status: 429, error: null })).toBe(
+      'Muitas tentativas seguidas. Aguarde 1 minuto e tente novamente.',
+    );
+    // nginx de borda antigo devolvia 503 com página HTML
+    expect(loginErrorMessage({ status: 503, error: null })).toBe(
+      'Muitas tentativas seguidas. Aguarde 1 minuto e tente novamente.',
+    );
+  });
+
+  it('erro de servidor e erro de validação têm mensagem própria', () => {
+    expect(loginErrorMessage({ status: 500, error: null })).toBe('Erro no servidor. Tente novamente em instantes.');
+    expect(loginErrorMessage({ status: 400, error: { errors: ['Login é obrigatório.'] } })).toBe(
+      'Login é obrigatório.',
+    );
+    expect(loginErrorMessage({ status: 0 })).toBe('Não foi possível conectar à API.');
   });
 });
