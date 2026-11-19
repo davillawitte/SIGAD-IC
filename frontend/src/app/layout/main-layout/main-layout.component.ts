@@ -84,19 +84,19 @@ export class MainLayoutComponent {
       ],
     });
 
+    // Cada tela aparece só para quem tem a permissão dela: antes bastava QUALQUER visão
+    // institucional (ex.: listar servidores/setores do instituto, como o Super Administrador) para
+    // ver "Escalas" e "Afastamentos" aqui, e a rota barrava o acesso — a aba parecia não abrir.
     const gestaoInstitucional = [
+      ...(this.auth.hasVisaoGlobal('escalas') ||
+      (this.auth.hasPermission('escalas.devolver') && this.auth.hasPermission('escalas.listar'))
+        ? [{ id: 'escalas-institucionais', label: 'Escalas', icon: 'clock' as const }]
+        : []),
+      ...(this.auth.hasVisaoGlobal('afastamentos')
+        ? [{ id: 'afastamentos-institucionais', label: 'Afastamentos', icon: 'user-x' as const }]
+        : []),
       ...(this.auth.hasGestaoInstitucional()
         ? [
-            {
-              id: 'escalas-institucionais',
-              label: 'Escalas',
-              icon: 'clock' as const,
-            },
-            {
-              id: 'afastamentos-institucionais',
-              label: 'Afastamentos',
-              icon: 'user-x' as const,
-            },
             {
               id: 'diarias-operacionais-institucionais',
               label: 'Diárias Operacionais',

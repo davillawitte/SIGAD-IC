@@ -118,10 +118,18 @@ export class AfastamentoList implements OnInit {
       }),
   );
 
+  /** Filtro por setor/núcleo: opções com as lotações presentes na lista, em ordem alfabética. */
+  private readonly setorOptions = computed(() =>
+    [...new Set(this.allRows().map((r) => r.setor).filter((s) => s && s !== '—'))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map((setor) => ({ label: setor, value: setor })),
+  );
+
   readonly filterFields = computed<PciFilterField[]>(() => [
     ...(this.isInstitucional()
       ? [{ key: 'mes', label: 'Mês', type: 'select' as const, options: this.mesOptions() }]
       : []),
+    { key: 'setor', label: 'Setor', type: 'select' as const, options: this.setorOptions() },
     ...this.camposDeColuna,
   ]);
 
@@ -190,7 +198,10 @@ export class AfastamentoList implements OnInit {
   readonly filteredRows = computed(() => {
     const mes = this.filterValues()['mes'];
     const doMes = mes ? this.allRows().filter((r) => r.meses.includes(mes)) : this.allRows();
-    const byPanel = filterRowsByPanelValues(doMes, this.filterValues(), this.camposDeColuna);
+    // Setor por igualdade exata (como o mês): "NB" não pode casar com outro setor que contenha "NB".
+    const setor = this.filterValues()['setor'];
+    const doSetor = setor ? doMes.filter((r) => r.setor === setor) : doMes;
+    const byPanel = filterRowsByPanelValues(doSetor, this.filterValues(), this.camposDeColuna);
     const searched = filterTableRowsByQuickSearch(byPanel, this.columns, this.searchTerm());
     const sort = this.sort();
     return sort ? sortTableRows(searched, sort, this.columns) : searched;

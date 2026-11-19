@@ -30,7 +30,7 @@ export const AFASTAMENTOS_ROUTES: Routes = [
   },
   {
     path: 'afastamentos-institucionais',
-    canActivate: [permissionGuard('afastamentos.listar')],
+    canActivate: [visaoGlobalGuard('afastamentos')],
     data: { navId: 'afastamentos-institucionais', escopo: 'institucional' },
     children: [
       {

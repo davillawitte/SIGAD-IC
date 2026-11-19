@@ -108,6 +108,10 @@ export class EscalaResumidaManager implements OnInit {
     pool: ReadonlySet<string>;
     selecionados: ReadonlySet<string>;
   } | null>(null);
+  /** Escala de um setor: a resumida (compartilhada pelo núcleo) mostra só o grupo desse setor e
+   * o de Agentes — o SCCV não vê o SELMA. Nulo (escala do núcleo) mostra todos. O PDF exportado
+   * continua com o núcleo inteiro. */
+  readonly setorFoco = input<string | null>(null);
   readonly escalaChange = output<EscalaResumidaDetail>();
 
   readonly working = signal(false);
@@ -120,12 +124,22 @@ export class EscalaResumidaManager implements OnInit {
   /** Índice da aba de setor ativa em "Equipes e rodízios" — uma aba por setor participante,
    * pra não empilhar as equipes de todos os setores na tela ao mesmo tempo. */
   readonly setorTabIndex = signal(0);
+  readonly setoresVisiveis = computed<EscalaResumidaSetor[]>(() => {
+    const setores = this.escala()?.setores ?? [];
+    const foco = this.setorFoco();
+    return foco ? setores.filter((s) => s.setorId === foco || s.setorId === null) : setores;
+  });
+  /** Mesma resumida, só com os grupos visíveis — é o que a grade mostra. */
+  readonly escalaVisivel = computed<EscalaResumidaDetail | null>(() => {
+    const e = this.escala();
+    return e ? { ...e, setores: this.setoresVisiveis() } : null;
+  });
   readonly clampedSetorTabIndex = computed(() => {
-    const total = this.escala()?.setores.length ?? 0;
+    const total = this.setoresVisiveis().length;
     return total === 0 ? 0 : Math.min(this.setorTabIndex(), total - 1);
   });
   readonly activeSetor = computed<EscalaResumidaSetor | null>(
-    () => this.escala()?.setores[this.clampedSetorTabIndex()] ?? null,
+    () => this.setoresVisiveis()[this.clampedSetorTabIndex()] ?? null,
   );
 
   onSetorTabChange(index: number): void {

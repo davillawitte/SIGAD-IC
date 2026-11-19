@@ -333,9 +333,7 @@
         {{
           escalaDeNucleo()
             ? 'Planeje as equipes e o rodízio dos setores do núcleo antes de continuar — os dados já entram sugeridos no passo seguinte.'
-            : podeGerenciarOutrosSetoresDoNucleo()
-              ? 'Você também gerencia o núcleo deste setor — pode incluir os demais setores do núcleo nesta mesma escala resumida antes de continuar.'
-              : 'Defina as equipes e o rodízio deste setor antes de continuar — os dados já entram sugeridos no passo seguinte.'
+            : 'Defina as equipes e o rodízio deste setor antes de continuar — os dados já entram sugeridos no passo seguinte.'
         }}
       </p>
       <div class="pci-form-group">
@@ -385,6 +383,7 @@
               [podeGerenciarSetores]="podeGerenciarOutrosSetoresDoNucleo()"
               [podeGerenciarAgentes]="podeIncluirAgentesNaResumida()"
               [restricaoServidores]="restricaoServidoresResumida()"
+              [setorFoco]="setorFocoResumida()"
               (escalaChange)="onResumidaChange($event)"
             />
           </div>
@@ -427,6 +426,7 @@
                       <th>Servidor</th>
                       <th>Período</th>
                       <th>Tipo</th>
+                      <th>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -435,6 +435,21 @@
                         <td>{{ a.servidorNome }}</td>
                         <td>{{ fmt(a.dataInicio) }} – {{ fmt(a.dataFim) }}</td>
                         <td>{{ a.tipoOcorrenciaNome }}</td>
+                        <td>
+                          <pci-stack gap="1" direction="horizontal">
+                            <pci-icon-button
+                              icon="edit"
+                              ariaLabel="Editar afastamento"
+                              (clicked)="editarAfastamento(a)"
+                            />
+                            <pci-icon-button
+                              icon="trash"
+                              tone="danger"
+                              ariaLabel="Excluir afastamento"
+                              (clicked)="excluirAfastamento(a)"
+                            />
+                          </pci-stack>
+                        </td>
                       </tr>
                     }
                   </tbody>

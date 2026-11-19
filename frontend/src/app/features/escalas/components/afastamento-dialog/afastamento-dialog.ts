@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import {
@@ -15,6 +15,7 @@ import type { PciSelectOption } from '@davillawitte/pci-design-system';
 
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
 import { AppDialogHeaderComponent } from '../../../../shared/dialogs/dialog-header/dialog-header';
+import { ligarPeriodoPorDias } from '../../../../shared/periodo-dias';
 import {
   AfastamentoItem,
   AfastamentosApiService,
@@ -25,6 +26,8 @@ export interface AfastamentoDialogData {
   defaultServidorId?: string;
   dataInicioPadrao?: string;
   dataFimPadrao?: string;
+  /** Afastamento já cadastrado: abre em modo edição (servidor travado). */
+  afastamento?: AfastamentoItem;
 }
 
 @Component({
@@ -46,7 +49,7 @@ export interface AfastamentoDialogData {
   ],
   templateUrl: './afastamento-dialog.html',
 })
-export class AfastamentoDialog implements OnInit {
+export class AfastamentoDialog implements OnInit, OnDestroy {
   private readonly api = inject(AfastamentosApiService);
   private readonly fb = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<AfastamentoDialog, AfastamentoItem | false>);
@@ -55,6 +58,8 @@ export class AfastamentoDialog implements OnInit {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly created = signal<AfastamentoItem | null>(null);
+  readonly isEdit = !!this.data.afastamento;
+  private desligarPeriodo?: () => void;
 
   readonly tipoOptions: PciSelectOption[] = [
     { label: 'FR — Férias', value: 'FR' },
@@ -67,21 +72,41 @@ export class AfastamentoDialog implements OnInit {
     servidorId: ['', Validators.required],
     dataInicio: ['', Validators.required],
     dataFim: ['', Validators.required],
+    quantidadeDias: [''],
     tipoOcorrenciaCodigo: ['FR', Validators.required],
     sei: ['', Validators.required],
     observacao: [''],
   });
 
   ngOnInit(): void {
-    if (this.data.defaultServidorId) {
-      this.form.controls.servidorId.setValue(this.data.defaultServidorId);
+    const existente = this.data.afastamento;
+    if (existente) {
+      this.form.patchValue({
+        servidorId: existente.servidorId,
+        dataInicio: existente.dataInicio.slice(0, 10),
+        dataFim: existente.dataFim.slice(0, 10),
+        tipoOcorrenciaCodigo: existente.tipoOcorrenciaCodigo,
+        sei: existente.sei ?? '',
+        observacao: existente.observacao ?? '',
+      });
+      this.form.controls.servidorId.disable();
+    } else {
+      if (this.data.defaultServidorId) {
+        this.form.controls.servidorId.setValue(this.data.defaultServidorId);
+      }
+      if (this.data.dataInicioPadrao) {
+        this.form.controls.dataInicio.setValue(this.data.dataInicioPadrao.slice(0, 10));
+      }
+      if (this.data.dataFimPadrao) {
+        this.form.controls.dataFim.setValue(this.data.dataFimPadrao.slice(0, 10));
+      }
     }
-    if (this.data.dataInicioPadrao) {
-      this.form.controls.dataInicio.setValue(this.data.dataInicioPadrao.slice(0, 10));
-    }
-    if (this.data.dataFimPadrao) {
-      this.form.controls.dataFim.setValue(this.data.dataFimPadrao.slice(0, 10));
-    }
+    const c = this.form.controls;
+    this.desligarPeriodo = ligarPeriodoPorDias(c.dataInicio, c.quantidadeDias, c.dataFim);
+  }
+
+  ngOnDestroy(): void {
+    this.desligarPeriodo?.();
   }
 
   save(): void {
@@ -106,15 +131,18 @@ export class AfastamentoDialog implements OnInit {
 
     this.saving.set(true);
     this.error.set(null);
-    this.api
-      .create({
-        servidorId: value.servidorId,
-        dataInicio: inicio,
-        dataFim: fim,
-        tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
-        observacao: value.observacao.trim() || null,
-        sei: value.sei.trim() || null,
-      })
+    const dados = {
+      dataInicio: inicio,
+      dataFim: fim,
+      tipoOcorrenciaCodigo: value.tipoOcorrenciaCodigo,
+      observacao: value.observacao.trim() || null,
+      sei: value.sei.trim() || null,
+    };
+    const existente = this.data.afastamento;
+    (existente
+      ? this.api.update(existente.id, dados)
+      : this.api.create({ servidorId: value.servidorId, ...dados })
+    )
       .subscribe({
         next: (item) => {
           this.saving.set(false);

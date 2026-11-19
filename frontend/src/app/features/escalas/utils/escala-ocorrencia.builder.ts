@@ -103,6 +103,17 @@ export function buildOcorrenciasFromCicloDerivado(input: BuildOcorrenciasFromCic
   });
 }
 
+/** Ocorrências de um servidor a partir dos DIAS da escala resumida (e não só do ciclo): plantão
+ * de 24h nos dias em que ele aparece numa vaga (1ª ou 2ª função), descanso nos demais. Assim o que
+ * foi ajustado na grade da resumida — plantão retirado, DO, troca de pessoa — chega à escala
+ * completa; pelo ciclo puro, quem teve um plantão retirado continuava com 8 (192h em vez de 168h). */
+export function buildOcorrenciasFromDiasResumida(days: string[], diasDeTrabalho: ReadonlySet<string>): EscalaOcorrencia[] {
+  return days.map((d) => {
+    const day = normalizeDay(d);
+    return diasDeTrabalho.has(day) ? oc(day, 'PT', 24) : oc(day, 'D');
+  });
+}
+
 /**
  * Gera a grade de ocorrências do formulário de escala (ex-wizard).
  * Congela o comportamento atual — inclusive EXP_ADM emitindo `D` no fim de semana,

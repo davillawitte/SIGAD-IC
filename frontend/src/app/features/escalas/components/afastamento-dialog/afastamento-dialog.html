@@ -1,12 +1,20 @@
 <div class="pci-app-dialog">
-  <app-dialog-header icon="calendar" title="Adicionar afastamento" (closed)="close()" />
+  <app-dialog-header
+    icon="calendar"
+    [title]="isEdit ? 'Editar afastamento' : 'Adicionar afastamento'"
+    (closed)="close()"
+  />
 
   @if (error()) {
     <pci-alert variant="error" title="Erro" [message]="error()!" />
   }
 
   @if (created()) {
-    <pci-alert variant="success" title="Afastamento cadastrado" message="Afastamento salvo com sucesso." />
+    <pci-alert
+      variant="success"
+      [title]="isEdit ? 'Afastamento atualizado' : 'Afastamento cadastrado'"
+      [message]="isEdit ? 'Afastamento atualizado com sucesso.' : 'Afastamento salvo com sucesso.'"
+    />
 
     <pci-form-actions>
       <pci-button variant="primary" (clicked)="concluir()">
@@ -28,14 +36,22 @@
         />
 
         <pci-input
-          [appFormCol]="6"
+          [appFormCol]="4"
           label="Data início"
           type="date"
           formControlName="dataInicio"
           [required]="true"
         />
         <pci-input
-          [appFormCol]="6"
+          [appFormCol]="4"
+          label="Quantidade de dias"
+          type="number"
+          formControlName="quantidadeDias"
+          placeholder="Ex.: 15"
+          hint="Calcula a data fim"
+        />
+        <pci-input
+          [appFormCol]="4"
           label="Data fim"
           type="date"
           formControlName="dataFim"

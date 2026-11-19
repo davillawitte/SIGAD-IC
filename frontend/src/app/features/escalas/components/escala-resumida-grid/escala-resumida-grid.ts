@@ -246,18 +246,25 @@ export class EscalaResumidaGrid {
     return dia.servidorId2 ?? '';
   }
 
-  /** Troca da pessoa principal: mantém o reforço (segunda pessoa) como está — só o rótulo no
-   * PDF/visão final é que recombina os dois nomes. */
+  /** Troca da pessoa principal: mantém a 2ª função como está — só o rótulo no PDF/visão final
+   * recombina os dois nomes. Exceção: marcar DO abre a vaga INTEIRA (a 2ª função sai junto, e o
+   * dia fica só "DO"); antes a 2ª pessoa continuava gravada ("DO + Fulano") e a linha dela sumia
+   * da tela, sem como removê-la. Quem quiser "DO + FOTÓGRAFO" adiciona a 2ª função de novo. */
   private emitPrincipalChange(equipe: EscalaResumidaEquipe, day: string, value: string): void {
     if (!this.editable()) return;
     const dia = equipe.dias.find((x) => x.data.slice(0, 10) === day);
+    const vagaEmAberto = value === DO_VALUE;
+    if (vagaEmAberto) {
+      this.segundaPessoaAberta.delete(this.cellKey(equipe, day));
+      this.cellControls2.delete(this.cellKey(equipe, day));
+    }
     this.cellSave.emit({
       equipeId: equipe.id,
       data: day,
-      servidorId: value === DO_VALUE || !value ? null : value,
-      isFolga: value === DO_VALUE,
-      servidorId2: dia?.servidorId2 ?? null,
-      isFolga2: dia?.isFolga2 ?? false,
+      servidorId: vagaEmAberto || !value ? null : value,
+      isFolga: vagaEmAberto,
+      servidorId2: vagaEmAberto ? null : (dia?.servidorId2 ?? null),
+      isFolga2: vagaEmAberto ? false : (dia?.isFolga2 ?? false),
     });
   }
 

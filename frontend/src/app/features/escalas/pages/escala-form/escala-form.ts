@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -26,7 +26,7 @@ import {
 } from '@davillawitte/pci-design-system';
 import type { PciSelectOption } from '@davillawitte/pci-design-system';
 import { Observable, forkJoin, merge, of } from 'rxjs';
-import { catchError, debounceTime, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, debounceTime, filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { AuthService } from '../../../../core/auth/auth.service';
 import { AdminApiService } from '../../../admin/services/admin-api.service';
@@ -69,6 +69,7 @@ import {
 import {
   buildOcorrenciasForServidor,
   buildOcorrenciasFromCicloDerivado,
+  buildOcorrenciasFromDiasResumida,
   normalizeDay,
   primeiraDataParaPosicao,
   type RegimeCodigo,
@@ -285,9 +286,18 @@ export class EscalaForm implements OnInit {
     return this.auth.canAccessEscala('escalas.criar', setorId, null);
   });
 
-  /** Resumida aberta: todo mundo que monta a escala de um setor do núcleo vê a seção de
-   * setores participantes (não só o chefe do núcleo). */
-  readonly podeGerenciarOutrosSetoresDoNucleo = computed(() => !!this.nucleoIdDoSetor());
+  /** Setores participantes da resumida só se escolhem na escala do NÚCLEO — na escala de um
+   * setor a resumida mostra só aquele setor (e Agentes), ver `setorFocoResumida`. */
+  readonly podeGerenciarOutrosSetoresDoNucleo = computed(
+    () => !!this.nucleoIdDoSetor() && this.escalaDeNucleo(),
+  );
+
+  /** Setor desta escala, para a resumida mostrar só o grupo dele (e Agentes); nulo na escala de
+   * núcleo, que vê todos os setores. */
+  readonly setorFocoResumida = computed(() => {
+    const setorId = this.setorIdValue();
+    return !setorId || this.isNucleoOption(setorId) ? null : setorId;
+  });
 
   /** Chefe de setor numa resumida de núcleo: não escolhe os setores participantes, mas pode
    * incluir o grupo "Agentes" (servidores lotados direto no núcleo). Quem chefia o núcleo já vê
@@ -342,6 +352,9 @@ export class EscalaForm implements OnInit {
   readonly servidorCicloResumida = signal<Map<string, { ancora: string; tamanhoPool: number }>>(
     new Map(),
   );
+  /** Dias de plantão de cada servidor do rodízio, lidos da grade da escala resumida (inclui os
+   * ajustes feitos nela). Quando existe, prevalece sobre o ciclo na escala completa. */
+  readonly servidorDiasResumida = signal<Map<string, Set<string>>>(new Map());
 
   readonly periodoDuplicado = signal(false);
 
@@ -791,9 +804,25 @@ export class EscalaForm implements OnInit {
             this.feedback.showSuccess('Rascunho salvo com sucesso.');
           }),
           map(() => true),
+          // Falhou ao salvar: antes a navegação era cancelada calada (o erro ficava no painel do
+          // assistente, fora da vista) e o menu parecia "não clicar". Agora mostra o motivo e
+          // deixa escolher entre ficar para corrigir ou sair sem salvar.
           catchError((err: unknown) => {
-            this.fail(httpErrorMessage(err, 'Não foi possível salvar o rascunho.'));
-            return of(false);
+            const motivo = httpErrorMessage(err, 'Não foi possível salvar o rascunho.');
+            this.fail(motivo);
+            return openConfirmDialog(this.dialog, {
+              title: 'Não foi possível salvar',
+              message: `${motivo} Deseja sair mesmo assim, sem salvar?`,
+              confirmLabel: 'Sair sem salvar',
+              cancelLabel: 'Ficar e corrigir',
+              danger: true,
+            }).pipe(
+              switchMap((sair) => {
+                if (!sair) return of(false);
+                this.dirty.set(false);
+                return this.cleanupResumidaOrfa$();
+              }),
+            );
           }),
         );
       }),
@@ -1628,11 +1657,11 @@ export class EscalaForm implements OnInit {
     const setorId = this.step1Form.getRawValue().setorId;
     if (!resumida || !setorId) return;
 
-    // Escala de setor: só as equipes daquele setor. Escala de núcleo: todas as equipes de
-    // todos os setores da resumida, já que a escala cobre o núcleo inteiro.
+    // Escala de setor: as equipes daquele setor e as de Agentes (lotados no núcleo, que também
+    // entram na escala do setor). Escala de núcleo: todas, já que ela cobre o núcleo inteiro.
     const setores = this.escalaDeNucleo()
       ? resumida.setores
-      : resumida.setores.filter((s) => s.setorId === setorId);
+      : resumida.setores.filter((s) => s.setorId === setorId || s.setorId === null);
 
     const inicioEscala = normalizeDay(resumida.dataInicio);
     const poolServidores = new Set(this.servidoresSetor().map((s) => s.id));
@@ -1648,7 +1677,12 @@ export class EscalaForm implements OnInit {
         const tamanhoPool = equipe.rotacao.length;
         if (!ancoraEquipe || tamanhoPool === 0) continue;
 
-        for (const membro of equipe.rotacao) {
+        // 1ª e 2ª função da posição (Agentes: motorista + fotógrafo) seguem o mesmo ciclo.
+        const membros = equipe.rotacao.flatMap((m) => [
+          { servidorId: m.servidorId, posicao: m.posicao },
+          { servidorId: m.servidorId2, posicao: m.posicao },
+        ]);
+        for (const membro of membros) {
           if (!membro.servidorId || !poolServidores.has(membro.servidorId)) continue;
           if (!selecionados.has(membro.servidorId)) {
             foraDoPasso2.add(membro.servidorId);
@@ -1676,7 +1710,32 @@ export class EscalaForm implements OnInit {
       }
     }
 
+    // Dias de plantão de cada servidor do rodízio lidos da grade da resumida (já com os ajustes
+    // feitos nela: plantão retirado, DO, troca de pessoa) — é o que vai para a escala completa.
+    // Só para equipes cuja grade já foi gerada; senão vale o ciclo.
+    const diasPorServidor = new Map<string, Set<string>>();
+    for (const setor of setores) {
+      for (const equipe of setor.equipes) {
+        if (!equipe.dias.length) continue;
+        for (const m of equipe.rotacao) {
+          for (const id of [m.servidorId, m.servidorId2]) {
+            if (id && ciclos.has(id) && !diasPorServidor.has(id)) diasPorServidor.set(id, new Set());
+          }
+        }
+        for (const dia of equipe.dias) {
+          const data = normalizeDay(dia.data);
+          for (const id of [dia.servidorId, dia.servidorId2]) {
+            if (!id || !ciclos.has(id)) continue;
+            const dias = diasPorServidor.get(id) ?? new Set<string>();
+            dias.add(data);
+            diasPorServidor.set(id, dias);
+          }
+        }
+      }
+    }
+
     this.servidorCicloResumida.set(ciclos);
+    this.servidorDiasResumida.set(diasPorServidor);
     this.servidorInicioCiclo.set(iniciosCiclo);
     this.ensureRegimeControls();
     this.ensureInicioCicloControls();
@@ -1743,8 +1802,11 @@ export class EscalaForm implements OnInit {
       hasRegimeSelection &&
       (fingerprint !== this.lastAppliedRegimesFingerprint ||
         (current != null && current.tipoFuncionamento !== tipo));
-    const mustRegenerate =
-      this.needsInicioCiclo() || regimesChanged || this.draftDesatualizadoPelaResumida;
+    // Só regera a matriz quando algo que a define mudou nesta sessão: regime/início de ciclo
+    // (o fingerprint inclui os dois) ou o rodízio da resumida. Antes `needsInicioCiclo()` também
+    // disparava — toda escala com plantão era regerada ao reabrir o rascunho, e os ajustes
+    // manuais salvos sumiam (só pareciam ficar depois de "Finalizar").
+    const mustRegenerate = regimesChanged || this.draftDesatualizadoPelaResumida;
     this.draftDesatualizadoPelaResumida = false;
 
     if (this.isEditMode() && current) {
@@ -1906,6 +1968,10 @@ export class EscalaForm implements OnInit {
 
   private buildOcorrenciasForServidor(servidorId: string, days: string[]): EscalaOcorrencia[] {
     const ciclo = this.servidorCicloResumida().get(servidorId);
+    const diasResumida = this.servidorDiasResumida().get(servidorId);
+    if (ciclo && diasResumida) {
+      return buildOcorrenciasFromDiasResumida(days, diasResumida);
+    }
     if (ciclo) {
       return buildOcorrenciasFromCicloDerivado({
         days,
@@ -2068,6 +2134,79 @@ export class EscalaForm implements OnInit {
         // antes de fechar.
         this.loadStep3Data();
       });
+  }
+
+  /** Corrige um afastamento lançado errado sem sair do assistente: os dias do período antigo
+   * voltam ao regime do servidor e o novo período é aplicado na matriz. */
+  editarAfastamento(afastamento: AfastamentoItem): void {
+    const e = this.escala();
+    if (!e) return;
+    const data: AfastamentoDialogData = {
+      servidorOptions: this.formServidorOptions(),
+      dataInicioPadrao: e.dataInicio.slice(0, 10),
+      dataFimPadrao: e.dataFim.slice(0, 10),
+      afastamento,
+    };
+    this.dialog
+      .open(AfastamentoDialog, { data, width: '640px', maxWidth: '95vw', panelClass: 'pci-app-dialog-panel' })
+      .afterClosed()
+      .subscribe((atualizado: AfastamentoItem | false | undefined) => {
+        if (!atualizado) return;
+        this.afastamentos.set(this.afastamentos().map((a) => (a.id === atualizado.id ? atualizado : a)));
+        this.restaurarDiasDoAfastamento(afastamento);
+        this.applyAfastamentosToDraft([atualizado]);
+        this.loadStep3Data();
+      });
+  }
+
+  /** Exclui um afastamento lançado errado; os dias dele na matriz voltam ao regime do servidor. */
+  excluirAfastamento(afastamento: AfastamentoItem): void {
+    openConfirmDialog(this.dialog, {
+      title: 'Excluir afastamento',
+      message: `Excluir o afastamento de ${afastamento.servidorNome} (${this.fmt(afastamento.dataInicio)} a ${this.fmt(afastamento.dataFim)})? Os dias voltam ao regime do servidor nesta escala.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    })
+      .pipe(filter(Boolean))
+      .subscribe(() => {
+        this.afastamentosApi.delete(afastamento.id).subscribe({
+          next: () => {
+            this.afastamentos.set(this.afastamentos().filter((a) => a.id !== afastamento.id));
+            this.restaurarDiasDoAfastamento(afastamento);
+            this.feedback.showSuccess('Afastamento excluído com sucesso.');
+          },
+          error: (err: unknown) => this.fail(httpErrorMessage(err, 'Não foi possível excluir o afastamento.')),
+        });
+      });
+  }
+
+  /** Dias do afastamento na matriz que ainda estão com o código dele voltam ao que o regime do
+   * servidor gera para aquele dia (ou ficam em branco, sem regime). */
+  private restaurarDiasDoAfastamento(afastamento: AfastamentoItem): void {
+    const e = this.escala();
+    if (!e) return;
+    const inicio = afastamento.dataInicio.slice(0, 10);
+    const fim = afastamento.dataFim.slice(0, 10);
+    const days = daysInRange(e.dataInicio, e.dataFim);
+    let changed = false;
+    const servidores = e.servidores.map((s) => {
+      if (s.servidorId !== afastamento.servidorId) return s;
+      const doRegime = new Map(
+        this.buildOcorrenciasForServidor(s.servidorId, days).map((o) => [o.data.slice(0, 10), o]),
+      );
+      const ocorrencias = s.ocorrencias.map((o) => {
+        const day = o.data.slice(0, 10);
+        if (day < inicio || day > fim || o.tipoOcorrenciaCodigo !== afastamento.tipoOcorrenciaCodigo) return o;
+        changed = true;
+        return doRegime.get(day) ?? this.emptyOc(day);
+      });
+      return { ...s, ocorrencias };
+    });
+    if (changed) {
+      this.escala.set({ ...e, servidores });
+      this.recalcCargas();
+      this.markDirty();
+    }
   }
 
   isHomeOfficeDay(servidorId: string, day: number): boolean {

@@ -40,7 +40,7 @@
       </div>
     }
 
-    @if (e.setores.length > 0) {
+    @if (setoresVisiveis().length > 0) {
       <pci-card>
         <pci-card-content>
           <h3>Equipes e rodízios</h3>
@@ -48,7 +48,7 @@
           <div class="pci-form-group">
             <div [appFormCol]="12">
               <pci-tabs [selectedIndex]="clampedSetorTabIndex()" (selectedIndexChange)="onSetorTabChange($event)">
-                @for (setor of e.setores; track setor.id) {
+                @for (setor of setoresVisiveis(); track setor.id) {
                   <pci-tab [label]="setorGrupoLabel(setor)"></pci-tab>
                 }
               </pci-tabs>
@@ -184,7 +184,7 @@
       <div class="pci-form-group">
         <div [appFormCol]="12">
           <app-escala-resumida-grid
-            [escala]="e"
+            [escala]="escalaVisivel() ?? e"
             [editable]="isRascunhoOuFinalizada()"
             [elegiveis]="elegiveisPermitidos()"
             (cellSave)="onCellSave($event)"

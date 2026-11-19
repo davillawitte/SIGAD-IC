@@ -27,6 +27,13 @@
       />
 
       <pci-input label="Data início" type="date" formControlName="dataInicio" [required]="true" />
+      <pci-input
+        label="Quantidade de dias"
+        type="number"
+        formControlName="quantidadeDias"
+        placeholder="Ex.: 15"
+        hint="Calcula a data fim"
+      />
       <pci-input label="Data fim" type="date" formControlName="dataFim" [required]="true" />
 
       <pci-select

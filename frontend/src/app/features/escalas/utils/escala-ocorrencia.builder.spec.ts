@@ -4,6 +4,7 @@ import type { PadraoEscala } from '../models/escalas.models';
 import {
   buildOcorrenciasForServidor,
   buildOcorrenciasFromCicloDerivado,
+  buildOcorrenciasFromDiasResumida,
   normalizeDay,
   posicaoNaData,
   primeiraDataParaPosicao,
@@ -306,5 +307,30 @@ describe('buildOcorrenciasFromCicloDerivado', () => {
 
     expect(result.map((o) => o.tipoOcorrenciaCodigo)).toEqual(['PT', 'D', 'D', 'D']);
     expect(result[0].horas).toBe(24);
+  });
+});
+
+describe('buildOcorrenciasFromDiasResumida', () => {
+  // Setembro/2026, 1 plantão a cada 4 dias a partir do dia 1: 8 plantões (192h) pelo ciclo.
+  const dias = Array.from({ length: 30 }, (_, i) => `2026-09-${String(i + 1).padStart(2, '0')}`);
+  const pelaRegra = dias.filter((_, i) => i % 4 === 0);
+
+  it('segue os dias da grade da resumida, não o ciclo: plantão retirado vira descanso', () => {
+    // Na resumida o chefe tirou o plantão do dia 29 (e abriu DO): ficam 7 plantões.
+    const naResumida = new Set(pelaRegra.filter((d) => d !== '2026-09-29'));
+
+    const result = buildOcorrenciasFromDiasResumida(dias, naResumida);
+
+    const plantoes = result.filter((o) => o.tipoOcorrenciaCodigo === 'PT');
+    expect(plantoes).toHaveLength(7);
+    expect(plantoes.reduce((acc, o) => acc + (o.horas ?? 0), 0)).toBe(168);
+    expect(result.find((o) => o.data === '2026-09-29')?.tipoOcorrenciaCodigo).toBe('D');
+  });
+
+  it('dia em que o servidor entrou na grade como troca vira plantão', () => {
+    const result = buildOcorrenciasFromDiasResumida(dias, new Set(['2026-09-02']));
+
+    expect(result.find((o) => o.data === '2026-09-02')?.tipoOcorrenciaCodigo).toBe('PT');
+    expect(result.filter((o) => o.tipoOcorrenciaCodigo === 'PT')).toHaveLength(1);
   });
 });

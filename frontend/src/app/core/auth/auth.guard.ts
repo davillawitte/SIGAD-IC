@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { PciToastService } from '@davillawitte/pci-design-system';
 import { catchError, map, of } from 'rxjs';
 
 import { AuthService } from './auth.service';
@@ -94,6 +95,17 @@ export const superAdminGuard: CanActivateFn = () => {
   return router.createUrlTree(['/']);
 };
 
+/** Barrado por falta de permissão: avisa e volta ao início. Antes voltava calado e a tela
+ * parecia "não abrir" (ex.: item do menu visível sem a permissão da rota). */
+function semPermissao(router: Router, auth: AuthService) {
+  if (auth.isAuthenticated()) {
+    inject(PciToastService).showError(
+      'Você não tem permissão para acessar esta tela. Fale com o administrador do sistema.',
+    );
+  }
+  return router.createUrlTree(['/']);
+}
+
 export const permissionGuard = (code: string): CanActivateFn => {
   return () => {
     const auth = inject(AuthService);
@@ -103,7 +115,7 @@ export const permissionGuard = (code: string): CanActivateFn => {
       return true;
     }
 
-    return router.createUrlTree(['/']);
+    return semPermissao(router, auth);
   };
 };
 
@@ -117,7 +129,7 @@ export const visaoGlobalGuard = (modulo: string): CanActivateFn => {
       return true;
     }
 
-    return router.createUrlTree(['/']);
+    return semPermissao(router, auth);
   };
 };
 
@@ -130,6 +142,6 @@ export const anyPermissionGuard = (...codes: string[]): CanActivateFn => {
       return true;
     }
 
-    return router.createUrlTree(['/']);
+    return semPermissao(router, auth);
   };
 };

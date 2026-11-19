@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -15,6 +15,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import type { ServidorListItem } from '../../../admin/models/admin.models';
 import { AdminApiService } from '../../../admin/services/admin-api.service';
 import { AppFormColDirective, AppFormSectionComponent } from '../../../../shared/form-layout';
+import { ligarPeriodoPorDias } from '../../../../shared/periodo-dias';
 import { AFASTAMENTOS_ROUTE_PAGES } from '../../afastamentos.routes.meta';
 import { AfastamentosApiService } from '../../services/afastamentos-api.service';
 
@@ -32,7 +33,7 @@ import { AfastamentosApiService } from '../../services/afastamentos-api.service'
   ],
   templateUrl: './afastamento-form.html',
 })
-export class AfastamentoForm implements OnInit {
+export class AfastamentoForm implements OnInit, OnDestroy {
   private readonly api = inject(AfastamentosApiService);
   private readonly adminApi = inject(AdminApiService);
   private readonly auth = inject(AuthService);
@@ -79,14 +80,23 @@ export class AfastamentoForm implements OnInit {
     servidorId: ['', Validators.required],
     dataInicio: ['', Validators.required],
     dataFim: ['', Validators.required],
+    /** Só para calcular a data fim (início + dias − 1); não é enviado à API. */
+    quantidadeDias: [''],
     tipoOcorrenciaCodigo: ['FR', Validators.required],
     sei: ['', Validators.required],
     observacao: [''],
   });
 
   private editId: string | null = null;
+  private desligarPeriodo?: () => void;
+
+  ngOnDestroy(): void {
+    this.desligarPeriodo?.();
+  }
 
   ngOnInit(): void {
+    const c = this.form.controls;
+    this.desligarPeriodo = ligarPeriodoPorDias(c.dataInicio, c.quantidadeDias, c.dataFim);
     this.editId = this.route.snapshot.paramMap.get('id');
     this.isEdit.set(!!this.editId);
     this.isInstitucional.set(this.route.snapshot.data['escopo'] === 'institucional');
