@@ -215,16 +215,6 @@ ainda não oferece suporte — pra portar pro pacote quando ele ganhar o recurso
   `aria-selected`, destaque da linha selecionada, `max-height` com rolagem e um slot para conteúdo
   extra por item (ex.: código à direita).
 
-## Toggle (interruptor sim/não) sem componente na lib
-
-- **Por quê**: o design system não tem toggle/switch; para escolhas sim/não só existe `pci-checkbox`.
-- **Onde foi usado**: `frontend/src/app/features/admin/components/export-servidores-dialog/` — "Separar
-  por setor" no modal de exportar servidores, com `mat-slide-toggle` (Angular Material) recolorido
-  com `--pci-color-primary` via variáveis `--mdc-switch-*`/`--mat-slide-toggle-*` no SCSS do modal.
-- **Spec pra portar**: `pci-toggle` (CVA, `label`, `checked`, `disabled`, saída `changed: boolean`),
-  trilho na cor primária quando ligado, sem ícone no polegar, rótulo à direita, acessível como
-  `role="switch"` com `aria-checked`.
-
 ## Como usar este documento
 
 Sempre que algo for implementado localmente por falta de suporte no design system, registrar

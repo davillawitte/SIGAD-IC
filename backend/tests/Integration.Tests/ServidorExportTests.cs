@@ -65,7 +65,7 @@ public class ServidorExportTests(PostgresFixture fixture) : IntegrationTestBase(
 
         grupos.Select(g => g.Lotacao).ShouldBe([
             "BAL — Setor de Balística",
-            "NPE — Núcleo de Perícias Externas (núcleo)",
+            "NPE — Núcleo de Perícias Externas",
             "SCCV — Setor de Crimes Contra a Vida",
         ]);
         grupos.Single(g => g.Lotacao!.StartsWith("SCCV")).Linhas.Select(x => x.Nome)

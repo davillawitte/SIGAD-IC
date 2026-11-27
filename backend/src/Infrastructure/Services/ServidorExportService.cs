@@ -23,6 +23,8 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
     private const string OrgaoSubtitulo =
         "SIGAD IC - Sistema de Gestão Administrativa do Instituto de Criminalística";
 
+    private const string Titulo = "SERVIDORES LOTADOS NO INSTITUTO DE CRIMINALÍSTICA";
+
     /// <summary>Ordem alfabética que ignora maiúsculas e acentos ("Á" junto do "A"). Não usa
     /// <c>CultureInfo("pt-BR")</c>: a API roda com <c>InvariantGlobalization</c> (sem dados de
     /// idioma no container) e criar a cultura lança exceção — derrubava o controller inteiro de
@@ -47,7 +49,6 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
             return Result<(byte[], string, string)>.Failure("Formato inválido. Use PDF ou Excel.");
         }
 
-        var filtrada = request.ServidorIds is { Count: > 0 };
         var linhas = await CarregarLinhasAsync(request.ServidorIds, cancellationToken);
         if (linhas.Count == 0)
         {
@@ -57,9 +58,7 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
         var grupos = request.AgruparPorSetor
             ? Agrupar(linhas)
             : [(Lotacao: (string?)null, Linhas: linhas)];
-        var descricao = $"{(filtrada ? "Listagem filtrada" : "Todos os servidores")} — {linhas.Count} "
-            + (linhas.Count == 1 ? "servidor" : "servidores")
-            + (request.AgruparPorSetor ? " — separados por setor" : string.Empty);
+        var descricao = $"Total: {linhas.Count} " + (linhas.Count == 1 ? "servidor" : "servidores");
         var hoje = DateTime.UtcNow.AddHours(-3);
 
         return formato == "pdf"
@@ -100,7 +99,7 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
                 s.Setor is not null
                     ? $"{s.Setor.Sigla} — {s.Setor.Nome}"
                     : s.Nucleo is not null
-                        ? $"{s.Nucleo.Sigla} — {s.Nucleo.Nome} (núcleo)"
+                        ? $"{s.Nucleo.Sigla} — {s.Nucleo.Nome}"
                         : SemLotacao,
                 s.Email ?? string.Empty,
                 s.Status.ToString()))
@@ -164,7 +163,7 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
                         }
                     });
 
-                    col.Item().PaddingTop(4).Text("SERVIDORES").Bold().FontSize(12);
+                    col.Item().PaddingTop(4).Text(Titulo).Bold().FontSize(12);
                     col.Item().Text($"{descricao}  |  Gerado em {geradoEm:dd/MM/yyyy HH:mm}");
                     col.Item().PaddingTop(6);
                 });
@@ -237,7 +236,7 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
         var ws = workbook.Worksheets.Add("Servidores");
         var cabecalho = Cabecalho(!agrupado).ToList();
 
-        ws.Cell(1, 1).Value = "Servidores";
+        ws.Cell(1, 1).Value = Titulo;
         ws.Cell(1, 1).Style.Font.Bold = true;
         ws.Cell(1, 1).Style.Font.FontSize = 14;
         ws.Cell(2, 1).Value = $"{descricao}  |  Gerado em {geradoEm:dd/MM/yyyy HH:mm}";

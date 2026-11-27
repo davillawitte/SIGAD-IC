@@ -2,13 +2,13 @@
   <app-dialog-header icon="download" title="Exportar Listagem de Servidores" (closed)="cancel()" />
   <p class="export-servidores-dialog__subtitulo">Selecione as opções abaixo para gerar o arquivo.</p>
 
+  <!-- Sem componente de radio no design system ainda: <input type="radio"> nativo, mesmo
+       padrão do diálogo de exportar escala (shared/dialogs/export-escala-dialog). -->
   <div class="export-servidores-dialog__card">
-    <!-- Sem componente de radio no design system ainda: <input type="radio"> nativo, mesmo
-         padrão do diálogo de exportar escala (shared/dialogs/export-escala-dialog). -->
-    <section class="export-servidores-dialog__secao">
-      <pci-icon name="users" size="lg" class="export-servidores-dialog__icone" />
-      <fieldset class="export-servidores-dialog__grupo">
-        <legend>Quais servidores?</legend>
+    <div class="export-servidores-dialog__secao">
+      <span class="export-servidores-dialog__icone"><pci-icon name="users" size="md" /></span>
+      <div class="export-servidores-dialog__conteudo" role="radiogroup" aria-labelledby="exp-serv-quais">
+        <h3 id="exp-serv-quais" class="export-servidores-dialog__titulo">Quais servidores?</h3>
         <label class="export-servidores-dialog__option">
           <input
             type="radio"
@@ -18,7 +18,7 @@
           />
           <span>
             Listagem atual — {{ data.totalListagem }} {{ data.totalListagem === 1 ? 'servidor' : 'servidores' }}
-            <span class="export-servidores-dialog__hint">(com os filtros e a busca aplicados)</span>
+            <small class="export-servidores-dialog__hint">(com os filtros e a busca aplicados)</small>
           </span>
         </label>
         <label class="export-servidores-dialog__option">
@@ -30,30 +30,38 @@
           />
           <span>Todos os servidores</span>
         </label>
-      </fieldset>
-    </section>
+      </div>
+    </div>
 
-    <section class="export-servidores-dialog__secao">
-      <pci-icon name="layers" size="lg" class="export-servidores-dialog__icone" />
-      <fieldset class="export-servidores-dialog__grupo">
-        <legend>Organização</legend>
-        <!-- Toggle do Angular Material: o design system ainda não tem um (ver
-             docs/design-system-pendencias.md). -->
-        <mat-slide-toggle
-          class="export-servidores-dialog__toggle"
-          hideIcon
-          [checked]="agruparPorSetor()"
-          (change)="agruparPorSetor.set($event.checked)"
-        >
-          Separar por setor
-        </mat-slide-toggle>
-      </fieldset>
-    </section>
+    <div class="export-servidores-dialog__secao">
+      <span class="export-servidores-dialog__icone"><pci-icon name="layers" size="md" /></span>
+      <div class="export-servidores-dialog__conteudo" role="radiogroup" aria-labelledby="exp-serv-org">
+        <h3 id="exp-serv-org" class="export-servidores-dialog__titulo">Organização</h3>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-organizacao"
+            [checked]="!agruparPorSetor()"
+            (change)="agruparPorSetor.set(false)"
+          />
+          <span>Lista única</span>
+        </label>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-organizacao"
+            [checked]="agruparPorSetor()"
+            (change)="agruparPorSetor.set(true)"
+          />
+          <span>Separar por setor</span>
+        </label>
+      </div>
+    </div>
 
-    <section class="export-servidores-dialog__secao">
-      <pci-icon name="file" size="lg" class="export-servidores-dialog__icone" />
-      <fieldset class="export-servidores-dialog__grupo">
-        <legend>Formato</legend>
+    <div class="export-servidores-dialog__secao">
+      <span class="export-servidores-dialog__icone"><pci-icon name="file" size="md" /></span>
+      <div class="export-servidores-dialog__conteudo" role="radiogroup" aria-labelledby="exp-serv-formato">
+        <h3 id="exp-serv-formato" class="export-servidores-dialog__titulo">Formato</h3>
         <label class="export-servidores-dialog__option">
           <input
             type="radio"
@@ -72,8 +80,8 @@
           />
           <span>Excel</span>
         </label>
-      </fieldset>
-    </section>
+      </div>
+    </div>
   </div>
 
   <div class="export-servidores-dialog__acoes">
