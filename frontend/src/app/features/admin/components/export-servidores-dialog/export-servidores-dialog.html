@@ -1,0 +1,70 @@
+<div class="pci-app-dialog">
+  <app-dialog-header icon="download" title="Exportar servidores" (closed)="cancel()" />
+  <pci-form-card>
+    <pci-stack gap="4" direction="vertical">
+      <!-- Sem componente de radio no design system ainda: <input type="radio"> nativo, mesmo
+           padrão do diálogo de exportar escala (shared/dialogs/export-escala-dialog). -->
+      <fieldset class="export-servidores-dialog__grupo">
+        <legend>Quais servidores</legend>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-abrangencia"
+            [checked]="abrangencia() === 'listagem'"
+            (change)="abrangencia.set('listagem')"
+          />
+          Listagem atual — {{ data.totalListagem }} {{ data.totalListagem === 1 ? 'servidor' : 'servidores' }}
+          <span class="export-servidores-dialog__hint">(com os filtros e a busca aplicados)</span>
+        </label>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-abrangencia"
+            [checked]="abrangencia() === 'todos'"
+            (change)="abrangencia.set('todos')"
+          />
+          Todos os servidores — {{ data.totalGeral }}
+        </label>
+      </fieldset>
+
+      <fieldset class="export-servidores-dialog__grupo">
+        <legend>Organização</legend>
+        <pci-checkbox
+          label="Separar por setor"
+          [checked]="agruparPorSetor()"
+          (changed)="agruparPorSetor.set($event)"
+        />
+        <p class="export-servidores-dialog__hint">Sempre em ordem alfabética.</p>
+      </fieldset>
+
+      <fieldset class="export-servidores-dialog__grupo">
+        <legend>Formato</legend>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-formato"
+            [checked]="formato() === 'pdf'"
+            (change)="formato.set('pdf')"
+          />
+          PDF
+        </label>
+        <label class="export-servidores-dialog__option">
+          <input
+            type="radio"
+            name="export-servidores-formato"
+            [checked]="formato() === 'excel'"
+            (change)="formato.set('excel')"
+          />
+          Excel
+        </label>
+      </fieldset>
+    </pci-stack>
+  </pci-form-card>
+  <pci-form-actions>
+    <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+    <pci-button variant="primary" (clicked)="confirm()">
+      <pci-icon slot="icon-left" name="download" size="sm" />
+      Exportar
+    </pci-button>
+  </pci-form-actions>
+</div>

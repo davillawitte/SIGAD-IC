@@ -1,9 +1,46 @@
-:host ::ng-deep .pci-filter-panel__grid {
-  grid-template-columns: 2fr 1fr 1.1fr 0.9fr; /* nome | matrícula | cargo | status */
+:host ::ng-deep .pci-filter-panel__grid {
+  grid-template-columns: 2fr 1fr 1.1fr 0.9fr; /* nome | matrícula | cargo | status */
+}
+
+@media (max-width: 960px) {
+  :host ::ng-deep .pci-filter-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Ações no canto do cabeçalho — mesmo arranjo da tela de Escalas (escala-list.scss).
+.servidores-list {
+  position: relative;
 }
 
-@media (max-width: 960px) {
-  :host ::ng-deep .pci-filter-panel__grid {
-    grid-template-columns: 1fr;
+.servidores-list__actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--pci-space-2, 0.5rem);
+}
+
+:host ::ng-deep .servidores-list .pci-page-header__text {
+  padding-right: 4rem;
+}
+
+:host ::ng-deep .servidores-list--com-criar .pci-page-header__text {
+  padding-right: 15rem;
+}
+
+@media (max-width: 768px) {
+  .servidores-list__actions {
+    position: static;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: var(--pci-space-3, 0.75rem);
+  }
+
+  :host ::ng-deep .servidores-list .pci-page-header__text,
+  :host ::ng-deep .servidores-list--com-criar .pci-page-header__text {
+    padding-right: 0;
   }
 }

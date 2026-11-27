@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IEscalaLoteExportService, EscalaLoteExportService>();
         services.AddScoped<IAfastamentoService, AfastamentoService>();
         services.AddScoped<IPermutaService, PermutaService>();
+        services.AddScoped<IServidorExportService, ServidorExportService>();
         services.AddScoped<ICalendarioService, CalendarioService>();
 
         return services;

@@ -11,8 +11,24 @@ namespace TemplateSistema.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/servidores")]
-public class ServidoresController(IServidorService servidorService) : ControllerBase
+public class ServidoresController(
+    IServidorService servidorService,
+    IServidorExportService servidorExportService) : ControllerBase
 {
+    /// <summary>Exporta a listagem (atual, com filtros, ou todos) em PDF ou Excel — sempre em
+    /// ordem alfabética, opcionalmente separada por setor.</summary>
+    [HttpPost("exportar")]
+    [RequiresPermission(PermissionCodes.ServidoresListar)]
+    public async Task<IActionResult> Exportar(
+        [FromBody] ExportarServidoresRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await servidorExportService.GerarAsync(request, cancellationToken);
+        return result.Succeeded
+            ? File(result.Value.Content, result.Value.ContentType, result.Value.FileName)
+            : BadRequest(new { message = result.Error });
+    }
+
     [HttpGet]
     [RequiresPermission(PermissionCodes.ServidoresListar)]
     public async Task<IActionResult> List([FromQuery] bool? semUsuario, CancellationToken cancellationToken) =>

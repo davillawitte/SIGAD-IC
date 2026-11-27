@@ -147,6 +147,15 @@ export class AdminApiService {
     return this.http.get<ServidorExclusaoImpacto>(`${this.base}/api/servidores/${id}/exclusao-impacto`);
   }
 
+  /** PDF ou Excel da listagem de servidores (ordem alfabética). Sem `servidorIds` = todos. */
+  exportarServidores(payload: {
+    formato: 'pdf' | 'excel';
+    agruparPorSetor: boolean;
+    servidorIds?: string[] | null;
+  }): Observable<Blob> {
+    return this.http.post(`${this.base}/api/servidores/exportar`, payload, { responseType: 'blob' });
+  }
+
   deleteServidor(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/servidores/${id}`);
   }

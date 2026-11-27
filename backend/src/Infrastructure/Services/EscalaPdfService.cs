@@ -154,25 +154,7 @@ public class EscalaPdfService(
             _ => $"Chefe do {unidadeLabel}",
         };
 
-    private byte[]? LoadImageBytes(string fileName)
-    {
-        var candidates = new[]
-        {
-            Path.Combine(env.ContentRootPath, "wwwroot", "assets", "images", fileName),
-            Path.Combine(AppContext.BaseDirectory, "wwwroot", "assets", "images", fileName),
-            Path.Combine(AppContext.BaseDirectory, "assets", "images", fileName),
-        };
-
-        foreach (var path in candidates)
-        {
-            if (File.Exists(path))
-            {
-                return File.ReadAllBytes(path);
-            }
-        }
-
-        return null;
-    }
+    private byte[]? LoadImageBytes(string fileName) => PdfAssets.LoadImage(env, fileName);
 
     private static void ComposeHeader(
         ColumnDescriptor col,

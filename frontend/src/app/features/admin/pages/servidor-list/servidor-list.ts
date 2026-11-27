@@ -4,14 +4,18 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import {
   PciAlertComponent,
+  PciButtonComponent,
   PciColumn,
   PciFeedbackModalService,
   PciFilterField,
   PciFilterValues,
+  PciIconButtonComponent,
   PciListPageComponent,
   PciRowAction,
   PciSortChange,
   PciToastService,
+  PciTooltipChildDirective,
+  PciTooltipComponent,
   filterRowsByPanelValues,
   filterTableRowsByQuickSearch,
   sortTableRows,
@@ -24,6 +28,10 @@ import {
   ServidorDetailDialog,
   type ServidorDetailDialogData,
 } from '../../components/servidor-detail-dialog/servidor-detail-dialog';
+import {
+  ExportServidoresDialog,
+  type ExportServidoresResultado,
+} from '../../components/export-servidores-dialog/export-servidores-dialog';
 import { maskMatricula } from '../../../../shared/input-masks';
 import { ADMIN_ROUTE_PAGES } from '../../admin-route-pages';
 import { AdminApiService } from '../../services/admin-api.service';
@@ -48,7 +56,16 @@ type ServidorRow = {
 
 @Component({
   selector: 'app-servidor-list',
-  imports: [CommonModule, MatDialogModule, PciAlertComponent, PciListPageComponent],
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    PciAlertComponent,
+    PciButtonComponent,
+    PciIconButtonComponent,
+    PciListPageComponent,
+    PciTooltipChildDirective,
+    PciTooltipComponent,
+  ],
   templateUrl: './servidor-list.html',
   styleUrl: './servidor-list.scss',
 })
@@ -64,6 +81,7 @@ export class ServidorList implements OnInit {
   readonly page = signal(1);
   readonly pageSize = signal<PageSizeOption>(DEFAULT_PAGE_SIZE);
   readonly loading = signal(false);
+  readonly exportando = signal(false);
   readonly error = signal<string | null>(null);
   readonly allRows = signal<ServidorRow[]>([]);
   readonly cargoOptions = signal<{ label: string; value: string }[]>([]);
@@ -188,6 +206,52 @@ export class ServidorList implements OnInit {
       error: () => this.setorFilterOptions.set([]),
     });
     this.reload();
+  }
+
+  /** Pergunta quais servidores (listagem atual, com filtros e busca, ou todos), se separa por
+   * setor e o formato; o arquivo sai sempre em ordem alfabética. */
+  exportar(): void {
+    const listagem = this.filteredRows();
+    this.dialog
+      .open(ExportServidoresDialog, {
+        data: { totalListagem: listagem.length, totalGeral: this.allRows().length },
+        width: '520px',
+        maxWidth: '95vw',
+        panelClass: 'pci-app-dialog-panel',
+      })
+      .afterClosed()
+      .subscribe((escolha: ExportServidoresResultado | null | undefined) => {
+        if (!escolha) return;
+        if (escolha.abrangencia === 'listagem' && listagem.length === 0) {
+          this.toast.showError('A listagem atual está vazia — ajuste os filtros ou exporte todos.');
+          return;
+        }
+        this.exportando.set(true);
+        this.api
+          .exportarServidores({
+            formato: escolha.formato,
+            agruparPorSetor: escolha.agruparPorSetor,
+            servidorIds: escolha.abrangencia === 'listagem' ? listagem.map((r) => r.id) : null,
+          })
+          .subscribe({
+            next: (blob) => {
+              this.exportando.set(false);
+              const hoje = new Date();
+              const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `Servidores-${data}.${escolha.formato === 'pdf' ? 'pdf' : 'xlsx'}`;
+              a.click();
+              URL.revokeObjectURL(url);
+              this.feedback.showSuccess('Arquivo de servidores gerado com sucesso.');
+            },
+            error: () => {
+              this.exportando.set(false);
+              this.toast.showError('Não foi possível exportar os servidores.');
+            },
+          });
+      });
   }
 
   goCreate(): void {

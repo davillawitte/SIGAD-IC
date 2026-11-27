@@ -81,3 +81,10 @@ public record ServidorExclusaoImpactoDto(
     int NucleosComoChefe,
     bool PodeExcluir,
     int Permutas = 0);
+
+/// <summary><c>Formato</c>: <c>pdf</c> ou <c>excel</c>. <c>ServidorIds</c> = a listagem atual da tela
+/// (com filtros e busca); nulo/vazio = todos os servidores. <c>AgruparPorSetor</c> separa por lotação.</summary>
+public record ExportarServidoresRequest(
+    string Formato,
+    bool AgruparPorSetor,
+    IReadOnlyList<Guid>? ServidorIds = null);

@@ -2,6 +2,28 @@
   <pci-alert variant="error" title="Erro" [message]="error()!" />
 }
 
+<div class="servidores-list" [class.servidores-list--com-criar]="canCreate">
+<!--
+  pci-list-page não projeta ações extras no header (só o botão de criar) — mesmo arranjo da tela de
+  Escalas: ações sobrepostas à área de ações do pci-page-header. Ver docs/design-system-pendencias.md.
+-->
+<div class="servidores-list__actions">
+  <pci-tooltip text="Exportar servidores (PDF ou Excel)" position="bottom">
+    <pci-icon-button
+      pciTooltipChild
+      icon="download"
+      size="md"
+      ariaLabel="Exportar servidores (PDF ou Excel)"
+      [loading]="exportando()"
+      [disabled]="allRows().length === 0"
+      (clicked)="exportar()"
+    />
+  </pci-tooltip>
+  @if (canCreate) {
+    <pci-button variant="primary" icon="plus" (clicked)="goCreate()">Novo servidor</pci-button>
+  }
+</div>
+
 <pci-list-page
   title="Servidores"
   description="Cadastro de servidores lotados nos setores do IC."
@@ -12,14 +34,11 @@
   [filtersExpanded]="filtersExpanded()"
   [columns]="columns"
   [rows]="pagedRows()"
-  [exportDataSource]="filteredRows()"
   [total]="filteredRows().length"
   [page]="page()"
   [pageSize]="pageSize()"
   [loading]="loading()"
-  [showCreateButton]="canCreate"
-  [enableExportPdf]="true"
-  createLabel="Novo servidor"
+  [showCreateButton]="false"
   [rowActions]="rowActions()"
   sortMode="server"
   quickSearchMode="server"
@@ -35,3 +54,4 @@
   (pageSizeChange)="onPageSizeChange($event)"
   (rowAction)="onRowAction($event)"
 />
+</div>
