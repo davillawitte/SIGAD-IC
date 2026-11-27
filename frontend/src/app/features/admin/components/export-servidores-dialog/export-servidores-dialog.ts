@@ -1,20 +1,14 @@
 import { Component, inject, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import {
-  PciButtonComponent,
-  PciCheckboxComponent,
-  PciFormActionsComponent,
-  PciFormCardComponent,
-  PciIconComponent,
-  PciStackComponent,
-} from '@davillawitte/pci-design-system';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { PciButtonComponent, PciIconComponent } from '@davillawitte/pci-design-system';
 
 import { AppDialogHeaderComponent } from '../../../../shared/dialogs/dialog-header/dialog-header';
 
 export interface ExportServidoresDialogData {
   /** Servidores na listagem atual (com filtros e busca aplicados, todas as páginas). */
   totalListagem: number;
-  /** Servidores cadastrados no total. */
+  /** Servidores cadastrados no total (não exibido; usado pela tela de origem). */
   totalGeral: number;
 }
 
@@ -24,18 +18,15 @@ export interface ExportServidoresResultado {
   formato: 'pdf' | 'excel';
 }
 
-/** Exportação da tela Servidores: quais (listagem atual ou todos), separado por setor ou não e
- * o formato. A ordem é sempre alfabética. */
+/** Exportação da tela Servidores: quais (listagem atual ou todos), separado por setor (toggle)
+ * e o formato. O arquivo sai sempre em ordem alfabética. */
 @Component({
   selector: 'app-export-servidores-dialog',
   imports: [
     MatDialogModule,
+    MatSlideToggleModule,
     PciButtonComponent,
-    PciCheckboxComponent,
-    PciFormActionsComponent,
-    PciFormCardComponent,
     PciIconComponent,
-    PciStackComponent,
     AppDialogHeaderComponent,
   ],
   templateUrl: './export-servidores-dialog.html',

@@ -1,11 +1,14 @@
 <div class="pci-app-dialog">
-  <app-dialog-header icon="download" title="Exportar servidores" (closed)="cancel()" />
-  <pci-form-card>
-    <pci-stack gap="4" direction="vertical">
-      <!-- Sem componente de radio no design system ainda: <input type="radio"> nativo, mesmo
-           padrão do diálogo de exportar escala (shared/dialogs/export-escala-dialog). -->
+  <app-dialog-header icon="download" title="Exportar Listagem de Servidores" (closed)="cancel()" />
+  <p class="export-servidores-dialog__subtitulo">Selecione as opções abaixo para gerar o arquivo.</p>
+
+  <div class="export-servidores-dialog__card">
+    <!-- Sem componente de radio no design system ainda: <input type="radio"> nativo, mesmo
+         padrão do diálogo de exportar escala (shared/dialogs/export-escala-dialog). -->
+    <section class="export-servidores-dialog__secao">
+      <pci-icon name="users" size="lg" class="export-servidores-dialog__icone" />
       <fieldset class="export-servidores-dialog__grupo">
-        <legend>Quais servidores</legend>
+        <legend>Quais servidores?</legend>
         <label class="export-servidores-dialog__option">
           <input
             type="radio"
@@ -13,8 +16,10 @@
             [checked]="abrangencia() === 'listagem'"
             (change)="abrangencia.set('listagem')"
           />
-          Listagem atual — {{ data.totalListagem }} {{ data.totalListagem === 1 ? 'servidor' : 'servidores' }}
-          <span class="export-servidores-dialog__hint">(com os filtros e a busca aplicados)</span>
+          <span>
+            Listagem atual — {{ data.totalListagem }} {{ data.totalListagem === 1 ? 'servidor' : 'servidores' }}
+            <span class="export-servidores-dialog__hint">(com os filtros e a busca aplicados)</span>
+          </span>
         </label>
         <label class="export-servidores-dialog__option">
           <input
@@ -23,20 +28,30 @@
             [checked]="abrangencia() === 'todos'"
             (change)="abrangencia.set('todos')"
           />
-          Todos os servidores — {{ data.totalGeral }}
+          <span>Todos os servidores</span>
         </label>
       </fieldset>
+    </section>
 
+    <section class="export-servidores-dialog__secao">
+      <pci-icon name="layers" size="lg" class="export-servidores-dialog__icone" />
       <fieldset class="export-servidores-dialog__grupo">
         <legend>Organização</legend>
-        <pci-checkbox
-          label="Separar por setor"
+        <!-- Toggle do Angular Material: o design system ainda não tem um (ver
+             docs/design-system-pendencias.md). -->
+        <mat-slide-toggle
+          class="export-servidores-dialog__toggle"
+          hideIcon
           [checked]="agruparPorSetor()"
-          (changed)="agruparPorSetor.set($event)"
-        />
-        <p class="export-servidores-dialog__hint">Sempre em ordem alfabética.</p>
+          (change)="agruparPorSetor.set($event.checked)"
+        >
+          Separar por setor
+        </mat-slide-toggle>
       </fieldset>
+    </section>
 
+    <section class="export-servidores-dialog__secao">
+      <pci-icon name="file" size="lg" class="export-servidores-dialog__icone" />
       <fieldset class="export-servidores-dialog__grupo">
         <legend>Formato</legend>
         <label class="export-servidores-dialog__option">
@@ -46,7 +61,7 @@
             [checked]="formato() === 'pdf'"
             (change)="formato.set('pdf')"
           />
-          PDF
+          <span>PDF</span>
         </label>
         <label class="export-servidores-dialog__option">
           <input
@@ -55,16 +70,17 @@
             [checked]="formato() === 'excel'"
             (change)="formato.set('excel')"
           />
-          Excel
+          <span>Excel</span>
         </label>
       </fieldset>
-    </pci-stack>
-  </pci-form-card>
-  <pci-form-actions>
-    <pci-button variant="ghost" (clicked)="cancel()">Cancelar</pci-button>
+    </section>
+  </div>
+
+  <div class="export-servidores-dialog__acoes">
+    <pci-button variant="secondary" (clicked)="cancel()">Cancelar</pci-button>
     <pci-button variant="primary" (clicked)="confirm()">
       <pci-icon slot="icon-left" name="download" size="sm" />
       Exportar
     </pci-button>
-  </pci-form-actions>
+  </div>
 </div>
