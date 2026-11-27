@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Igual à API em produção (TemplateSistema.Api.csproj): sem dados de idioma. Faz os testes
+         pegarem uso de cultura (ex.: CultureInfo("pt-BR")) que derruba a API no container. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

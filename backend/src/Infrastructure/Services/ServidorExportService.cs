@@ -1,4 +1,3 @@
-using System.Globalization;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
@@ -24,8 +23,11 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
     private const string OrgaoSubtitulo =
         "SIGAD IC - Sistema de Gestão Administrativa do Instituto de Criminalística";
 
-    private static readonly CultureInfo PtBr = new("pt-BR");
-    private static readonly StringComparer Alfabetica = StringComparer.Create(PtBr, ignoreCase: true);
+    /// <summary>Ordem alfabética que ignora maiúsculas e acentos ("Á" junto do "A"). Não usa
+    /// <c>CultureInfo("pt-BR")</c>: a API roda com <c>InvariantGlobalization</c> (sem dados de
+    /// idioma no container) e criar a cultura lança exceção — derrubava o controller inteiro de
+    /// Servidores, inclusive a listagem (500 em GET api/servidores).</summary>
+    public static readonly StringComparer Alfabetica = new ComparadorAlfabetico();
 
     static ServidorExportService()
     {
@@ -333,5 +335,43 @@ public class ServidorExportService(ApplicationDbContext db, IHostEnvironment env
 
         yield return linha.Email;
         yield return linha.Situacao;
+    }
+
+    /// <summary>Compara sem acento e sem diferenciar maiúsculas; empate decide pelo texto original,
+    /// para a ordem ser estável.</summary>
+    private sealed class ComparadorAlfabetico : StringComparer
+    {
+        private const string ComAcento = "ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑáàâãäéèêëíìîïóòôõöúùûüçñ";
+        private const string SemAcento = "AAAAAEEEEIIIIOOOOOUUUUCNaaaaaeeeeiiiiooooouuuucn";
+
+        public static string Chave(string? texto)
+        {
+            if (string.IsNullOrEmpty(texto))
+            {
+                return string.Empty;
+            }
+
+            var chars = texto.ToCharArray();
+            for (var i = 0; i < chars.Length; i++)
+            {
+                var idx = ComAcento.IndexOf(chars[i]);
+                if (idx >= 0)
+                {
+                    chars[i] = SemAcento[idx];
+                }
+            }
+
+            return new string(chars).ToUpperInvariant();
+        }
+
+        public override int Compare(string? x, string? y)
+        {
+            var porChave = string.CompareOrdinal(Chave(x), Chave(y));
+            return porChave != 0 ? porChave : string.CompareOrdinal(x, y);
+        }
+
+        public override bool Equals(string? x, string? y) => Compare(x, y) == 0;
+
+        public override int GetHashCode(string obj) => Chave(obj).GetHashCode(StringComparison.Ordinal);
     }
 }
